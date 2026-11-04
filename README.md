@@ -27,8 +27,11 @@ la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu g
    - **Places** ;
    - **Centre** (Corps) et **Gueule** ;
    - **Touches** : les 24 boutons dans l'ordre Bouton_01 → Bouton_24 ;
-   - les 3 **Audio Players** (clic, claquement, carte).
-4. Si la mâchoire tourne dans le mauvais sens, change **AxeFermeture** (0, 1 ou 2) ou mets un **AngleFermeture** négatif.
+   - **Plaque** (le support du clavier) ;
+   - les 4 **Audio Players** : clic, claquement, carte, et **SonRotation** (son en boucle pendant que la machine tourne).
+4. À chaque tour, **toute la machine pivote** vers le joueur qui joue, avec le son de rotation, coupé à l'arrêt.
+   Si elle ne fait pas face au bon joueur, change **FaceDepart** (par exemple 90, 180 ou -90).
+5. Si la mâchoire tourne dans le mauvais sens, change **AxeFermeture** (0, 1 ou 2) ou mets un **AngleFermeture** négatif.
 
 ## Animation (se pencher et appuyer)
 Prends sur Mixamo une animation « Button Pushing » ou « Reaching », convertis-la pour le squelette Fortnite

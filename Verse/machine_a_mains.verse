@@ -52,6 +52,13 @@ hands_manager := class(creative_device):
     @editable Centre : creative_prop = creative_prop{}
     @editable Gueule : creative_prop = creative_prop{}
     @editable Touches : []creative_prop = array{}
+    @editable Plaque : creative_prop = creative_prop{}
+    # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
+    @editable SonRotation : audio_player_device = audio_player_device{}
+    # Direction (degres, vue du dessus dans UEFN) vers laquelle la gueule regarde au depart. Ajuste si elle
+    # ne fait pas face au bon joueur (ex. 90, 180, -90).
+    @editable FaceDepart : float = 0.0
+    @editable VitesseRotation : float = 140.0    # degres par seconde
     # Sons (Audio Player : lecture automatique NON)
     @editable SonClic : audio_player_device = audio_player_device{}
     @editable SonBoom : audio_player_device = audio_player_device{}
@@ -71,6 +78,9 @@ hands_manager := class(creative_device):
     Choix : event(int) = event(int){}
     var BaseTouches : []transform = array{}
     var BaseGueule : transform = transform{}
+    var BaseCentre : transform = transform{}
+    var BasePlaque : transform = transform{}
+    var LacetMachine : float = 0.0               # rotation actuelle de toute la machine (degres)
     var Enfoncee : []logic = array{}
     var Piegee : []logic = array{}
     var Assis : []player = array{}
@@ -85,6 +95,8 @@ hands_manager := class(creative_device):
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
         set BaseGueule = Gueule.GetTransform()
+        set BaseCentre = Centre.GetTransform()
+        set BasePlaque = Plaque.GetTransform()
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         loop:
@@ -182,7 +194,48 @@ hands_manager := class(creative_device):
             if (not Piegee[K]?, set Piegee[K] = true):
                 set Poses += 1
         for (K -> T : Touches, B := BaseTouches[K]):
-            spawn{ Bouger(T, B, 0.25) }
+            spawn{ Bouger(T, Tournee(B, LacetMachine), 0.25) }
+
+    # une piece de la machine, tournee de Lacet degres autour du centre de la machine
+    Tournee(B : transform, Lacet : float) : transform =
+        R := MakeRotation(vector3{X := 0.0, Y := 0.0, Z := 1.0}, DegreesToRadians(Lacet))
+        C := BaseCentre.Translation
+        transform{Translation := C + R.RotateVector(B.Translation - C), Rotation := B.Rotation.RotateBy(R), Scale := B.Scale}
+
+    # TOUTE la machine pivote vers le joueur J, avec le son de rotation (coupe a l'arret)
+    TournerVers(J : player)<suspends> : void =
+        I := NumeroDe(J) - 1
+        if (Pl := Places[I]):
+            Ici := Pl.GetTransform().Translation
+            C := BaseCentre.Translation
+            Cible := ArcTan(Ici.Y - C.Y, Ici.X - C.X) * 180.0 / PiFloat - FaceDepart
+            var Ecart : float = Cible - LacetMachine
+            loop:
+                if (Ecart <= 180.0):
+                    break
+                set Ecart -= 360.0
+            loop:
+                if (Ecart >= -180.0):
+                    break
+                set Ecart += 360.0
+            if (Abs(Ecart) > 1.0):
+                Duree := Max(0.35, Abs(Ecart) / Max(10.0, VitesseRotation))
+                Pas := if (N := Ceil[Abs(Ecart) / 8.0]) then Max(1, N) else 1
+                Dt := Duree / (Pas * 1.0)
+                Depart := LacetMachine
+                SonRotation.Play()
+                for (K := 1..Pas):
+                    L := Depart + Ecart * (K * 1.0) / (Pas * 1.0)
+                    spawn{ Bouger(Centre, Tournee(BaseCentre, L), Dt) }
+                    spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
+                    spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
+                    for (N2 -> T : Touches, B := BaseTouches[N2]):
+                        Pose := Tournee(B, L)
+                        Bas := if (Enfoncee[N2]?) then Enfoncement else 0.0
+                        spawn{ Bouger(T, transform{Translation := Pose.Translation - vector3{X := 0.0, Y := 0.0, Z := Bas}, Rotation := Pose.Rotation, Scale := Pose.Scale}, Dt) }
+                    Sleep(Dt)
+                set LacetMachine = Depart + Ecart
+                SonRotation.Stop()
 
     Bouger(T : creative_prop, Ou : transform, Duree : float)<suspends> : void =
         T.MoveTo(Ou.Translation, Ou.Rotation, Duree)
@@ -217,6 +270,7 @@ hands_manager := class(creative_device):
     #  renvoie true si le joueur est elimine
     # =========================================================================
     TourDe(J : player)<suspends> : logic =
+        TournerVers(J)
         if (M := Mains[J], M.Length < MainMax, set Mains[J] = M + array{TirerCarte()}):
             SonCarte.Play()
         var Requis : int = 1 + Bloque
@@ -317,7 +371,8 @@ hands_manager := class(creative_device):
             Controle.Play(Anim)
             Sleep(0.6)
         if (set Enfoncee[K] = true) {}
-        if (T := Touches[K], B := BaseTouches[K]):
+        if (T := Touches[K], B0 := BaseTouches[K]):
+            B := Tournee(B0, LacetMachine)
             Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1)
         SonClic.Play()
         Sleep(0.4)
@@ -325,13 +380,15 @@ hands_manager := class(creative_device):
     # piege : la machoire claque, flash rouge pour la victime, puis elle se rouvre et la grille repart a zero
     Croc(J : player)<suspends> : void =
         Axe := if (AxeFermeture = 0) then vector3{X := 1.0, Y := 0.0, Z := 0.0} else if (AxeFermeture = 2) then vector3{X := 0.0, Y := 0.0, Z := 1.0} else vector3{X := 0.0, Y := 1.0, Z := 0.0}
-        Fermee := BaseGueule.Rotation.RotateBy(MakeRotation(Axe, DegreesToRadians(AngleFermeture)))
+        Lacet := MakeRotation(vector3{X := 0.0, Y := 0.0, Z := 1.0}, DegreesToRadians(LacetMachine))
+        PoseG := Tournee(BaseGueule, LacetMachine)
+        Fermee := PoseG.Rotation.RotateBy(MakeRotation(Lacet.RotateVector(Axe), DegreesToRadians(AngleFermeture)))
         SonBoom.Play()
         spawn{ FlashRouge(J) }
-        Gueule.MoveTo(BaseGueule.Translation, Fermee, 0.12)
+        Gueule.MoveTo(PoseG.Translation, Fermee, 0.12)
         Bandeau("P{NumeroDe(J)} LOST A HAND!")
         Sleep(1.6)
-        Gueule.MoveTo(BaseGueule.Translation, BaseGueule.Rotation, 0.8)
+        Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.8)
         Bandeau("")
         NouvelleGrille()
 
