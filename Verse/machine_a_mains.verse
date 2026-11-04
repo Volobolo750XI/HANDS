@@ -11,6 +11,7 @@ using { /Fortnite.com/Animation/PlayAnimation }
 using { /Verse.org/Simulation }
 using { /Verse.org/Random }
 using { /Verse.org/Colors }
+using { /Verse.org/Assets }
 using { /UnrealEngine.com/Temporary/UI }
 using { /UnrealEngine.com/Temporary/SpatialMath }
 
