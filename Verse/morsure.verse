@@ -542,8 +542,19 @@ hands_manager := class(creative_device):
                 LacetAssis := ArcTan(C.Y - Base.Y, C.X - Base.X)
                 Avant := vector3{X := Cos(LacetAssis), Y := Sin(LacetAssis), Z := 0.0}
                 Pose := Base + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
-                if (Perso.TeleportTo[Pose, MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := false, AllowEmotes := false})
+                Rot := MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)
+                # la chaise peut bloquer la teleportation (collision) : on essaie plus haut, puis sa Place
+                var Arrive : logic = false
+                var Exact : logic = false
+                if (Perso.TeleportTo[Pose, Rot]):
+                    set Arrive = true
+                    set Exact = true
+                if (not Arrive?, Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := 60.0}, Rot]):
+                    set Arrive = true
+                if (not Arrive?, Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, Rot]):
+                    set Arrive = true
+                # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
+                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
                 spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
                 if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
