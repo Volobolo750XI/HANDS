@@ -405,11 +405,11 @@ hands_manager := class(creative_device):
     Peindre(K : int) : void =
         if (T := Touches[K]):
             if (K = BoutonBlanc):
-                T.SetMaterial(Teintes.T_Clair, ?Index := IndexMateriau)
+                T.SetMaterial(Teintes.T_Clair{}, ?Index := IndexMateriau)
             else if (K = BoutonVert):
-                T.SetMaterial(Teintes.T_Sur, ?Index := IndexMateriau)
+                T.SetMaterial(Teintes.T_Sur{}, ?Index := IndexMateriau)
             else:
-                T.SetMaterial(Teintes.T_Base, ?Index := IndexMateriau)
+                T.SetMaterial(Teintes.T_Base{}, ?Index := IndexMateriau)
 
     # le bouton vise devient blanc (-1 = aucun) ; l'ancien reprend sa couleur
     Surligner(K : int) : void =

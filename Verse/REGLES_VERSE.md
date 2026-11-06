@@ -15,3 +15,4 @@
 - AVANT CHAQUE ENVOI : lancer python3 Outils/verifier_verse.py
 - JAMAIS 'not' devant une action qui peut echouer (TeleportTo[...], set...) : Verse annule ses effets. Faire : X := if (Action[]) then true else false ; puis if (not X?).
 - 3512 : jamais de fonction <suspends> (Await, Sleep...) DANS option{...} : faire X := Ev.Await() puis option{X}.
+- 3509 : un MATERIAU s'utilise avec {} : T.SetMaterial(Dossier.Mon_Materiau{}) (c'est un type, pas une valeur). Les textures, elles, s'utilisent sans {}.
