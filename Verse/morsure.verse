@@ -427,6 +427,7 @@ hands_manager := class(creative_device):
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
+        EnleverCameras()
         loop:
             Presents := GetPlayspace().GetPlayers()
             Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
@@ -436,6 +437,25 @@ hands_manager := class(creative_device):
             else:
                 Bandeau("WAITING FOR PLAYERS {Presents.Length}/{Requis}")
                 Sleep(1.0)
+
+    # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
+    CameraDe(J : player) : ?gameplay_camera_fixed_point_device =
+        var Meilleure : ?gameplay_camera_fixed_point_device = false
+        if (Pl := Places[NumeroDe(J) - 1]):
+            Ici := Pl.GetTransform().Translation
+            var PlusPres : float = 100000000.0
+            for (Cam : CamerasClavier):
+                V := Cam.GetTransform().Translation - Ici
+                D := DotProduct(V, V)
+                if (D < PlusPres):
+                    set PlusPres = D
+                    set Meilleure = option{Cam}
+        Meilleure
+
+    # aucune camera fixe sur personne (au demarrage et a chaque manche) : on ne la voit que pendant son tour
+    EnleverCameras() : void =
+        for (Cam : CamerasClavier, J : GetPlayspace().GetPlayers()):
+            Cam.RemoveFrom(J)
 
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
@@ -450,6 +470,7 @@ hands_manager := class(creative_device):
                 set Liste += array{J}
         set Assis = Liste
         set Vivants = Liste
+        EnleverCameras()
         set Paquets = map{}
         set Penalites = map{}
         set DefiEnCours = false
@@ -780,7 +801,7 @@ hands_manager := class(creative_device):
 
         # --- 2. LA MACHINE : il vise un bouton (il devient blanc) et clique, Requis fois
         if (not Passe?):
-            if (Camera := CamerasClavier[NumeroDe(J) - 1]):
+            if (Camera := CameraDe(J)?):
                 Camera.AddTo(J)
             Fin := GetSimulationElapsedTime() + DureeTour
             loop:
@@ -804,7 +825,7 @@ hands_manager := class(creative_device):
                             set Elimine = true
                     else:
                         set Requis -= 1
-            if (Camera := CamerasClavier[NumeroDe(J) - 1]):
+            if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
         Surligner(-1)
         Verdir(-1)
@@ -813,7 +834,7 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
-        if (Camera := CamerasClavier[NumeroDe(J) - 1]):
+        if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
         var Choisi : int = -2
