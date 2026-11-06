@@ -33,6 +33,8 @@ for f in glob.glob('Verse/*.verse'):
         if re.search(r'\bnot\s+\w+\.(TeleportTo|MoveTo|Damage|Respawn|Remove|Grant\w*)\[', l):
             print(f, i + 1, 'not devant une action (Verse annule son effet) :', l.strip()[:80])
     for i, l in enumerate(L):
+        if re.match(r'\s*continue\s*$', l):
+            print(f, i + 1, "'continue' n'existe pas en Verse :", l.strip()[:80])
         if re.search(r'option\{[^}]*\.Await\(', l):
             print(f, i + 1, '3512 Await dans option{...} :', l.strip()[:80])
     # chaque fonction appelee doit exister (dans le fichier ou dans Verse) : evite d'en supprimer une par erreur

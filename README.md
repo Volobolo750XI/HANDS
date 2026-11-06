@@ -9,18 +9,22 @@ la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu g
 - `Modeles/Grange.glb` : le décor (grange, enclos, salle avec la table ronde).
 
 ## Déroulé d'un tour
-Au début de la manche, les **règles** s'affichent 6 s. Les joueurs sont **assis** autour de la machine. Chacun commence avec **3 cartes** (4 max en main).
-On voit **sa main en bas de l'écran** ; des autres, on ne voit que le **nombre** de cartes.
+Au début de la manche, les **règles** s'affichent 6 s. Les joueurs sont **assis** autour de la machine.
+Chacun commence avec **2 cartes** (3 max). On voit **sa main en bas de l'écran** ; des autres, seulement le **nombre**.
+Tous les textes (chrono, danger, messages, boutons) sont écrits au **pinceau** (dossier Ecriture).
 1. La machine **pivote vers le joueur** (son de rotation, puis **« clac »** à l'arrêt).
-2. Il **pioche automatiquement** 1 carte (« +1 CARD »).
-3. **CHOOSE A CARD** : il clique une carte de sa main, puis **TRUTH** (il la joue pour ce qu'elle est) ou **LIE**
-   (il dit que c'est une autre carte : il choisit laquelle). Ou **SKIP** : pas de carte.
-4. Sa carte est posée **face cachée** au centre : « P1 PLAYS: JAM ». Les autres ont 5 s pour **cliquer** (LIAR!) :
+2. **SON CHOIX** : **PLAY A CARD** ou **DRAW A CARD** (0 carte : seulement piocher ; 3 cartes : seulement jouer).
+3. **PLAY A CARD** : il clique une carte, puis **TRUTH** (il la joue pour ce qu'elle est) ou **LIE**
+   (il dit que c'est une autre : « SAY IT IS... »). **BACK** pour revenir en arrière.
+4. Sa carte est posée **face cachée** : « P1 PLAYS: JAM ». Les autres ont 5 s pour **cliquer** (LIAR? CLICK TO ACCUSE!) :
    - personne n'accuse → l'effet de la carte **annoncée** s'applique, même si c'était un bluff ;
-   - accusé → la carte est **retournée** devant tout le monde : **LIE!** (pas d'effet, +1 bouton pour le menteur)
+   - accusé → la carte est **retournée** : **LIE!** (pas d'effet, +1 bouton pour le menteur)
      ou **TRUTH!** (l'effet s'applique, l'accusateur perd une carte et aura +1 bouton).
-5. **LA MACHINE** : avec la caméra fixe, il clique un bouton de la machine (il devient blanc au survol).
-6. Piège → la mâchoire se ferme (60°), il est éliminé, la grille repart à zéro.
+5. **LA MACHINE** : il clique un bouton de la machine (il devient blanc au survol). Piège → la mâchoire se ferme.
+
+**Les JAM se cumulent, comme les +2 d'un Uno** : un gros **« +1 », « +2 », « +3 »…** surgit à l'écran.
+Celui qui reçoit des JAM peut jouer un JAM (vrai ou bluff !) pour **tout passer au suivant, +1**.
+Sinon, il appuie sur **tous** ces boutons en plus. PASS fait aussi passer les JAM au suivant.
 
 Les cartes : **DEFUSE** (le piège ne mord pas), **PEEK** (un bouton sûr devient vert), **PASS** (il passe),
 **REVERSE** (le sens change), **JAM** (le suivant appuie sur 2 boutons), **STEAL** (il regarde un joueur et clique :
