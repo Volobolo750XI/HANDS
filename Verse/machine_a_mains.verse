@@ -84,6 +84,9 @@ hands_manager := class(creative_device):
     @editable AnimAppui : ?animation_sequence = false
     # Reglages
     @editable JoueursMinimum : int = 2
+    # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege).
+    # Decoche avant de publier.
+    @editable TestSolo : logic = false
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 20.0
     @editable DureeDefi : float = 5.0            # secondes pour crier LIAR! apres une annonce
@@ -124,11 +127,12 @@ hands_manager := class(creative_device):
         set Piegee = for (T : Touches) do false
         loop:
             Presents := GetPlayspace().GetPlayers()
-            if (Presents.Length >= JoueursMinimum):
+            Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
+            if (Presents.Length >= Requis):
                 Manche()
                 Sleep(6.0)
             else:
-                Bandeau("WAITING FOR PLAYERS {Presents.Length}/{JoueursMinimum}")
+                Bandeau("WAITING FOR PLAYERS {Presents.Length}/{Requis}")
                 Sleep(1.0)
 
     # =========================================================================
@@ -157,7 +161,8 @@ hands_manager := class(creative_device):
         var Index : int = GetRandomInt(0, Max(0, Vivants.Length - 1))
         loop:
             set Vivants = for (J : Vivants, EstLa(J)?) do J
-            if (Vivants.Length <= 1):
+            # a plusieurs : le dernier en jeu gagne. En TEST SOLO : on joue jusqu'a tomber sur un piege.
+            if (Vivants.Length = 0 or (Vivants.Length = 1 and not TestSolo?)):
                 break
             if (M := Mod[Index + Vivants.Length * 100, Vivants.Length]):
                 set Index = M
@@ -174,7 +179,7 @@ hands_manager := class(creative_device):
         if (G := Vivants[0]):
             Bandeau("P{NumeroDe(G)} WINS THE ROUND!")
         else:
-            Bandeau("NO WINNER")
+            Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
         for (J : Assis, Perso := J.GetFortCharacter[]):
@@ -439,7 +444,8 @@ hands_manager := class(creative_device):
         SonCarte.Play()
         Afficher(J, 0, true, false, false, false, -1)
         var Accuse : ?player = false
-        FinDefi := GetSimulationElapsedTime() + DureeDefi
+        # seul (TEST SOLO) : personne ne peut crier LIAR, on n'attend qu'une seconde
+        FinDefi := GetSimulationElapsedTime() + (if (TestSolo?) then 1.0 else DureeDefi)
         loop:
             Reste := FinDefi - GetSimulationElapsedTime()
             MajChronos(Reste)
