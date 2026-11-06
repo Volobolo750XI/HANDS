@@ -35,7 +35,7 @@ Les cartes :
 ## Installation dans UEFN
 1. Importe `Machine.glb` avec **Combine Meshes décoché**. Fais de chaque morceau un **accessoire** (Gueule et chaque bouton).
 2. Copie le widget **TEST1** de Football Pillars dans un dossier **BOUTON** du projet.
-3. Importe les 12 images de `Textures/CartesHands/` dans un dossier **CartesHands** (les 6 cartes + leurs versions `_Survol`).
+3. Importe les 12 images de `Textures/CartesHands/` dans un dossier **CartesHands** (Hands_Defuse … Hands_Steal + leurs versions `_Hover`).
 4. Pose autour de la table **une place par joueur** (petit accessoire invisible devant chaque chaise) et **une Chaise** par place.
 5. Pose un **Déclencheur d'entrée** (Input Trigger) réglé sur l'action **Tir** : c'est le clic du jeu.
 6. Crée un dossier **MateriauxHands** avec 3 matériaux : **M_Normal** (copie du matériau actuel des boutons),

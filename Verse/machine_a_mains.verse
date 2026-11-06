@@ -34,17 +34,17 @@ TexteHands<localizes>(S : string) : message = "{S}"
 #  3 REVERSE : le sens du tour s'inverse
 #  4 JAM     : le joueur suivant devra appuyer sur 2 boutons
 #  5 STEAL   : tu regardes un joueur et tu cliques : tu lui voles une carte au hasard
-#  Images : dossier CartesHands (Carte_Defuse ... Carte_Steal) + les versions _Survol (plus claires)
+#  Images : dossier CartesHands (Hands_Defuse ... Hands_Steal) + les versions _Hover (plus claires)
 NomCarte(Id : int) : string =
     if (Id = 0) then "DEFUSE" else if (Id = 1) then "PEEK" else if (Id = 2) then "PASS" else if (Id = 3) then "REVERSE" else if (Id = 4) then "JAM" else "STEAL"
 
 ImageCarte(Id : int) : texture =
-    if (Id = 0) then CartesHands.Carte_Defuse else if (Id = 1) then CartesHands.Carte_Peek else if (Id = 2) then CartesHands.Carte_Pass
-    else if (Id = 3) then CartesHands.Carte_Reverse else if (Id = 4) then CartesHands.Carte_Jam else CartesHands.Carte_Steal
+    if (Id = 0) then CartesHands.Hands_Defuse else if (Id = 1) then CartesHands.Hands_Peek else if (Id = 2) then CartesHands.Hands_Pass
+    else if (Id = 3) then CartesHands.Hands_Reverse else if (Id = 4) then CartesHands.Hands_Jam else CartesHands.Hands_Steal
 
 ImageCarteSurvol(Id : int) : texture =
-    if (Id = 0) then CartesHands.Carte_Defuse_Survol else if (Id = 1) then CartesHands.Carte_Peek_Survol else if (Id = 2) then CartesHands.Carte_Pass_Survol
-    else if (Id = 3) then CartesHands.Carte_Reverse_Survol else if (Id = 4) then CartesHands.Carte_Jam_Survol else CartesHands.Carte_Steal_Survol
+    if (Id = 0) then CartesHands.Hands_Defuse_Hover else if (Id = 1) then CartesHands.Hands_Peek_Hover else if (Id = 2) then CartesHands.Hands_Pass_Hover
+    else if (Id = 3) then CartesHands.Hands_Reverse_Hover else if (Id = 4) then CartesHands.Hands_Jam_Hover else CartesHands.Hands_Steal_Hover
 
 ImgH(T : texture, L : float, H : float) : texture_block =
     texture_block{DefaultImage := T, DefaultDesiredSize := vector2{X := L, Y := H}}
