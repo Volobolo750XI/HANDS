@@ -81,6 +81,25 @@ relique_cliquable := class:
                 Zone.Sort.Await()
                 Image.SetImage(Normale)
 
+# Avec la CAMERA FIXE : une zone de clic invisible posee a l'ecran PILE sur un bouton de la machine.
+# Souris dessus -> le vrai bouton devient blanc ; clic -> il est enfonce.
+zone_bouton := class:
+    Manager : hands_manager
+    K : int
+    Zone : TEST1
+
+    Suivre()<suspends> : void =
+        race:
+            Manager.FinEcran.Await()
+            loop:
+                Zone.Clic.Await()
+                Manager.Choix.Signal(K)
+            loop:
+                Zone.Entre.Await()
+                Manager.Surligner(K)
+                Zone.Sort.Await()
+                Manager.Surligner(-1)
+
 hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
     # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
@@ -90,6 +109,14 @@ hands_manager := class(creative_device):
     # FACULTATIF : une camera fixe par place, MEME ORDRE, posee devant la bouche de la machine et qui regarde
     # le clavier (la machine est tournee vers cette place pendant son tour). Vide = la camera du joueur.
     @editable CamerasClavier : []gameplay_camera_fixed_point_device = array{}
+    # Avec une camera fixe : on vise A LA SOURIS. Mets ici le CHAMP DE VISION de tes cameras (reglage de la
+    # camera, en degres, horizontal) et la taille d'un bouton (cm) pour que les zones de clic tombent pile.
+    @editable ChampVision : float = 90.0
+    @editable TailleBouton : float = 7.0
+    @editable RapportEcran : float = 1.7778     # largeur / hauteur de l'ecran (16:9)
+    # REGLAGE : true = les zones de clic sont affichees en carres rouges transparents (pour verifier qu'elles
+    # tombent pile sur les boutons). Decoche ensuite.
+    @editable MontrerZones : logic = false
     # La machine : le centre (Corps), la machoire du haut (Gueule) et les 24 boutons DANS L'ORDRE Bouton_01..Bouton_24
     @editable Centre : creative_prop = creative_prop{}
     @editable Gueule : creative_prop = creative_prop{}
@@ -520,7 +547,9 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
-        EcranVisee(J, Requis, Vu)
+        if (Camera := CamerasClavier[NumeroDe(J) - 1]):
+            return CliquerALaSouris(J, Requis, Vu, Fin, Camera.GetTransform())
+        EcranVisee(J, Requis, Vu, false)
         var Choisi : int = -2
         var Vise : int = -1
         loop:
@@ -546,6 +575,59 @@ hands_manager := class(creative_device):
                 break
         Surligner(-1)
         Choisi
+
+    # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
+    # enfonce le bouton. Temps ecoule : bouton au hasard.
+    CliquerALaSouris(J : player, Requis : int, Vu : int, Fin : float, Camera : transform)<suspends> : int =
+        EcranVisee(J, Requis, Vu, true)
+        PoserZones(J, Camera)
+        var Choisi : int = -1
+        loop:
+            Reste := Fin - GetSimulationElapsedTime()
+            MajChronos(Reste)
+            if (Reste <= 0.0):
+                set Choisi = BoutonLibre()
+                break
+            var Recu : int = -2
+            race:
+                Sleep(Min(0.5, Reste))
+                block:
+                    set Recu = Choix.Await()
+            if (Recu >= 0, Recu < Touches.Length, not Enfoncee[Recu]?):
+                set Choisi = Recu
+                break
+        Surligner(-1)
+        Choisi
+
+    # ou tombe le point P (monde) sur l'ecran de la camera : (X, Y) entre 0 et 1, et la distance ; rien si derriere
+    Projeter(Camera : transform, P : vector3)<transacts> : ?tuple(float, float, float) =
+        V := P - Camera.Translation
+        Devant := DotProduct(V, Camera.Rotation.GetLocalForward())
+        if (Devant <= 1.0):
+            return false
+        Droite := DotProduct(V, Camera.Rotation.GetLocalRight())
+        Haut := DotProduct(V, Camera.Rotation.GetLocalUp())
+        Pente := Tan(DegreesToRadians(Max(10.0, ChampVision) * 0.5))
+        X := 0.5 + 0.5 * Droite / (Devant * Pente)
+        Y := 0.5 - 0.5 * Haut * RapportEcran / (Devant * Pente)
+        option{(X, Y, Devant)}
+
+    # une zone de clic (TEST1) sur chaque bouton libre, a sa place exacte a l'ecran
+    PoserZones(J : player, Camera : transform) : void =
+        if (C := Ecrans[J]):
+            Pente := Tan(DegreesToRadians(Max(10.0, ChampVision) * 0.5))
+            for (K -> T : Touches, not Enfoncee[K]?, Pos := Projeter(Camera, T.GetTransform().Translation)?):
+                # taille du bouton a l'ecran (unites de l'interface : 1920 de large)
+                Cote := Max(24.0, TailleBouton / (Pos(2) * Pente) * 960.0)
+                Ancres := anchors{Minimum := vector2{X := Pos(0), Y := Pos(1)}, Maximum := vector2{X := Pos(0), Y := Pos(1)}}
+                if (MontrerZones?):
+                    C.AddWidget(canvas_slot{Widget := color_block{DefaultColor := color{R := 1.0, G := 0.1, B := 0.1}, DefaultOpacity := 0.35}, Anchors := Ancres,
+                        Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := Cote, Bottom := Cote}, SizeToContent := false})
+                Zone := TEST1{}
+                ZB := zone_bouton{Manager := Self, K := K, Zone := Zone}
+                spawn{ ZB.Suivre() }
+                C.AddWidget(canvas_slot{Widget := Zone, Anchors := Ancres,
+                    Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := Cote, Bottom := Cote}, SizeToContent := false})
 
     # STEAL : il regarde un joueur (son nom s'affiche) et clique. Temps ecoule : un joueur au hasard.
     Voler(J : player)<suspends> : void =
@@ -807,19 +889,23 @@ hands_manager := class(creative_device):
             Montrer(J, S, Chrono, false)
 
     # A LA MACHINE : pas de curseur, il vise avec la camera. PEEK : le bouton sur, sur SON ecran seulement.
-    EcranVisee(Actif : player, Requis : int, Vu : int) : void =
+    EcranVisee(Actif : player, Requis : int, Vu : int, Souris : logic) : void =
         FermerEcrans()
         for (J : Assis, EstLa(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
             if (J = Actif):
-                set S += array{TexteH("AIM AT A BUTTON AND CLICK - {Requis} TO PRESS", 0.5, 0.0, 0.0, 110.0)}
+                Consigne := if (Souris?) then "CLICK A BUTTON OF THE MACHINE - {Requis} TO PRESS" else "AIM AT A BUTTON AND CLICK - {Requis} TO PRESS"
+                set S += array{TexteH(Consigne, 0.5, 0.0, 0.0, 110.0)}
                 if (Vu >= 0):
                     set S += array{TexteH("THE GREEN BUTTON IS SAFE", 0.5, 0.0, 0.0, 225.0)}
+                if (not Souris?):
+                    set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, Souris)
             else:
                 set S += array{TexteH("P{NumeroDe(Actif)} IS CHOOSING A BUTTON...", 0.5, 0.0, 0.0, 110.0)}
-            set S += PaquetEnBas(J)
-            Montrer(J, S, Chrono, false)
+                set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, false)
 
     # message en haut de l'ecran pour tout le monde ("" = efface)
     Bandeau(S : string) : void =
