@@ -443,8 +443,8 @@ hands_manager := class(creative_device):
     # "Sitting Idle", In Place), le joueur n'utilise PAS la chaise : il est fige a sa Place, joue l'animation
     # assise en boucle, et reste a la PREMIERE PERSONNE (il peut tourner la tete). Vide = la chaise.
     @editable AnimAssiseJoueur : ?animation_sequence = false
-    # Avec l'animation assise, le joueur est pose PILE a l'endroit de SA chaise (Chaises), tourne vers la machine.
-    # Pour bien le caler sur l'assise : AvanceAssis = cm vers la table (negatif = vers le dossier),
+    # Avec l'animation assise, le joueur est pose PILE sur SA Place (mets l'accessoire invisible SUR l'assise de la
+    # chaise 3D), tourne vers la machine. Pour le caler : AvanceAssis = cm vers la table (negatif = vers le dossier),
     # HauteurAssis = cm vers le haut (negatif = plus bas).
     @editable AvanceAssis : float = 0.0
     @editable HauteurAssis : float = 0.0
@@ -602,29 +602,20 @@ hands_manager := class(creative_device):
             C := Centre.GetTransform().Translation
             Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
             if (AnimAssiseJoueur?):
-                # assis par l'animation : pose sur l'assise de sa chaise (ou sur sa Place sans chaise)
-                Base := if (Ch := Chaises[I]) then Ch.GetTransform().Translation else Ici
-                LacetAssis := ArcTan(C.Y - Base.Y, C.X - Base.X)
+                # assis par l'animation : pose PILE sur sa Place (l'accessoire invisible que tu as mis SUR la chaise 3D),
+                # tourne vers la machine. AvanceAssis / HauteurAssis : petit reglage autour de la Place.
+                LacetAssis := ArcTan(C.Y - Ici.Y, C.X - Ici.X)
                 Avant := vector3{X := Cos(LacetAssis), Y := Sin(LacetAssis), Z := 0.0}
-                Pose := Base + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
+                Pose := Ici + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
                 Rot := MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)
-                # la chaise peut bloquer la teleportation (collision) : on essaie plus haut, puis sa Place
-                var Arrive : logic = false
                 var Exact : logic = false
-                var Ou : string = "SEAT: BLOCKED - STAYED AT SPAWN"
+                var Ou : string = "SEAT: BLOCKED BY THE CHAIR - REMOVE ITS COLLISION"
                 if (Perso.TeleportTo[Pose, Rot]):
-                    set Arrive = true
                     set Exact = true
-                    set Ou = "SEAT: ON THE CHAIR"
-                if (not Arrive?, Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := 60.0}, Rot]):
-                    set Arrive = true
-                    set Ou = "SEAT: CHAIR BLOCKED - DROPPED FROM ABOVE"
-                if (not Arrive?, Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, Rot]):
-                    set Arrive = true
-                    set Ou = "SEAT: CHAIR BLOCKED - AT THE PLACE"
-                if (not Chaises[I]):
-                    set Ou = "SEAT: NO CHAIR IN THE LIST - AT THE PLACE"
-                # TEST SOLO : on te dit ou tu as ete pose (pour regler la chaise)
+                    set Ou = "SEAT: ON YOUR PLACE"
+                else if (Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := 30.0}, Rot]):
+                    set Ou = "SEAT: CHAIR IN THE WAY - DROPPED FROM ABOVE"
+                # TEST SOLO : on te dit ou tu as ete pose (pour regler la Place)
                 if (TestSolo?):
                     Avertir(J, Ou)
                 # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
