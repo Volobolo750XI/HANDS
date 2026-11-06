@@ -37,7 +37,7 @@ for f in glob.glob('Verse/*.verse'):
             print(f, i + 1, '3512 Await dans option{...} :', l.strip()[:80])
     # chaque fonction appelee doit exister (dans le fichier ou dans Verse) : evite d'en supprimer une par erreur
     sans_textes = re.sub(r'"[^"]*"', '""', '\n'.join(L))
-    definies = set(re.findall(r'^\s*([A-Z]\w*)(?:<[^>]*>)?\(.*\)[^=\n]*:[^=\n]*=\s*$', sans_textes, re.M))
+    definies = set(re.findall(r'^\s*([A-Z]\w*)(?:<[^>]*>)*\([^\n]*?\)(?:<[^>]*>)*\s*:\s*[^=\n]+=', sans_textes, re.M))
     variables = set(re.findall(r'\b([A-Z]\w*)\s*:=', sans_textes))
     appels = set(re.findall(r'(?<![\.\w])([A-Z]\w*)\(', sans_textes))
     connues = {'Sleep', 'Max', 'Min', 'Abs', 'Floor', 'Ceil', 'Mod', 'ArcTan', 'Tan', 'Sin', 'Cos', 'Sqrt', 'DotProduct',
