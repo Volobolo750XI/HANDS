@@ -1,7 +1,12 @@
 # ============================================================================
 #  MACHINE A MAINS - jeu de table : chacun son tour, on appuie sur un bouton de la machine.
 #  Certains boutons sont pieges : la machoire se referme et le joueur est elimine de la manche.
-#  Avant d'appuyer, on peut jouer UNE carte (on en pioche une a chaque tour).
+#  Avant d'appuyer, on peut ANNONCER une carte (on en pioche une a chaque tour). BLUFF : on peut annoncer une
+#  carte qu'on n'a pas. Les autres ont DureeDefi s pour crier LIAR! :
+#    - personne n'accuse        -> l'effet s'applique (meme si c'etait un mensonge)
+#    - accuse et il mentait     -> pas d'effet, le menteur appuie sur 1 bouton de plus
+#    - accuse mais c'etait vrai -> l'effet s'applique, l'accusateur perd une carte et appuiera sur 1 bouton de plus
+#  Les mains sont secretes : les autres ne voient que le NOMBRE de cartes.
 #  Un seul appareil Verse a poser : hands_manager
 # ============================================================================
 using { /Fortnite.com/Devices }
@@ -23,12 +28,21 @@ TexteHands<localizes>(S : string) : message = "{S}"
 #  2 PASS    : tu passes ton tour sans appuyer
 #  3 REVERSE : le sens du tour s'inverse
 #  4 JAM     : le joueur suivant devra appuyer sur 2 boutons
-#  5 STEAL   : tu voles une carte au joueur de ton choix
+#  5 STEAL   : tu voles une carte (au hasard) au joueur de ton choix
+#  Images des cartes : dossier CartesHands du Tiroir a contenu (Carte_Defuse, Carte_Peek, Carte_Pass,
+#  Carte_Reverse, Carte_Jam, Carte_Steal) : remplace-les par tes images en gardant les memes noms.
 NomCarte(Id : int) : string =
     if (Id = 0) then "DEFUSE" else if (Id = 1) then "PEEK" else if (Id = 2) then "PASS" else if (Id = 3) then "REVERSE" else if (Id = 4) then "JAM" else "STEAL"
 
 AideCarte(Id : int) : string =
     if (Id = 0) then "TRAP WON'T BITE" else if (Id = 1) then "SEE 1 SAFE BUTTON" else if (Id = 2) then "SKIP YOUR TURN" else if (Id = 3) then "REVERSE ORDER" else if (Id = 4) then "NEXT PRESSES 2" else "TAKE A CARD"
+
+ImageCarte(Id : int) : texture =
+    if (Id = 0) then CartesHands.Carte_Defuse else if (Id = 1) then CartesHands.Carte_Peek else if (Id = 2) then CartesHands.Carte_Pass
+    else if (Id = 3) then CartesHands.Carte_Reverse else if (Id = 4) then CartesHands.Carte_Jam else CartesHands.Carte_Steal
+
+ImgH(T : texture, L : float, H : float) : texture_block =
+    texture_block{DefaultImage := T, DefaultDesiredSize := vector2{X := L, Y := H}}
 
 # un clic sur un bouton de l'interface envoie son code a la partie
 clic_hands := class:
@@ -72,6 +86,7 @@ hands_manager := class(creative_device):
     @editable JoueursMinimum : int = 2
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 20.0
+    @editable DureeDefi : float = 5.0            # secondes pour crier LIAR! apres une annonce
     @editable AngleFermeture : float = 26.0      # degres pour fermer la machoire
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
     @editable Enfoncement : float = 2.0          # cm : un bouton appuye descend de ca
@@ -94,6 +109,11 @@ hands_manager := class(creative_device):
     var Ecrans : [player]canvas = map{}
     var Chronos : [player]text_block = map{}
     var Bandeaux : [player]text_block = map{}
+    # BLUFF : l'annonce en cours (les autres peuvent crier LIAR!)
+    var DefiEnCours : logic = false
+    var DefiCarte : int = 0
+    var DefiAuteur : int = 0                     # numero (P1, P2...) de celui qui annonce
+    var Penalites : [player]int = map{}          # boutons en plus au prochain tour (mauvaise accusation)
 
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
@@ -122,6 +142,8 @@ hands_manager := class(creative_device):
         set Assis = Liste
         set Vivants = Liste
         set Mains = map{}
+        set Penalites = map{}
+        set DefiEnCours = false
         set Sens = 1
         set Bloque = 0
         for (I -> J : Liste):
@@ -165,7 +187,8 @@ hands_manager := class(creative_device):
             C := Centre.GetTransform().Translation
             Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
             if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := true})
+            # assis : il ne peut pas se deplacer, mais il peut tourner la tete (et faire des emotes)
+            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := true})
 
     TirerCarte()<transacts> : int = GetRandomInt(0, 5)
 
@@ -272,27 +295,33 @@ hands_manager := class(creative_device):
         if (K := Libres[GetRandomInt(0, Libres.Length - 1)]) then K else -1
 
     # =========================================================================
-    #  UN TOUR : piocher, (jouer une carte), appuyer
+    #  UN TOUR : piocher, (annoncer une carte - vraie ou bluff), appuyer
     #  renvoie true si le joueur est elimine
+    #  Codes des clics : 0-23 bouton de la machine, 100+Id annoncer une carte, 200+I voler a la place I,
+    #  300 annuler le vol, 400 montrer un bouton a tous (apres PEEK), 500+I LIAR! de la place I
     # =========================================================================
     TourDe(J : player)<suspends> : logic =
         TournerVers(J)
         if (M := Mains[J], M.Length < MainMax, set Mains[J] = M + array{TirerCarte()}):
             SonCarte.Play()
-        var Requis : int = 1 + Bloque
+        Penalite := if (P := Penalites[J]) then P else 0
+        if (set Penalites[J] = 0) {}
+        var Requis : int = 1 + Bloque + Penalite
         set Bloque = 0
         var CarteJouee : logic = false
         var Bouclier : logic = false
         var ModeVol : logic = false
+        var ModeMontrer : logic = false
+        var PeekFait : logic = false
         var Vu : int = -1
         var FinVu : float = 0.0
         var Elimine : logic = false
         var Fini : logic = false
-        Fin := GetSimulationElapsedTime() + DureeTour
+        var Fin : float = GetSimulationElapsedTime() + DureeTour
         loop:
             if (Fini?):
                 break
-            Afficher(J, Requis, CarteJouee, ModeVol, Vu)
+            Afficher(J, Requis, CarteJouee, ModeVol, ModeMontrer, PeekFait, Vu)
             # attente : un clic, ou la fin du temps (bouton au hasard), ou la fin du PEEK
             var Code : int = -2
             loop:
@@ -311,12 +340,20 @@ hands_manager := class(creative_device):
                     Sleep(Min(1.0, Reste))
                     block:
                         set Recu = Choix.Await()
-                if (Recu <> -2):
+                # (un LIAR! hors annonce est ignore)
+                if (Recu <> -2, Recu < 500):
                     set Code = Recu
                     break
-            # --- un bouton (ou le temps ecoule : bouton au hasard)
             K := if (Code = -1) then BoutonLibre() else Code
-            if (K >= 0, K < Touches.Length, not Enfoncee[K]?):
+            # --- PEEK : le joueur MONTRE un bouton a tout le monde (vrai ou faux !) au lieu d'appuyer
+            if (ModeMontrer?, Code >= 0, Code < Touches.Length, not Enfoncee[Code]?):
+                set ModeMontrer = false
+                set PeekFait = false
+                BandeauSauf(J, "P{NumeroDe(J)} SAYS BUTTON {Code + 1} IS SAFE")
+                Avertir(J, "YOU TOLD EVERYONE BUTTON {Code + 1} IS SAFE")
+            # --- un bouton (ou le temps ecoule : bouton au hasard)
+            else if (K >= 0, K < Touches.Length, not Enfoncee[K]?):
+                set ModeMontrer = false
                 Appuyer(J, K)
                 if (Piegee[K]?):
                     if (Bouclier?):
@@ -332,44 +369,122 @@ hands_manager := class(creative_device):
                     set Requis -= 1
                     if (Requis <= 0):
                         set Fini = true
-            # --- une carte de la main
-            else if (Code >= 100, Code < 100 + MainMax, not CarteJouee?, Main := Mains[J], Id := Main[Code - 100]):
-                if (Id = 5):
-                    set ModeVol = true
+            # --- ANNONCE d'une carte (vraie ou bluff), une fois par tour
+            else if (Code >= 100, Code <= 105, not CarteJouee?):
+                set CarteJouee = true
+                Id := Code - 100
+                Possede := IndexCarte(J, Id)
+                Debut := GetSimulationElapsedTime()
+                Accusateur := Annoncer(J, Id)
+                # le temps de l'annonce ne compte pas dans le temps du tour
+                set Fin += GetSimulationElapsedTime() - Debut
+                var Effet : logic = true
+                if (A := Accusateur?):
+                    if (Possede < 0):
+                        # il mentait : pas d'effet, 1 bouton de plus
+                        set Effet = false
+                        set Requis += 1
+                        SonBoom.Play()
+                        Bandeau("P{NumeroDe(J)} WAS LYING! +1 BUTTON")
+                    else:
+                        # il disait vrai : l'accusateur perd une carte et appuiera sur 1 bouton de plus
+                        RetirerCarteAuHasard(A)
+                        PA := if (P := Penalites[A]) then P else 0
+                        if (set Penalites[A] = PA + 1) {}
+                        Bandeau("P{NumeroDe(J)} TOLD THE TRUTH! P{NumeroDe(A)} LOSES A CARD AND +1 BUTTON")
                 else:
-                    set CarteJouee = true
-                    RetirerCarte(J, Code - 100)
+                    Bandeau("NOBODY CALLED LIAR - {NomCarte(Id)} WORKS")
+                spawn{ EffacerBandeau(2.5) }
+                # s'il avait vraiment la carte, elle est defaussee
+                if (Possede >= 0, Effet?):
+                    RetirerCarte(J, Possede)
+                if (Effet?):
                     SonCarte.Play()
                     if (Id = 0):
                         set Bouclier = true
                     else if (Id = 1):
                         set Vu = BoutonSur()
                         set FinVu = GetSimulationElapsedTime() + 3.0
+                        set PeekFait = true
                     else if (Id = 2):
                         set Fini = true
                     else if (Id = 3):
                         set Sens = -Sens
                     else if (Id = 4):
                         set Bloque += 1
-                    BandeauSauf(J, "P{NumeroDe(J)} PLAYED {NomCarte(Id)}")
-            # --- STEAL : le joueur a choisi sa victime
-            else if (Code >= 200, Code < 300, ModeVol?, Cible := Assis[Code - 200], MC := Mains[Cible], Volee := MC[0], Main := Mains[J]):
-                for (I -> X : Main, X = 5, not CarteJouee?):
-                    RetirerCarte(J, I)
-                    set CarteJouee = true
-                ResteCible := for (I -> X : MC, I > 0) do X
-                if (set Mains[Cible] = ResteCible) {}
-                if (MJ := Mains[J], set Mains[J] = MJ + array{Volee}) {}
+                    else if (Id = 5):
+                        set ModeVol = true
+            # --- STEAL : le joueur a choisi sa victime (une carte au hasard)
+            else if (Code >= 200, Code < 300, ModeVol?, Cible := Assis[Code - 200], MC := Mains[Cible], MC.Length > 0):
+                I := GetRandomInt(0, MC.Length - 1)
+                if (Volee := MC[I]):
+                    RetirerCarte(Cible, I)
+                    if (MJ := Mains[J], MJ.Length < MainMax, set Mains[J] = MJ + array{Volee}) {}
                 set ModeVol = false
                 SonCarte.Play()
                 BandeauSauf(J, "P{NumeroDe(J)} STOLE A CARD FROM P{NumeroDe(Cible)}")
             else if (Code = 300):
                 set ModeVol = false
+            else if (Code = 400, PeekFait?):
+                set ModeMontrer = true
         FermerEcrans()
         Elimine
 
+    # l'annonce : DureeDefi s pendant lesquelles les autres joueurs en jeu peuvent crier LIAR!
+    # renvoie le premier accusateur (ou rien)
+    Annoncer(J : player, Id : int)<suspends> : ?player =
+        set DefiEnCours = true
+        set DefiCarte = Id
+        set DefiAuteur = NumeroDe(J)
+        SonCarte.Play()
+        Afficher(J, 0, true, false, false, false, -1)
+        var Accuse : ?player = false
+        FinDefi := GetSimulationElapsedTime() + DureeDefi
+        loop:
+            Reste := FinDefi - GetSimulationElapsedTime()
+            MajChronos(Reste)
+            if (Reste <= 0.0 or Accuse?):
+                break
+            var Recu : int = -2
+            race:
+                Sleep(Min(0.5, Reste))
+                block:
+                    set Recu = Choix.Await()
+            if (Recu >= 500, Recu < 600, A := Assis[Recu - 500], A <> J, Contient(Vivants, A)?):
+                set Accuse = option{A}
+                Bandeau("P{NumeroDe(A)} SAYS P{NumeroDe(J)} IS LYING!")
+                Sleep(1.2)
+        set DefiEnCours = false
+        Accuse
+
+    Contient(Liste : []player, J : player)<transacts> : logic =
+        var Trouve : logic = false
+        for (X : Liste, X = J):
+            set Trouve = true
+        Trouve
+
+    EffacerBandeau(Apres : float)<suspends> : void =
+        Sleep(Apres)
+        if (not DefiEnCours?):
+            Bandeau("")
+
+    # place de la carte Id dans la main du joueur (-1 s'il ne l'a pas)
+    IndexCarte(J : player, Id : int)<transacts> : int =
+        var Trouve : int = -1
+        if (M := Mains[J]):
+            for (I -> X : M, X = Id, Trouve < 0):
+                set Trouve = I
+        Trouve
+
+    NombreDe(J : player)<transacts> : int =
+        if (M := Mains[J]) then M.Length else 0
+
     RetirerCarte(J : player, Index : int) : void =
         if (M := Mains[J], set Mains[J] = for (I -> X : M, I <> Index) do X) {}
+
+    RetirerCarteAuHasard(J : player) : void =
+        if (M := Mains[J], M.Length > 0):
+            RetirerCarte(J, GetRandomInt(0, M.Length - 1))
 
     # le personnage se penche (animation), puis le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
@@ -425,7 +540,9 @@ hands_manager := class(creative_device):
             for (J -> T : Chronos):
                 T.SetText(TexteHands("{Max(0, S)}"))
 
-    Afficher(Actif : player, Requis : int, CarteJouee : logic, ModeVol : logic, Vu : int) : void =
+    # l'ecran de chaque joueur : SA main en images (secrete), le nombre de cartes des autres,
+    # et pour le joueur actif la grille + les 6 cartes qu'il peut ANNONCER (vraies ou bluff)
+    Afficher(Actif : player, Requis : int, CarteJouee : logic, ModeVol : logic, ModeMontrer : logic, PeekFait : logic, Vu : int) : void =
         FermerEcrans()
         Libres := LibresRestants()
         Risque := if (Libres > 0, P := Floor[PiegesRestants() * 100.0 / (Libres * 1.0) + 0.5]) then P else 0
@@ -436,44 +553,64 @@ hands_manager := class(creative_device):
                 Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 150.0, Right := 0.0, Bottom := 0.0}, SizeToContent := true}}
             set S += array{TexteH("DANGER {Risque}%", 0.5, 0.0, 0.0, 185.0)}
             set S += array{TexteH("YOU ARE P{NumeroDe(J)}", 0.0, 0.0, 120.0, 40.0)}
-            # sa main (en bas)
+            # le nombre de cartes de chacun (les mains sont secretes)
+            var Ligne : float = 80.0
+            for (I -> X : Assis, X <> J, Contient(Vivants, X)?):
+                set S += array{TexteH("P{I + 1} : {NombreDe(X)} CARD(S)", 0.0, 0.0, 120.0, Ligne)}
+                set Ligne += 32.0
+            # SA main, en images, en bas de l'ecran (lui seul la voit)
             Main : []int = if (M := Mains[J]) then M else array{}
-            if (J = Actif):
-                set S += array{TexteH("YOUR TURN - PRESS {Requis} BUTTON(S)", 0.5, 0.0, 0.0, 110.0)}
+            for (I -> Id : Main):
+                X := (I * 1.0 - (Main.Length - 1) * 0.5) * 170.0
+                set S += array{PlaceH(ImgH(ImageCarte(Id), 150.0, 225.0), 0.5, 1.0, X, -130.0, 150.0, 225.0)}
+            var Clavier : logic = false
+            if (DefiEnCours?):
+                # une annonce est en cours : LIAR! pour les autres joueurs encore en jeu
+                set S += array{PlaceH(ImgH(ImageCarte(DefiCarte), 180.0, 270.0), 0.5, 0.5, 0.0, -40.0, 180.0, 270.0)}
+                if (J = Actif):
+                    set S += array{TexteH("YOU CLAIMED {NomCarte(DefiCarte)} - WILL THEY BELIEVE YOU?", 0.5, 0.0, 0.0, 110.0)}
+                else if (Contient(Vivants, J)?):
+                    set S += array{TexteH("P{DefiAuteur} CLAIMS {NomCarte(DefiCarte)}! LYING?", 0.5, 0.0, 0.0, 110.0)}
+                    set S += array{PlaceH(BoutonCode("LIAR!", 500 + NumeroDe(J) - 1), 0.5, 0.5, 0.0, 150.0, 260.0, 80.0)}
+                    set Clavier = true
+            else if (J = Actif):
+                set Clavier = true
                 if (ModeVol?):
                     # choisir la victime du STEAL
                     set S += array{TexteH("STEAL FROM WHO?", 0.5, 0.5, 0.0, -120.0)}
                     var N : int = 0
-                    for (I -> X : Assis, X <> J, EstLa(X)?, MX := Mains[X], MX.Length > 0):
-                        set S += array{PlaceH(BoutonCode("P{I + 1} ({MX.Length})", 200 + I), 0.5, 0.5, -200.0 + N * 200.0, -40.0, 180.0, 60.0)}
+                    for (I -> X : Assis, X <> J, Contient(Vivants, X)?, NombreDe(X) > 0):
+                        set S += array{PlaceH(BoutonCode("P{I + 1} ({NombreDe(X)})", 200 + I), 0.5, 0.5, -200.0 + N * 200.0, -40.0, 180.0, 60.0)}
                         set N += 1
                     set S += array{PlaceH(BoutonCode("CANCEL", 300), 0.5, 0.5, 0.0, 60.0, 180.0, 60.0)}
                 else:
+                    Consigne := if (ModeMontrer?) then "CLICK THE BUTTON TO SHOW EVERYONE (TRUE OR FALSE!)" else "YOUR TURN - PRESS {Requis} BUTTON(S)"
+                    set S += array{TexteH(Consigne, 0.5, 0.0, 0.0, 110.0)}
                     # la grille : rangee du haut = fond de la machine
                     for (R := 0..5, C0 := 0..Colonnes - 1, K := R * Colonnes + C0, K < Touches.Length):
                         Q := Colonnes - 1 - C0
                         X := (Q * 1.0 - (Colonnes - 1) * 0.5) * 92.0 + 330.0
-                        Y := (R * 1.0 - 2.5) * 70.0 - 20.0
+                        Y := (R * 1.0 - 2.5) * 70.0 - 60.0
                         if (Enfoncee[K]?):
                             set S += array{PlaceH(color_block{DefaultColor := color{R := 0.08, G := 0.08, B := 0.08}, DefaultOpacity := 0.8}, 0.5, 0.5, X, Y, 84.0, 60.0)}
                         else:
                             if (K = Vu):
                                 set S += array{PlaceH(color_block{DefaultColor := color{R := 0.1, G := 0.9, B := 0.2}}, 0.5, 0.5, X, Y, 94.0, 70.0)}
                             set S += array{PlaceH(BoutonCode("{K + 1}", K), 0.5, 0.5, X, Y, 84.0, 60.0)}
-                    # les cartes : jouables une seule fois par tour
-                    for (I -> Id : Main):
-                        X := (I * 1.0 - (Main.Length - 1) * 0.5) * 230.0 - 330.0
-                        if (CarteJouee?):
-                            set S += array{TexteH(NomCarte(Id), 0.5, 0.5, X, 140.0)}
-                        else:
-                            set S += array{PlaceH(BoutonCode(NomCarte(Id), 100 + I), 0.5, 0.5, X, 140.0, 210.0, 60.0)}
-                        set S += array{TexteH(AideCarte(Id), 0.5, 0.5, X, 190.0)}
+                    if (not CarteJouee?):
+                        # ANNONCER une carte : n'importe laquelle des 6 (celles qu'il a sont marquees IN HAND)
+                        set S += array{TexteH("CLAIM A CARD (YOU CAN BLUFF!)", 0.5, 0.5, -560.0, -260.0)}
+                        for (Id := 0..5):
+                            Y := -200.0 + Id * 62.0
+                            set S += array{PlaceH(BoutonCode(NomCarte(Id), 100 + Id), 0.5, 0.5, -600.0, Y, 200.0, 54.0)}
+                            Info := if (IndexCarte(J, Id) >= 0) then "IN HAND" else AideCarte(Id)
+                            set S += array{TexteH(Info, 0.5, 0.5, -390.0, Y)}
+                    if (PeekFait?, not ModeMontrer?):
+                        set S += array{PlaceH(BoutonCode("SHOW A BUTTON TO ALL", 400), 0.5, 0.5, -560.0, 200.0, 320.0, 60.0)}
             else:
                 set S += array{TexteH("P{NumeroDe(Actif)} IS PLAYING...", 0.5, 0.0, 0.0, 110.0)}
-                for (I -> Id : Main):
-                    set S += array{TexteH(NomCarte(Id), 0.5, 1.0, (I * 1.0 - (Main.Length - 1) * 0.5) * 200.0, -80.0)}
             C := canvas{Slots := S}
-            if (J = Actif):
+            if (Clavier?):
                 UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
             else:
                 UI.AddWidget(C)
