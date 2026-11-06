@@ -9,13 +9,13 @@ la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu g
 - `Modeles/Grange.glb` : le décor (grange, enclos, salle avec la table ronde).
 
 ## Déroulé d'un tour
-Les joueurs sont **assis** autour de la machine. Chacun commence avec **3 cartes** (4 max en main).
+Au début de la manche, les **règles** s'affichent 6 s. Les joueurs sont **assis** autour de la machine. Chacun commence avec **3 cartes** (4 max en main).
 On voit **sa main en bas de l'écran** ; des autres, on ne voit que le **nombre** de cartes.
 1. La machine **pivote vers le joueur** (son de rotation, puis **« clac »** à l'arrêt).
-2. **PIOCHER** : il clique sur la **pile** (à droite) ou sur **DRAW** → une carte arrive dans sa main.
-3. **JOUER** : il clique **une carte de sa main**, puis **« WHAT DO YOU SAY IT IS? »** : il choisit ce qu'il annonce
-   parmi les 6 cartes (la vraie est marquée **TRUTH**, les autres **BLUFF**). Ou **NO CARD**.
-4. Sa carte est posée **face cachée** au centre : « P1 SAYS: JAM ». Les autres ont 5 s pour **cliquer** (LIAR!) :
+2. Il **pioche automatiquement** 1 carte (« +1 CARD »).
+3. **CHOOSE A CARD** : il clique une carte de sa main, puis **TRUTH** (il la joue pour ce qu'elle est) ou **LIE**
+   (il dit que c'est une autre carte : il choisit laquelle). Ou **SKIP** : pas de carte.
+4. Sa carte est posée **face cachée** au centre : « P1 PLAYS: JAM ». Les autres ont 5 s pour **cliquer** (LIAR!) :
    - personne n'accuse → l'effet de la carte **annoncée** s'applique, même si c'était un bluff ;
    - accusé → la carte est **retournée** devant tout le monde : **LIE!** (pas d'effet, +1 bouton pour le menteur)
      ou **TRUTH!** (l'effet s'applique, l'accusateur perd une carte et aura +1 bouton).
