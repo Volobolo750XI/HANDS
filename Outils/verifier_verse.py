@@ -55,5 +55,21 @@ for f in glob.glob('Verse/*.verse'):
                'IdentityRotation', 'Distance', 'Lerp', 'TEST1'}
     for fn in sorted(appels - definies - variables - connues):
         print(f, '3506 fonction appelee mais introuvable :', fn)
+    # BOUCLE SANS VRAIE PAUSE : une boucle qui n'attend que par MoveTo / PlayAndAwait / Fondu peut tourner a
+    # l'infini si l'appel se termine tout de suite (accessoire cache...) -> ComputationLimitExceeded, tout le code s'arrete
+    for i, l in enumerate(L):
+        if l.strip() != 'loop:':
+            continue
+        ind = len(l) - len(l.lstrip())
+        corps = []
+        for m in L[i + 1:]:
+            if m.strip() == '':
+                continue
+            if len(m) - len(m.lstrip()) <= ind:
+                break
+            corps.append(m)
+        txt = '\n'.join(corps)
+        if not re.search(r'Sleep\(|Await\(|\bbreak\b|\breturn\b', txt):
+            print(f, i + 1, 'BOUCLE SANS Sleep/Await ni break (risque de boucle infinie)')
 print('verification terminee')
 sys.exit(1 if ERREURS else 0)
