@@ -74,7 +74,7 @@ hands_manager := class(creative_device):
     # ne fait pas face au bon joueur (ex. 90, 180, -90).
     @editable FaceDepart : float = 0.0
     @editable DureeRotation : float = 1.75       # secondes pour pivoter vers le joueur suivant
-    # true = sens des aiguilles d'une montre (vu du dessus). Mets false si elle tourne a l'envers.
+    # (plus utilise : la machine prend toujours le chemin le plus court vers le joueur)
     @editable SensHoraire : logic = true
     # Sons (Audio Player : lecture automatique NON)
     @editable SonClic : audio_player_device = audio_player_device{}
@@ -241,18 +241,17 @@ hands_manager := class(creative_device):
             C := BaseCentre.Translation
             Cible := ArcTan(Ici.Y - C.Y, Ici.X - C.X) * 180.0 / PiFloat - FaceDepart
             var Ecart : float = Cible - LacetMachine
-            # toujours dans le meme sens (aiguilles d'une montre) : ecart ramene entre 0 et 360 (ou -360 et 0)
+            # le CHEMIN LE PLUS COURT (entre -180 et 180 degres) : plus jamais de tour complet.
+            # Deja face au joueur (ex. seul en TEST SOLO) : la machine ne bouge pas.
             loop:
-                if (Ecart < 360.0):
+                if (Ecart <= 180.0):
                     break
                 set Ecart -= 360.0
             loop:
-                if (Ecart >= 0.0):
+                if (Ecart > -180.0):
                     break
                 set Ecart += 360.0
-            if (not SensHoraire?, Ecart > 0.0):
-                set Ecart -= 360.0
-            if (Abs(Ecart) > 1.0, Abs(Ecart) < 359.0):
+            if (Abs(Ecart) > 2.0):
                 Duree := Max(0.2, DureeRotation)
                 Pas := if (N := Ceil[Abs(Ecart) / 8.0]) then Max(1, N) else 1
                 Dt := Duree / (Pas * 1.0)
