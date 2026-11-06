@@ -43,7 +43,7 @@ Les textes et les boutons sont écrits au **pinceau** (dossier **Ecriture**) ; u
 7. FACULTATIF : une **caméra fixe** par place, devant la bouche de la machine, qui regarde le clavier.
 8. Pose l'appareil `hands_manager` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
-   - **AnimationAssise** (facultatif) : une animation assise Mixamo. Les joueurs restent alors à la première personne
+   - **AnimAssiseJoueur** (facultatif) : une animation assise Mixamo. Les joueurs restent alors à la première personne
      (pas de vraie chaise : ils sont figés à leur Place et jouent l'animation en boucle) ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;

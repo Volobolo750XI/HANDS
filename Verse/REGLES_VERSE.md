@@ -17,3 +17,8 @@
 - 3512 : jamais de fonction <suspends> (Await, Sleep...) DANS option{...} : faire X := Ev.Await() puis option{X}.
 - 3509 : un MATERIAU s'utilise avec {} : T.SetMaterial(Dossier.Mon_Materiau{}) (c'est un type, pas une valeur). Les textures, elles, s'utilisent sans {}.
 - Verse n'a PAS de 'continue' dans une boucle : utiliser if / else et break.
+
+## Noms des reglages et noms des dossiers
+Un dossier du Tiroir a contenu devient un module Verse du meme nom. Un reglage (@editable) ou une fonction
+qui porte le meme nom qu'un dossier -> erreur 3532 / 3588 "ambiguous". Les animations vont dans le dossier
+"Animations" ; un nouveau reglage ne doit jamais s'appeler comme un dossier existant ou probable.
