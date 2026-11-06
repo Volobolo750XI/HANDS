@@ -38,6 +38,21 @@ TexteJeu<localizes>(S : string) : message = "{S}"
 NomRelique(Id : int) : string =
     if (Id = 0) then "DEFUSE" else if (Id = 1) then "PEEK" else if (Id = 2) then "PASS" else if (Id = 3) then "REVERSE" else if (Id = 4) then "JAM" else "STEAL"
 
+# ce que fait la carte, en 2 lignes courtes (ecran du choix des cartes)
+DescriptionRelique(Id : int, Ligne : int) : string =
+    if (Id = 0) then (if (Ligne = 0) then "SAVES YOU FROM" else "ONE TRAP")
+    else if (Id = 1) then (if (Ligne = 0) then "SHOWS YOU ONE" else "SAFE BUTTON")
+    else if (Id = 2) then (if (Ligne = 0) then "NO PRESS FOR YOU" else "THIS TURN")
+    else if (Id = 3) then (if (Ligne = 0) then "TURN ORDER" else "GOES BACKWARD")
+    else if (Id = 4) then (if (Ligne = 0) then "NEXT PLAYER" else "PRESSES +1")
+    else (if (Ligne = 0) then "TAKE A CARD" else "FROM A PLAYER")
+
+Dedans(L : []int, X : int)<transacts> : logic =
+    var Trouve : logic = false
+    for (Y : L, Y = X):
+        set Trouve = true
+    Trouve
+
 ImageRelique(Id : int) : texture =
     if (Id = 0) then Reliques.Relique_Bouclier else if (Id = 1) then Reliques.Relique_Serrure else if (Id = 2) then Reliques.Relique_Sablier
     else if (Id = 3) then Reliques.Relique_Chaine else if (Id = 4) then Reliques.Relique_Etau else Reliques.Relique_Corbeau
@@ -327,6 +342,55 @@ zone_bouton := class:
                 Zone.Sort.Await()
                 Manager.Surligner(-1)
 
+# LE CHOIX DES CARTES au debut de la manche (chaque joueur a le sien, en meme temps que les autres)
+choix_depart := class:
+    Manager : hands_manager
+    J : player
+    Cadres : []color_block
+    Compteur : texture_block
+    Ev : event(int) = event(int){}
+    var Pris : []int = array{}
+    var Confirme : logic = false
+
+    Suivre(Fin : event())<suspends> : void =
+        race:
+            Fin.Await()
+            loop:
+                Code := Ev.Await()
+                if (not Confirme?):
+                    if (Code = 599):
+                        if (Pris.Length = 3):
+                            set Confirme = true
+                            Manager.Avertir(J, "WAITING FOR THE OTHERS...")
+                        else:
+                            Manager.Avertir(J, "CHOOSE 3 CARDS")
+                    else:
+                        Basculer(Code - 500)
+
+    # clic sur une carte : prise (cadre clair) ou rendue
+    Basculer(Id : int) : void =
+        if (Dedans(Pris, Id)?):
+            set Pris = for (P : Pris, P <> Id) do P
+            if (Cadre := Cadres[Id]):
+                Cadre.SetVisibility(widget_visibility.Hidden)
+        else if (Pris.Length < 3):
+            set Pris += array{Id}
+            if (Cadre := Cadres[Id]):
+                Cadre.SetVisibility(widget_visibility.Visible)
+        if (G := GlypheChiffre(Pris.Length)?):
+            Compteur.SetImage(G)
+
+    # temps ecoule : on complete au hasard
+    Completer() : void =
+        var Essais : int = 0
+        loop:
+            if (Pris.Length >= 3 or Essais > 100):
+                break
+            Id := GetRandomInt(0, 5)
+            if (not Dedans(Pris, Id)?):
+                set Pris += array{Id}
+            set Essais += 1
+
 hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
     # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
@@ -394,6 +458,7 @@ hands_manager := class(creative_device):
     @editable TestSolo : logic = false
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
+    @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
     @editable DureeDefi : float = 5.0            # secondes pour crier LIAR! apres une annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
@@ -492,12 +557,12 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, I)
-            # 2 cartes au depart
-            if (set Paquets[J] = array{TirerRelique(), TirerRelique()}) {}
+            if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
         Sleep(6.0)
         FermerEcrans()
+        ChoixDepart()
         for (N := 0..2):
             Bandeau("ROUND STARTS IN {3 - N}")
             Sleep(1.0)
@@ -546,17 +611,28 @@ hands_manager := class(creative_device):
                 # la chaise peut bloquer la teleportation (collision) : on essaie plus haut, puis sa Place
                 var Arrive : logic = false
                 var Exact : logic = false
+                var Ou : string = "SEAT: BLOCKED - STAYED AT SPAWN"
                 if (Perso.TeleportTo[Pose, Rot]):
                     set Arrive = true
                     set Exact = true
+                    set Ou = "SEAT: ON THE CHAIR"
                 if (not Arrive?, Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := 60.0}, Rot]):
                     set Arrive = true
+                    set Ou = "SEAT: CHAIR BLOCKED - DROPPED FROM ABOVE"
                 if (not Arrive?, Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, Rot]):
                     set Arrive = true
+                    set Ou = "SEAT: CHAIR BLOCKED - AT THE PLACE"
+                if (not Chaises[I]):
+                    set Ou = "SEAT: NO CHAIR IN THE LIST - AT THE PLACE"
+                # TEST SOLO : on te dit ou tu as ete pose (pour regler la chaise)
+                if (TestSolo?):
+                    Avertir(J, Ou)
                 # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
                 Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
                 spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
+                if (TestSolo?):
+                    Avertir(J, "SEAT: NO ANIMATION IN ANIMASSISEJOUEUR - REAL CHAIR")
                 if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 Ch.Seat(J)
             else:
@@ -763,7 +839,7 @@ hands_manager := class(creative_device):
         Peindre(K)
 
     # =========================================================================
-    #  UN TOUR : piocher -> (annoncer une carte, vraie ou bluff) -> appuyer soi-meme sur la machine
+    #  UN TOUR : (jouer une carte et l'annoncer une carte, vraie ou bluff) -> appuyer soi-meme sur la machine
     #  renvoie true si le joueur est elimine
     # =========================================================================
     TourDe(J : player)<suspends> : logic =
@@ -784,21 +860,19 @@ hands_manager := class(creative_device):
         if (Attente > 0):
             AnimerPlus("+{Attente}", "P{NumeroDe(J)} MUST PRESS {Attente} MORE!", "PLAY A JAM TO PASS IT ON!", J)
 
-        # --- 1. SON CHOIX : JOUER une carte OU PIOCHER une carte
+        # --- 1. SON CHOIX : JOUER une carte OU NO CARD (pas de pioche : les 3 cartes sont choisies au debut)
         var Index : int = -1
         var Id : int = -1
         loop:
             Action := ChoisirAction(J, Attente)
             if (Action = 0):
                 Jeu := JouerCarte(J)
-                # BACK (-2) : il revient au choix JOUER / PIOCHER ; sinon c'est joue
+                # BACK (-2) : il revient au choix PLAY A CARD / NO CARD ; sinon c'est joue
                 if (Jeu(0) <> -2):
                     set Index = Jeu(0)
                     set Id = Jeu(1)
                     break
             else:
-                if (Action = 1):
-                    Piocher(J)
                 break
         if (Index >= 0, Paquet := Paquets[J], Reelle := Paquet[Index]):
             # la carte part sur la table, face cachee (elle quitte sa main dans tous les cas)
@@ -1017,14 +1091,16 @@ hands_manager := class(creative_device):
         for (X : Assis, X <> J):
             Avertir(X, "P{NumeroDe(J)} DRAWS A CARD")
 
-    # SON CHOIX : PLAY A CARD (0) ou DRAW A CARD (1). 0 carte : seulement DRAW. 3 cartes : seulement PLAY.
-    # Temps ecoule : il pioche s'il peut. Renvoie -1 s'il ne peut rien faire.
+    # SON CHOIX : PLAY A CARD (0) ou NO CARD (1). 0 carte : pas d'ecran, il va direct a la machine (-1).
+    # Temps ecoule : NO CARD.
     ChoisirAction(J : player, Attente : int)<suspends> : int =
         N := NombreDe(J)
-        PeutJouer := if (N > 0) then true else false
-        PeutPiocher := if (N < PaquetMax) then true else false
+        if (N = 0):
+            return -1
+        PeutJouer := true
+        PeutPiocher := true
         EcranAction(J, Attente, PeutJouer, PeutPiocher)
-        var Action : int = if (PeutPiocher?) then 1 else -1
+        var Action : int = 1
         Fin := GetSimulationElapsedTime() + DureeChoixCarte
         loop:
             Reste := Fin - GetSimulationElapsedTime()
@@ -1284,6 +1360,9 @@ hands_manager := class(creative_device):
 
     # un TEXTE-BOUTON au pinceau (blanc + plus gros au survol)
     BoutonTexte(S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
+        BoutonTexteSur(Choix, S, AX, AY, X, Y, Taille, Code)
+
+    BoutonTexteSur(Ev : event(int), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
         var Slots : []canvas_slot = array{}
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
@@ -1300,7 +1379,7 @@ hands_manager := class(creative_device):
                 set Slots += array{PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y)}
             set Cx += L + Taille * 0.06
         Zone := TEST1{}
-        BT := bouton_texte{Ev := Choix, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := Taille, Zone := Zone}
+        BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := Taille, Zone := Zone}
         spawn{ BT.Suivre() }
         Slots + array{PlaceH(Zone, AX, AY, X, Y, Largeur + 20.0, Taille * 0.9)}
 
@@ -1316,6 +1395,50 @@ hands_manager := class(creative_device):
     NouveauChrono() : []texture_block =
         array{ImgH(Ecriture.E_0, 64.0, 64.0), ImgH(Ecriture.E_0, 64.0, 64.0)}
 
+    # LE CHOIX DES CARTES : les 6 cartes, leur effet ; on en prend 3 (clic = prise / rendue), puis CONFIRM
+    ChoixDepart()<suspends> : void =
+        FermerEcrans()
+        var Liste : []choix_depart = array{}
+        for (J : Assis, EstLa(J)?):
+            Chrono := NouveauChrono()
+            Cadres := for (Id := 0..5) do color_block{DefaultColor := color{R := 1.0, G := 1.0, B := 1.0}, DefaultOpacity := 0.3}
+            Compteur := ImgH(Ecriture.E_0, 56.0, 56.0)
+            CD := choix_depart{Manager := Self, J := J, Cadres := Cadres, Compteur := Compteur}
+            var S : []canvas_slot = Entete(J, Chrono)
+            set S += TexteEcrit("CHOOSE YOUR CARDS", 0.5, 0.0, 0.0, 300.0, 80.0)
+            set S += array{PlaceLibre(Compteur, 0.5, 0.0, -30.0, 375.0)}
+            set S += TexteEcrit("/3", 0.5, 0.0, 25.0, 375.0, 56.0)
+            for (Id := 0..5, Cadre := Cadres[Id]):
+                X := (Id * 1.0 - 2.5) * 290.0
+                Img := ImgH(ImageRelique(Id), 240.0, 240.0)
+                Zone := TEST1{}
+                CM := carte_main{Ev := CD.Ev, Fin := FinEcran, Code := 500 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
+                spawn{ CM.Suivre() }
+                set S += array{PlaceH(Cadre, 0.5, 0.5, X, 0.0, 270.0, 280.0), PlaceLibre(Img, 0.5, 0.5, X, 0.0), PlaceH(Zone, 0.5, 0.5, X, 0.0, 200.0, 240.0)}
+                set S += TexteEcrit(NomRelique(Id), 0.5, 0.5, X, 160.0, 40.0)
+                set S += TexteEcrit(DescriptionRelique(Id, 0), 0.5, 0.5, X, 205.0, 24.0)
+                set S += TexteEcrit(DescriptionRelique(Id, 1), 0.5, 0.5, X, 235.0, 24.0)
+            set S += BoutonTexteSur(CD.Ev, "CONFIRM", 0.5, 1.0, 0.0, -110.0, 80.0, 599)
+            Montrer(J, S, Chrono, true)
+            for (Cadre : Cadres):
+                Cadre.SetVisibility(widget_visibility.Hidden)
+            spawn{ CD.Suivre(FinEcran) }
+            set Liste += array{CD}
+        Fin := GetSimulationElapsedTime() + DureeChoixDepart
+        loop:
+            Reste := Fin - GetSimulationElapsedTime()
+            MajChronos(Reste)
+            var Tous : logic = true
+            for (CD : Liste, not CD.Confirme?):
+                set Tous = false
+            if (Reste <= 0.0 or Tous?):
+                break
+            Sleep(0.25)
+        for (CD : Liste):
+            CD.Completer()
+            if (set Paquets[CD.J] = CD.Pris) {}
+        FermerEcrans()
+
     # LES REGLES, au debut de la manche, pour tout le monde
     EcranRegles() : void =
         FermerEcrans()
@@ -1329,7 +1452,7 @@ hands_manager := class(creative_device):
             set S += TexteEcrit("AND PRAY.", 0.5, 0.5, 0.0, 170.0, 80.0)
             Montrer(J, S, Chrono, false)
 
-    # SON CHOIX : deux gros mots, PLAY A CARD / DRAW A CARD (et les boutons qui l'attendent, s'il y en a)
+    # SON CHOIX : deux gros mots, PLAY A CARD / NO CARD (et les boutons qui l'attendent, s'il y en a)
     EcranAction(Actif : player, Attente : int, PeutJouer : logic, PeutPiocher : logic) : void =
         FermerEcrans()
         for (J : Assis, EstLa(J)?):
@@ -1342,7 +1465,7 @@ hands_manager := class(creative_device):
                 if (PeutJouer?):
                     set S += BoutonTexte("PLAY A CARD", 0.5, 0.5, if (PeutPiocher?) then -300.0 else 0.0, 20.0, 80.0, 410)
                 if (PeutPiocher?):
-                    set S += BoutonTexte("DRAW A CARD", 0.5, 0.5, if (PeutJouer?) then 300.0 else 0.0, 20.0, 80.0, 411)
+                    set S += BoutonTexte("NO CARD", 0.5, 0.5, if (PeutJouer?) then 300.0 else 0.0, 20.0, 80.0, 411)
                 set S += PaquetEnBas(J)
                 Montrer(J, S, Chrono, true)
             else:
