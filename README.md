@@ -43,6 +43,8 @@ Les textes et les boutons sont écrits au **pinceau** (dossier **Ecriture**) ; u
 7. FACULTATIF : une **caméra fixe** par place, devant la bouche de la machine, qui regarde le clavier.
 8. Pose l'appareil `hands_manager` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
+   - **CamerasPremierePersonne** : ta « Caméra à la première personne » (priorité 0 ; caméras fixes : 10) ;
+   - **RegardCartes** (25 par défaut) : de combien de degrés on baisse la tête pour prendre ses cartes ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;
    - les **Audio Players** : clic, claquement, carte, **SonRotation** (en boucle pendant que la machine tourne)
