@@ -118,7 +118,7 @@ hands_manager := class(creative_device):
     @editable BordDroit : []float = array{0.6225, 0.6275, 0.634, 0.641, 0.649, 0.659, 0.669}
     # quel bouton (Bouton_01...) est ou a l'ecran : si le bouton qui devient blanc n'est pas celui sous la
     # souris, coche / decoche ces cases
-    @editable InverserColonnes : logic = true
+    @editable InverserColonnes : logic = false
     @editable InverserLignes : logic = false
     # La machine : le centre (Corps), la machoire du haut (Gueule) et les 24 boutons DANS L'ORDRE Bouton_01..Bouton_24
     @editable Centre : creative_prop = creative_prop{}
