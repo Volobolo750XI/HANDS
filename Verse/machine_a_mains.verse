@@ -29,7 +29,7 @@ TexteHands<localizes>(S : string) : message = "{S}"
 
 # --- Les cartes (id) ---------------------------------------------------------
 #  0 DEFUSE  : si tu tombes sur un piege ce tour-ci, il ne mord pas
-#  1 PEEK    : un bouton SUR t'est montre (sur TON ecran seulement) jusqu'a la fin de ton tour
+#  1 PEEK    : un bouton SUR devient VERT sur la machine jusqu'a la fin de ton tour
 #  2 PASS    : tu passes ton tour sans appuyer
 #  3 REVERSE : le sens du tour s'inverse
 #  4 JAM     : le joueur suivant devra appuyer sur 2 boutons
@@ -95,9 +95,10 @@ hands_manager := class(creative_device):
     @editable Gueule : creative_prop = creative_prop{}
     @editable Touches : []creative_prop = array{}
     @editable Plaque : creative_prop = creative_prop{}
-    # Le repere BLANC pose sur le bouton vise (un petit disque / cube blanc, un peu plus grand qu'un bouton)
-    @editable Surbrillance : creative_prop = creative_prop{}
-    @editable HauteurSurbrillance : float = 1.0  # cm au-dessus du bouton
+    # COULEURS DES BOUTONS : 3 materiaux dans un dossier MateriauxHands du Tiroir a contenu :
+    #   M_Normal (l'aspect normal d'un bouton), M_Blanc (le bouton vise), M_Vert (le bouton sur du PEEK)
+    # Numero de l'emplacement de materiau du bouton (0 en general)
+    @editable IndexMateriau : int = 0
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
@@ -139,7 +140,8 @@ hands_manager := class(creative_device):
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
     var BasePlaque : transform = transform{}
-    var BaseSurbrillance : transform = transform{}
+    var BoutonBlanc : int = -1                   # bouton vise en ce moment (blanc)
+    var BoutonVert : int = -1                    # bouton sur montre par PEEK (vert)
     var LacetMachine : float = 0.0               # rotation actuelle de toute la machine (degres)
     var Enfoncee : []logic = array{}
     var Piegee : []logic = array{}
@@ -163,8 +165,6 @@ hands_manager := class(creative_device):
         set BaseGueule = Gueule.GetTransform()
         set BaseCentre = Centre.GetTransform()
         set BasePlaque = Plaque.GetTransform()
-        set BaseSurbrillance = Surbrillance.GetTransform()
-        Surbrillance.Hide()
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
@@ -284,8 +284,11 @@ hands_manager := class(creative_device):
             K := GetRandomInt(0, Touches.Length - 1)
             if (not Piegee[K]?, set Piegee[K] = true):
                 set Poses += 1
+        set BoutonBlanc = -1
+        set BoutonVert = -1
         for (K -> T : Touches, B := BaseTouches[K]):
             spawn{ Bouger(T, Tournee(B, LacetMachine), 0.25) }
+            Peindre(K)
 
     # une piece de la machine, tournee de Lacet degres autour du centre de la machine
     Tournee(B : transform, Lacet : float) : transform =
@@ -398,14 +401,30 @@ hands_manager := class(creative_device):
                         set Meilleur = option{X}
         Meilleur
 
-    # le repere blanc sur le bouton K (-1 = cache)
-    Surligner(K : int) : void =
+    # le bouton K prend son materiau : blanc s'il est vise, vert si c'est le bouton sur du PEEK, normal sinon
+    Peindre(K : int) : void =
         if (T := Touches[K]):
-            Pose := T.GetTransform()
-            if (Surbrillance.TeleportTo[Pose.Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurSurbrillance}, Pose.Rotation]) {}
-            Surbrillance.Show()
-        else:
-            Surbrillance.Hide()
+            if (K = BoutonBlanc):
+                T.SetMaterial(MateriauxHands.M_Blanc, ?Index := IndexMateriau)
+            else if (K = BoutonVert):
+                T.SetMaterial(MateriauxHands.M_Vert, ?Index := IndexMateriau)
+            else:
+                T.SetMaterial(MateriauxHands.M_Normal, ?Index := IndexMateriau)
+
+    # le bouton vise devient blanc (-1 = aucun) ; l'ancien reprend sa couleur
+    Surligner(K : int) : void =
+        Ancien := BoutonBlanc
+        set BoutonBlanc = K
+        if (Ancien <> K):
+            Peindre(Ancien)
+            Peindre(K)
+
+    # PEEK : le bouton sur devient vert (-1 = plus de vert)
+    Verdir(K : int) : void =
+        Ancien := BoutonVert
+        set BoutonVert = K
+        Peindre(Ancien)
+        Peindre(K)
 
     # =========================================================================
     #  UN TOUR : piocher -> (annoncer une carte, vraie ou bluff) -> appuyer soi-meme sur la machine
@@ -456,6 +475,7 @@ hands_manager := class(creative_device):
                     set Bouclier = true
                 else if (Id = 1):
                     set Vu = BoutonSur()
+                    Verdir(Vu)
                 else if (Id = 2):
                     set Passe = true
                 else if (Id = 3):
@@ -477,6 +497,7 @@ hands_manager := class(creative_device):
                 if (K >= 0):
                     if (K = Vu):
                         set Vu = -1
+                        Verdir(-1)
                     Appuyer(J, K)
                     if (Piegee[K]?):
                         if (Bouclier?):
@@ -493,6 +514,7 @@ hands_manager := class(creative_device):
             if (Camera := CamerasClavier[NumeroDe(J) - 1]):
                 Camera.RemoveFrom(J)
         Surligner(-1)
+        Verdir(-1)
         FermerEcrans()
         Elimine
 
@@ -793,23 +815,11 @@ hands_manager := class(creative_device):
             if (J = Actif):
                 set S += array{TexteH("AIM AT A BUTTON AND CLICK - {Requis} TO PRESS", 0.5, 0.0, 0.0, 110.0)}
                 if (Vu >= 0):
-                    set S += PlanSecret(Vu)
+                    set S += array{TexteH("THE GREEN BUTTON IS SAFE", 0.5, 0.0, 0.0, 225.0)}
             else:
                 set S += array{TexteH("P{NumeroDe(Actif)} IS CHOOSING A BUTTON...", 0.5, 0.0, 0.0, 110.0)}
             set S += MainEnBas(J)
             Montrer(J, S, Chrono, false)
-
-    # PEEK : petit plan du clavier (non cliquable), le bouton sur en vert. Lui seul le voit.
-    # Rangee du haut = fond de la machine, comme vu depuis sa place.
-    PlanSecret(Vu : int) : []canvas_slot =
-        var S : []canvas_slot = array{TexteH("SAFE BUTTON (ONLY YOU SEE THIS)", 1.0, 0.5, -170.0, -150.0)}
-        for (R := 0..5, C0 := 0..Colonnes - 1, K := R * Colonnes + C0, K < Touches.Length):
-            Q := Colonnes - 1 - C0
-            X := -260.0 + Q * 46.0
-            Y := -100.0 + R * 40.0
-            Couleur := if (K = Vu) then color{R := 0.1, G := 0.95, B := 0.25} else if (Enfoncee[K]?) then color{R := 0.05, G := 0.05, B := 0.05} else color{R := 0.45, G := 0.45, B := 0.45}
-            set S += array{PlaceH(color_block{DefaultColor := Couleur, DefaultOpacity := 0.9}, 1.0, 0.5, X, Y, 40.0, 34.0)}
-        S
 
     # message en haut de l'ecran pour tout le monde ("" = efface)
     Bandeau(S : string) : void =

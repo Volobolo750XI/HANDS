@@ -26,7 +26,7 @@ le **nombre** de cartes des autres.
 
 Les cartes :
 - **DEFUSE** : le piège ne mord pas ce tour-ci ;
-- **PEEK** : un bouton sûr s'affiche en vert sur un petit plan du clavier, **sur son écran seulement** ;
+- **PEEK** : un bouton sûr devient **vert** sur la machine jusqu'à la fin de son tour ;
 - **PASS** : il passe son tour ;
 - **REVERSE** : le sens change ;
 - **JAM** : le suivant doit appuyer sur 2 boutons ;
@@ -38,12 +38,13 @@ Les cartes :
 3. Importe les 12 images de `Textures/CartesHands/` dans un dossier **CartesHands** (les 6 cartes + leurs versions `_Survol`).
 4. Pose autour de la table **une place par joueur** (petit accessoire invisible devant chaque chaise) et **une Chaise** par place.
 5. Pose un **Déclencheur d'entrée** (Input Trigger) réglé sur l'action **Tir** : c'est le clic du jeu.
-6. Pose un petit accessoire **blanc** (disque ou cube un peu plus grand qu'un bouton) : le repère du bouton visé.
+6. Crée un dossier **MateriauxHands** avec 3 matériaux : **M_Normal** (copie du matériau actuel des boutons),
+   **M_Blanc** (le bouton visé, blanc lumineux) et **M_Vert** (le bouton sûr du PEEK, vert lumineux).
 7. FACULTATIF : une **caméra fixe** par place, devant la bouche de la machine, qui regarde le clavier.
 8. Pose l'appareil `hands_manager` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
-   - **Surbrillance** (l'accessoire blanc) et **ToucheClic** (le Déclencheur d'entrée) ;
+   - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;
    - les 4 **Audio Players** : clic, claquement, carte, et **SonRotation** (en boucle pendant que la machine tourne).
 9. Si la machine ne fait pas face au bon joueur, change **FaceDepart** (90, 180 ou -90).
    Si la mâchoire tourne dans le mauvais sens, change **AxeFermeture** (0, 1 ou 2) ou mets un **AngleFermeture** négatif.
