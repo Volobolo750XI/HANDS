@@ -379,6 +379,14 @@ hands_manager := class(creative_device):
     # "Sitting Idle", In Place), le joueur n'utilise PAS la chaise : il est fige a sa Place, joue l'animation
     # assise en boucle, et reste a la PREMIERE PERSONNE (il peut tourner la tete). Vide = la chaise.
     @editable AnimAssiseJoueur : ?animation_sequence = false
+    # Avec l'animation assise, le joueur est pose PILE a l'endroit de SA chaise (Chaises), tourne vers la machine.
+    # Pour bien le caler sur l'assise : AvanceAssis = cm vers la table (negatif = vers le dossier),
+    # HauteurAssis = cm vers le haut (negatif = plus bas).
+    @editable AvanceAssis : float = 0.0
+    @editable HauteurAssis : float = 0.0
+    # Assis par l'animation : decoche pour essayer de garder le CORPS immobile sur la chaise (si la tete ne
+    # bouge plus du tout, recoche-la).
+    @editable CorpsTourne : logic = true
     # Reglages
     @editable JoueursMinimum : int = 2
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
@@ -528,13 +536,20 @@ hands_manager := class(creative_device):
             Ici := Pl.GetTransform().Translation
             C := Centre.GetTransform().Translation
             Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
-            if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
             if (AnimAssiseJoueur?):
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+                # assis par l'animation : pose sur l'assise de sa chaise (ou sur sa Place sans chaise)
+                Base := if (Ch := Chaises[I]) then Ch.GetTransform().Translation else Ici
+                LacetAssis := ArcTan(C.Y - Base.Y, C.X - Base.X)
+                Avant := vector3{X := Cos(LacetAssis), Y := Sin(LacetAssis), Z := 0.0}
+                Pose := Base + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
+                if (Perso.TeleportTo[Pose, MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := false, AllowEmotes := false})
                 spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
+                if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 Ch.Seat(J)
             else:
+                if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 # pas de chaise : il ne peut pas se deplacer, mais il peut tourner la tete
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := true})
 
