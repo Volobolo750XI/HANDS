@@ -327,19 +327,6 @@ zone_bouton := class:
                 Zone.Sort.Await()
                 Manager.Surligner(-1)
 
-# Le HAUT de l'ecran, quand on tient ses cartes : la souris y monte -> on lache les cartes, la tete est libre
-zone_relache := class:
-    Manager : hands_manager
-    J : player
-    Zone : TEST1
-
-    Suivre()<suspends> : void =
-        race:
-            Manager.FinEcran.Await()
-            loop:
-                Zone.Entre.Await()
-                Manager.Relacher(J)
-
 hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
     # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
@@ -349,16 +336,6 @@ hands_manager := class(creative_device):
     # FACULTATIF : une camera fixe par place, MEME ORDRE, posee devant la bouche de la machine et qui regarde
     # le clavier (la machine est tournee vers cette place pendant son tour). Vide = la camera du joueur.
     @editable CamerasClavier : []gameplay_camera_fixed_point_device = array{}
-    # FACULTATIF : ta "Camera a la premiere personne" (une seule suffit). Remise a chaque joueur assis, et
-    # apres son tour a la machine : il est toujours a la premiere personne.
-    @editable CamerasPremierePersonne : []gameplay_camera_first_person_device = array{}
-    # ASSIS, Fortnite repasse en 3e personne (la camera premiere personne ne marche pas sur une chaise).
-    # Solution : une "Camera orbitale" reglee en vue dans la tete (distance 0, decalage a hauteur des yeux).
-    # Une seule suffit : elle est donnee a chaque joueur assis et enlevee a la fin de la manche.
-    @editable CamerasTete : []gameplay_camera_orbit_device = array{}
-    # LES CARTES : on regarde librement autour de soi. On BAISSE LA TETE vers ses cartes (de plus de ces
-    # degres sous l'horizon) -> le curseur apparait et on choisit. Souris tout en HAUT de l'ecran -> on relache.
-    @editable RegardCartes : float = 25.0
     # Avec une camera fixe : on clique A LA SOURIS. Ou est le clavier A L'ECRAN (vu par la camera), en fractions
     # de l'ecran (0 = gauche / haut, 1 = droite / bas). 7 valeurs = les 7 lignes qui separent les 6 rangees de
     # boutons, de haut en bas : hauteur de la ligne, bord gauche et bord droit du clavier a cette hauteur.
@@ -398,6 +375,10 @@ hands_manager := class(creative_device):
     @editable SonCarte : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
+    # ASSIS SANS CHAISE : sur une chaise, Fortnite force la 3e personne. Avec cette animation (Mixamo
+    # "Sitting Idle", In Place), le joueur n'utilise PAS la chaise : il est fige a sa Place, joue l'animation
+    # assise en boucle, et reste a la PREMIERE PERSONNE (il peut tourner la tete). Vide = la chaise.
+    @editable AnimAssis : ?animation_sequence = false
     # Reglages
     @editable JoueursMinimum : int = 2
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
@@ -418,6 +399,8 @@ hands_manager := class(creative_device):
     # un clic (action Tir) d'un joueur
     ClicJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
+    FinAssis : event() = event(){}
+    var Penches : [player]logic = map{}            # en train de se pencher vers la machine (AnimAppui)
     var BaseTouches : []transform = array{}
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
@@ -435,10 +418,6 @@ hands_manager := class(creative_device):
     var Ecrans : [player]canvas = map{}
     var Chronos : [player][]texture_block = map{}   # les 2 chiffres du chrono (ecriture pinceau)
     var Bandeaux : [player]canvas = map{}           # le message du haut (ecriture pinceau)
-    var Interactifs : [player]logic = map{}         # son ecran attend un choix de carte / d'action
-    var EnMain : [player]logic = map{}              # il tient ses cartes : curseur, tete immobile
-    var Armes : [player]logic = map{}               # il a releve la tete depuis qu'il a lache ses cartes
-    var Indices : [player]canvas = map{}            # "LOOK DOWN AT YOUR CARDS" / "MOUSE UP TO LOOK AROUND"
     var DernierTourne : int = -1                 # place vers laquelle la machine est tournee
     # BLUFF : l'annonce en cours (les autres peuvent crier LIAR!)
     var DefiEnCours : logic = false
@@ -455,7 +434,6 @@ hands_manager := class(creative_device):
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
         EnleverCameras()
-        spawn{ SuivreRegards() }
         loop:
             Presents := GetPlayspace().GetPlayers()
             Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
@@ -484,54 +462,6 @@ hands_manager := class(creative_device):
     EnleverCameras() : void =
         for (Cam : CamerasClavier, J : GetPlayspace().GetPlayers()):
             Cam.RemoveFrom(J)
-        for (Cam : CamerasTete, J : GetPlayspace().GetPlayers()):
-            Cam.RemoveFrom(J)
-
-    PremierePersonne(J : player) : void =
-        for (Cam : CamerasPremierePersonne):
-            Cam.AddTo(J)
-        for (Cam : CamerasTete):
-            Cam.AddTo(J)
-
-    # toutes les 0,1 s : qui baisse la tete vers ses cartes ? (il les prend) / qui l'a relevee ? (il pourra les reprendre)
-    SuivreRegards()<suspends> : void =
-        loop:
-            Sleep(0.1)
-            for (J : Assis, Perso := J.GetFortCharacter[]):
-                Regard := Perso.GetViewRotation().GetLocalForward()
-                Plat := Sqrt(Regard.X * Regard.X + Regard.Y * Regard.Y)
-                Bas := ArcTan(-Regard.Z, Plat) * 180.0 / PiFloat
-                if (Bas >= RegardCartes):
-                    Prendre(J)
-                else if (Bas < RegardCartes - 10.0):
-                    if (set Armes[J] = true) {}
-
-    # il prend ses cartes : l'ecran passe en mode souris (la tete ne bouge plus)
-    Prendre(J : player) : void =
-        if (Interactifs[J]?, not EnMain[J]?, Armes[J]?, C := Ecrans[J], UI := GetPlayerUI[J]):
-            if (set EnMain[J] = true) {}
-            UI.RemoveWidget(C)
-            UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
-            Indice(J)
-
-    # la souris est montee en haut de l'ecran : il lache ses cartes, la tete est libre
-    Relacher(J : player) : void =
-        if (EnMain[J]?, C := Ecrans[J], UI := GetPlayerUI[J]):
-            if (set EnMain[J] = false, set Armes[J] = false) {}
-            UI.RemoveWidget(C)
-            UI.AddWidget(C)
-            Indice(J)
-
-    # la petite consigne, selon qu'il tient ses cartes ou non (rien si son ecran n'attend pas de choix)
-    Indice(J : player) : void =
-        if (UI := GetPlayerUI[J]):
-            if (Ancien := Indices[J]):
-                UI.RemoveWidget(Ancien)
-            if (Interactifs[J]?):
-                S := if (EnMain[J]?) then TexteEcrit("MOUSE UP TO LOOK AROUND", 0.5, 0.0, 0.0, 200.0, 34.0) else TexteEcrit("LOOK DOWN AT YOUR CARDS", 0.5, 1.0, 0.0, -290.0, 46.0)
-                C := canvas{Slots := S}
-                UI.AddWidget(C)
-                if (set Indices[J] = C) {}
 
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
@@ -588,10 +518,9 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
+        FinAssis.Signal()
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
-        for (Cam : CamerasTete, J : Assis):
-            Cam.RemoveFrom(J)
 
     # le joueur va a sa place, tourne vers la machine, et s'assoit sur sa chaise (ou reste fige sur place)
     Asseoir(J : player, I : int) : void =
@@ -600,19 +529,34 @@ hands_manager := class(creative_device):
             C := Centre.GetTransform().Translation
             Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
             if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-            if (set Armes[J] = true) {}
-            if (Ch := Chaises[I]):
+            if (AnimAssis?):
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+                spawn{ GarderAssis(J) }
+            else if (Ch := Chaises[I]):
                 Ch.Seat(J)
-                PremierePersonne(J)
             else:
                 # pas de chaise : il ne peut pas se deplacer, mais il peut tourner la tete
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := true})
 
     # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
     Rasseoir() : void =
-        for (I -> J : Assis, Contient(Vivants, J)?, Ch := Chaises[I]):
+        for (I -> J : Assis, not AnimAssis?, Contient(Vivants, J)?, Ch := Chaises[I]):
             Ch.Seat(J)
-            PremierePersonne(J)
+
+    # l'animation assise, en boucle, jusqu'a la fin de la manche (pause pendant qu'il se penche)
+    GarderAssis(J : player)<suspends> : void =
+        race:
+            FinAssis.Await()
+            loop:
+                if (Anim := AnimAssis?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[], not Penches[J]?):
+                    Controle.PlayAndAwait(Anim)
+                else:
+                    Sleep(0.2)
+                Sleep(0.0)
+
+    Redresser(J : player)<suspends> : void =
+        Sleep(1.2)
+        if (set Penches[J] = false) {}
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 5)
 
@@ -908,7 +852,6 @@ hands_manager := class(creative_device):
                         set Requis -= 1
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
-            PremierePersonne(J)
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
@@ -1218,8 +1161,10 @@ hands_manager := class(creative_device):
     # le personnage se penche (animation), puis le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            if (set Penches[J] = true) {}
             Controle.Play(Anim)
             Sleep(0.6)
+            spawn{ Redresser(J) }
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
@@ -1260,10 +1205,6 @@ hands_manager := class(creative_device):
             UI.RemoveWidget(C)
         set Ecrans = map{}
         set Chronos = map{}
-        set Interactifs = map{}
-        for (J -> C : Indices, UI := GetPlayerUI[J]):
-            UI.RemoveWidget(C)
-        set Indices = map{}
 
     MajChronos(Reste : float) : void =
         if (S := Ceil[Reste]):
@@ -1345,23 +1286,6 @@ hands_manager := class(creative_device):
             else:
                 UI.AddWidget(C)
             if (set Ecrans[J] = C, set Chronos[J] = Chrono) {}
-            if (set Interactifs[J] = false, set EnMain[J] = false) {}
-            Indice(J)
-
-    # un ecran de CARTES : tete libre ; il baisse la tete -> curseur (voir SuivreRegards). Tout en haut de
-    # l'ecran, une zone invisible : la souris y monte -> il relache ses cartes.
-    MontrerCartes(J : player, S : []canvas_slot, Chrono : []texture_block) : void =
-        if (UI := GetPlayerUI[J]):
-            Zone := TEST1{}
-            ZR := zone_relache{Manager := Self, J := J, Zone := Zone}
-            spawn{ ZR.Suivre() }
-            C := canvas{Slots := array{PlaceH(Zone, 0.5, 0.0, 0.0, 70.0, 4000.0, 140.0)} + S}
-            if (EnMain[J]?):
-                UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
-            else:
-                UI.AddWidget(C)
-            if (set Ecrans[J] = C, set Chronos[J] = Chrono, set Interactifs[J] = true) {}
-            Indice(J)
 
     NouveauChrono() : []texture_block =
         array{ImgH(Ecriture.E_0, 64.0, 64.0), ImgH(Ecriture.E_0, 64.0, 64.0)}
@@ -1394,7 +1318,7 @@ hands_manager := class(creative_device):
                 if (PeutPiocher?):
                     set S += BoutonTexte("DRAW A CARD", 0.5, 0.5, if (PeutJouer?) then 300.0 else 0.0, 20.0, 80.0, 411)
                 set S += PaquetEnBas(J)
-                MontrerCartes(J, S, Chrono)
+                Montrer(J, S, Chrono, true)
             else:
                 set S += TexteEcrit("P{NumeroDe(Actif)} IS THINKING...", 0.5, 0.0, 0.0, 300.0, 54.0)
                 set S += PaquetEnBas(J)
@@ -1431,7 +1355,7 @@ hands_manager := class(creative_device):
                 if (Choisie < 0):
                     set S += BoutonTexte("BACK", 0.5, 1.0, 600.0, -130.0, 56.0, 197)
                 set S += MainCliquable(J, Choisie)
-                MontrerCartes(J, S, Chrono)
+                Montrer(J, S, Chrono, true)
             else:
                 set S += TexteEcrit("P{NumeroDe(Actif)} IS CHOOSING A CARD...", 0.5, 0.0, 0.0, 260.0, 54.0)
                 set S += PaquetEnBas(J)
