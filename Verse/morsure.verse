@@ -272,6 +272,36 @@ bouton_texte := class:
                     Img.SetImage(T)
                     Img.SetDesiredSize(vector2{X := Taille, Y := Taille})
 
+# LA PILE cliquable : au survol, le cadre de la carte du dessus s'allume en BLANC et DRAW devient blanc et grossit
+pile_cliquable := class:
+    Ev : event(int)
+    Fin : event()
+    Code : int
+    Bordure : color_block
+    Lettres : []texture_block
+    Normales : []texture
+    Claires : []texture
+    Taille : float
+    Zone : TEST1
+
+    Suivre()<suspends> : void =
+        race:
+            Fin.Await()
+            loop:
+                Zone.Clic.Await()
+                Ev.Signal(Code)
+            loop:
+                Zone.Entre.Await()
+                Bordure.SetColor(color{R := 0.95, G := 0.95, B := 0.92})
+                for (I -> Img : Lettres, T := Claires[I]):
+                    Img.SetImage(T)
+                    Img.SetDesiredSize(vector2{X := Taille * 1.18, Y := Taille * 1.18})
+                Zone.Sort.Await()
+                Bordure.SetColor(color{R := 0.33, G := 0.33, B := 0.32})
+                for (I -> Img : Lettres, T := Normales[I]):
+                    Img.SetImage(T)
+                    Img.SetDesiredSize(vector2{X := Taille, Y := Taille})
+
 # une CARTE de sa main, cliquable : au survol elle s'eclaircit et grossit (on la "prend")
 carte_main := class:
     Ev : event(int)
@@ -371,7 +401,8 @@ hands_manager := class(creative_device):
     @editable TestSolo : logic = false
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
-    @editable DureeChoixCarte : float = 10.0     # temps pour choisir la carte a annoncer
+    @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
+    @editable DureePioche : float = 15.0         # temps pour cliquer la pile (sinon pioche automatique)
     @editable DureeDefi : float = 5.0            # secondes pour crier LIAR! apres une annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
@@ -905,7 +936,7 @@ hands_manager := class(creative_device):
             Avertir(J, "YOUR HAND IS FULL")
             return
         EcranPioche(J)
-        Fin := GetSimulationElapsedTime() + 8.0
+        Fin := GetSimulationElapsedTime() + DureePioche
         loop:
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
@@ -1126,6 +1157,37 @@ hands_manager := class(creative_device):
             set S += DosCarte(1.0, 0.5, -230.0 + K * 6.0, -40.0 - K * 6.0, 230.0)
         S + TexteEcrit(Texte, 1.0, 0.5, -218.0, 120.0, 46.0)
 
+    # LA PILE CLIQUABLE du joueur actif : 3 dos de cartes ; celle du dessus s'allume au survol, avec DRAW dessous
+    PileCliquable() : []canvas_slot =
+        var S : []canvas_slot = array{}
+        for (K := 0..1):
+            set S += DosCarte(1.0, 0.5, -230.0 + K * 6.0, -40.0 - K * 6.0, 230.0)
+        X := -218.0
+        Y := -52.0
+        Bordure := color_block{DefaultColor := color{R := 0.33, G := 0.33, B := 0.32}}
+        set S += array{PlaceH(Bordure, 1.0, 0.5, X, Y, 230.0 * 0.72 + 6.0, 230.0 * 0.96 + 6.0),
+            PlaceH(color_block{DefaultColor := color{R := 0.07, G := 0.07, B := 0.075}}, 1.0, 0.5, X, Y, 230.0 * 0.66, 230.0 * 0.90)}
+        set S += TexteEcrit("?", 1.0, 0.5, X, Y, 230.0 * 0.45)
+        var Lettres : []texture_block = array{}
+        var Normales : []texture = array{}
+        var Claires : []texture = array{}
+        Taille := 60.0
+        var Cx : float = X - LargeurTexte("DRAW", Taille) * 0.5
+        for (C : "DRAW"):
+            L := LargeurGlyphe(C) * Taille
+            if (T := GlypheNormal(C)?, T2 := GlypheClair(C)?):
+                Img := ImgH(T, Taille, Taille)
+                set Lettres += array{Img}
+                set Normales += array{T}
+                set Claires += array{T2}
+                set S += array{PlaceLibre(Img, 1.0, 0.5, Cx + L * 0.5, 120.0)}
+            set Cx += L + Taille * 0.06
+        Zone := TEST1{}
+        PC := pile_cliquable{Ev := Choix, Fin := FinEcran, Code := 50, Bordure := Bordure, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := Taille, Zone := Zone}
+        spawn{ PC.Suivre() }
+        # la zone couvre la carte du dessus ET le mot DRAW
+        S + array{PlaceH(Zone, 1.0, 0.5, X, 20.0, 200.0, 360.0)}
+
     # un TEXTE-BOUTON au pinceau (blanc + plus gros au survol)
     BoutonTexte(S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
         var Slots : []canvas_slot = array{}
@@ -1157,12 +1219,7 @@ hands_manager := class(creative_device):
             if (J = Actif):
                 set S += TexteEcrit("YOUR TURN", 0.5, 0.0, 0.0, 250.0, 90.0)
                 set S += TexteEcrit("CLICK THE DECK TO DRAW A CARD", 0.5, 0.0, 0.0, 330.0, 44.0)
-                set S += Pile("")
-                Zone := TEST1{}
-                BT := bouton_texte{Ev := Choix, Fin := FinEcran, Code := 50, Lettres := array{}, Normales := array{}, Claires := array{}, Taille := 1.0, Zone := Zone}
-                spawn{ BT.Suivre() }
-                set S += array{PlaceH(Zone, 1.0, 0.5, -224.0, -46.0, 190.0, 240.0)}
-                set S += BoutonTexte("DRAW", 1.0, 0.5, -218.0, 120.0, 56.0, 50)
+                set S += PileCliquable()
                 set S += PaquetEnBas(J)
                 Montrer(J, S, Chrono, true)
             else:
