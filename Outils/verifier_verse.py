@@ -2,7 +2,14 @@
 #  - fonction sans <transacts>/<decides> appelee dans une condition if/for (3512)
 #  - condition if/for coupee sur plusieurs lignes (3506)
 # usage : python3 Outils/verifier_verse.py
-import re, glob
+import re, glob, sys, builtins
+ERREURS = 0
+_print = builtins.print
+def print(*a, **k):
+    global ERREURS
+    if a and a[0] != 'verification terminee':
+        ERREURS += 1
+    _print(*a, **k)
 for f in glob.glob('Verse/*.verse'):
     L = open(f).read().split('\n')
     trans, toutes = set(), set()
@@ -49,3 +56,4 @@ for f in glob.glob('Verse/*.verse'):
     for fn in sorted(appels - definies - variables - connues):
         print(f, '3506 fonction appelee mais introuvable :', fn)
 print('verification terminee')
+sys.exit(1 if ERREURS else 0)

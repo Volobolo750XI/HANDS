@@ -439,7 +439,7 @@ hands_manager := class(creative_device):
                 Sleep(1.0)
 
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
-    CameraDe(J : player) : ?gameplay_camera_fixed_point_device =
+    CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
         if (Pl := Places[NumeroDe(J) - 1]):
             Ici := Pl.GetTransform().Translation
