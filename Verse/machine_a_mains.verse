@@ -612,7 +612,9 @@ hands_manager := class(creative_device):
             race:
                 Sleep(Min(0.5, Reste))
                 block:
-                    set Qui = option{ClicJoueur.Await()}
+                    # (pas d'Await dans option{...} : erreur 3512)
+                    Cliqueur := ClicJoueur.Await()
+                    set Qui = option{Cliqueur}
             if (Ag := Qui?, A := player[Ag], A <> J, Contient(Vivants, A)?):
                 set Accuse = option{A}
                 Bandeau("P{NumeroDe(A)} SAYS P{NumeroDe(J)} IS LYING!")

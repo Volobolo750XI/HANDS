@@ -14,3 +14,4 @@
 - 3532 : ne jamais nommer une variable comme un dossier d'assets (Cartes, Interface, Police, Celebrations...).
 - AVANT CHAQUE ENVOI : lancer python3 Outils/verifier_verse.py
 - JAMAIS 'not' devant une action qui peut echouer (TeleportTo[...], set...) : Verse annule ses effets. Faire : X := if (Action[]) then true else false ; puis if (not X?).
+- 3512 : jamais de fonction <suspends> (Await, Sleep...) DANS option{...} : faire X := Ev.Await() puis option{X}.

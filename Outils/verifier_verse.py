@@ -31,4 +31,7 @@ for f in glob.glob('Verse/*.verse'):
     for i, l in enumerate(L):
         if re.search(r'\bnot\s+\w+\.(TeleportTo|MoveTo|Damage|Respawn|Remove|Grant\w*)\[', l):
             print(f, i + 1, 'not devant une action (Verse annule son effet) :', l.strip()[:80])
+    for i, l in enumerate(L):
+        if re.search(r'option\{[^}]*\.Await\(', l):
+            print(f, i + 1, '3512 Await dans option{...} :', l.strip()[:80])
 print('verification terminee')
