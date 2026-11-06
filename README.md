@@ -4,7 +4,7 @@ Jeu de table : chacun son tour, on appuie sur un bouton de la machine. Certains 
 la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu gagne.
 
 ## Fichiers
-- `Verse/morsure.verse` : tout le système (un seul appareil `morsure_device`).
+- `Verse/morsure.verse` : tout le système (un seul appareil `hands_manager`).
 - `Modeles/Machine.glb` : la machine stylisée, découpée (Corps, Plaque, Gueule, Bouton_01 à Bouton_24).
 - `Modeles/Grange.glb` : le décor (grange, enclos, salle avec la table ronde).
 
@@ -41,7 +41,7 @@ Les cartes :
 6. Crée un dossier **Teintes** avec 3 matériaux : **T_Base** (copie du matériau actuel des boutons),
    **T_Clair** (le bouton visé, blanc lumineux) et **T_Sur** (le bouton sûr du PEEK, vert lumineux).
 7. FACULTATIF : une **caméra fixe** par place, devant la bouche de la machine, qui regarde le clavier.
-8. Pose l'appareil `morsure_device` et remplis :
+8. Pose l'appareil `hands_manager` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;

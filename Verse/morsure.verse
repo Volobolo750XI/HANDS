@@ -11,7 +11,7 @@
 #    - accuse mais c'etait vrai -> l'effet s'applique, l'accusateur perd une carte et appuiera sur 1 bouton de plus
 #  Les jeux de chacun sont secrets : les autres ne voient que le NOMBRE de cartes.
 #
-#  Un seul appareil Verse a poser : morsure_device
+#  Un seul appareil Verse a poser : hands_manager
 # ============================================================================
 using { /Fortnite.com/Devices }
 using { /Fortnite.com/Characters }
@@ -81,7 +81,7 @@ relique_cliquable := class:
                 Zone.Sort.Await()
                 Image.SetImage(Normale)
 
-morsure_device := class(creative_device):
+hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
     # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
     @editable Places : []creative_prop = array{}
@@ -113,7 +113,7 @@ morsure_device := class(creative_device):
     # Sons (Audio Player : lecture automatique NON)
     @editable SonClic : audio_player_device = audio_player_device{}
     @editable SonBoom : audio_player_device = audio_player_device{}
-    @editable SonRelique : audio_player_device = audio_player_device{}
+    @editable SonCarte : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
     # Reglages
@@ -123,7 +123,7 @@ morsure_device := class(creative_device):
     @editable TestSolo : logic = false
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
-    @editable DureeChoixRelique : float = 10.0     # temps pour choisir la carte a annoncer
+    @editable DureeChoixCarte : float = 10.0     # temps pour choisir la carte a annoncer
     @editable DureeDefi : float = 5.0            # secondes pour crier LIAR! apres une annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
@@ -434,7 +434,7 @@ morsure_device := class(creative_device):
         Rasseoir()
         TournerVers(J)
         if (M := Paquets[J], M.Length < PaquetMax, set Paquets[J] = M + array{TirerRelique()}):
-            SonRelique.Play()
+            SonCarte.Play()
         Penalite := if (P := Penalites[J]) then P else 0
         if (set Penalites[J] = 0) {}
         var Requis : int = 1 + Bloque + Penalite
@@ -470,7 +470,7 @@ morsure_device := class(creative_device):
             if (Possede >= 0, Effet?):
                 RetirerRelique(J, Possede)
             if (Effet?):
-                SonRelique.Play()
+                SonCarte.Play()
                 if (Id = 0):
                     set Bouclier = true
                 else if (Id = 1):
@@ -585,7 +585,7 @@ morsure_device := class(creative_device):
             if (Volee := MC[I]):
                 RetirerRelique(C, I)
                 if (MJ := Paquets[J], MJ.Length < PaquetMax, set Paquets[J] = MJ + array{Volee}) {}
-                SonRelique.Play()
+                SonCarte.Play()
                 Avertir(J, "YOU STOLE {NomRelique(Volee)} FROM P{NumeroDe(C)}!")
                 Avertir(C, "P{NumeroDe(J)} STOLE YOUR {NomRelique(Volee)}!")
                 for (X : Assis, X <> J, X <> C):
@@ -595,7 +595,7 @@ morsure_device := class(creative_device):
     ChoisirRelique(J : player)<suspends> : int =
         EcranReliques(J)
         var Id : int = -1
-        Fin := GetSimulationElapsedTime() + DureeChoixRelique
+        Fin := GetSimulationElapsedTime() + DureeChoixCarte
         loop:
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
@@ -620,7 +620,7 @@ morsure_device := class(creative_device):
         set DefiEnCours = true
         set DefiRelique = Id
         set DefiAuteur = NumeroDe(J)
-        SonRelique.Play()
+        SonCarte.Play()
         EcranDefi(J)
         var Accuse : ?player = false
         # seul (TEST SOLO) : personne ne peut crier LIAR, on n'attend qu'une seconde
