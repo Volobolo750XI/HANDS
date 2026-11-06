@@ -1,3 +1,4 @@
+# Usage : python3 -I Outils/detourer_cartes.py dossier_des_images dossier_de_sortie  (33.webp ... 38.webp -> Carte_*.png 1024x1024)
 import sys, os
 import numpy as np
 from PIL import Image, ImageFilter
@@ -19,7 +20,7 @@ for k, nom in noms.items():
     flou = np.asarray(Image.fromarray(g.astype(np.uint8)).filter(ImageFilter.BoxBlur(3))).astype(float)
     flou2 = np.asarray(Image.fromarray(np.clip(g * g / 255.0, 0, 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(3))).astype(float) * 255.0
     ecart = np.sqrt(np.maximum(0, flou2 - flou * flou))
-    passable = (a.max(-1) < 30) & (ecart < 4.0)
+    passable = (a.max(-1) < 26) & (ecart < 3.0)
     # remplissage depuis les bords : tout ce qu'on atteint sur du "fond" = fond
     dehors = np.zeros(passable.shape, bool)
     dehors[0, :] = dehors[-1, :] = dehors[:, 0] = dehors[:, -1] = True
@@ -38,7 +39,20 @@ for k, nom in noms.items():
         if (n == garde).all():
             break
         garde = n
-    alpha = Image.fromarray((garde * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    # le cadre metallique sombre et lisse etait parfois pris pour du fond (encoches dans le bord) :
+    # on bouche, ligne par ligne ET colonne par colonne, tout ce qui est entre le premier et le dernier pixel de la carte
+    lignes = np.zeros_like(garde)
+    for y in range(h):
+        xs = np.where(garde[y])[0]
+        if len(xs):
+            lignes[y, xs[0]:xs[-1] + 1] = True
+    colonnes = np.zeros_like(garde)
+    for x in range(w):
+        ys = np.where(garde[:, x])[0]
+        if len(ys):
+            colonnes[ys[0]:ys[-1] + 1, x] = True
+    plein = lignes | colonnes
+    alpha = Image.fromarray((plein * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7))
     rgba = im.convert('RGBA'); rgba.putalpha(alpha)
     bb = alpha.point(lambda v: 255 if v > 10 else 0).getbbox()
     rgba = rgba.crop(bb)
