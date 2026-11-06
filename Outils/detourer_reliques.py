@@ -1,9 +1,9 @@
-# Usage : python3 -I Outils/detourer_cartes.py dossier_des_images dossier_de_sortie  (33.webp ... 38.webp -> Carte_*.png 1024x1024)
+# Usage : python3 -I Outils/detourer_cartes.py dossier_des_images dossier_de_sortie  (33.webp ... 38.webp -> Relique_*.png 1024x1024)
 import sys, os
 import numpy as np
 from PIL import Image, ImageFilter
 src, out = sys.argv[1], sys.argv[2]
-noms = {33: 'Carte_Defuse', 34: 'Carte_Peek', 35: 'Carte_Pass', 36: 'Carte_Reverse', 37: 'Carte_Jam', 38: 'Carte_Steal'}
+noms = {33: 'Relique_Bouclier', 34: 'Relique_Serrure', 35: 'Relique_Sablier', 36: 'Relique_Chaine', 37: 'Relique_Etau', 38: 'Relique_Corbeau'}
 
 def dil(m):
     n = m.copy()

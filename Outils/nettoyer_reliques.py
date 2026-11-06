@@ -1,10 +1,10 @@
-# Cartes : plus de rouille (couleurs orange/brun -> metal gris) et le sang assombri (rouges -> brun tres fonce).
+# Reliques : plus de rouille (couleurs orange/brun -> metal gris) et le sang assombri (rouges -> brun tres fonce).
 # Les boutons rouges de JAM (dans le medaillon) ne sont pas touches.
 import sys, os
 import numpy as np
 from PIL import Image, ImageEnhance
 src, out = sys.argv[1], sys.argv[2]
-for nom in ['Carte_Defuse', 'Carte_Peek', 'Carte_Pass', 'Carte_Reverse', 'Carte_Jam', 'Carte_Steal']:
+for nom in ['Relique_Bouclier', 'Relique_Serrure', 'Relique_Sablier', 'Relique_Chaine', 'Relique_Etau', 'Relique_Corbeau']:
     im = Image.open(os.path.join(src, nom + '.png')).convert('RGBA')
     a = np.asarray(im).astype(float)
     rgb = a[..., :3] / 255.0
@@ -22,7 +22,7 @@ for nom in ['Carte_Defuse', 'Carte_Peek', 'Carte_Pass', 'Carte_Reverse', 'Carte_
     rouille = np.clip((sat - 0.04) / 0.06, 0, 1) * chaud
     # SANG : rouges -> brun tres fonce
     rouge = np.clip((sat - 0.22) / 0.15, 0, 1) * np.clip(1 - np.abs(hc) / 28, 0, 1)
-    if nom == 'Carte_Jam':
+    if nom == 'Relique_Etau':
         H, W = lum.shape
         yy, xx = np.mgrid[0:H, 0:W]
         dans = ((xx - 515) ** 2 + (yy - 520) ** 2) < 230 ** 2
@@ -36,5 +36,5 @@ for nom in ['Carte_Defuse', 'Carte_Peek', 'Carte_Pass', 'Carte_Reverse', 'Carte_
     n.save(os.path.join(out, nom + '.png'), optimize=True)
     al = n.getchannel('A')
     s = ImageEnhance.Brightness(n.convert('RGB')).enhance(1.28).convert('RGBA'); s.putalpha(al)
-    s.save(os.path.join(out, nom + '_Survol.png'), optimize=True)
+    s.save(os.path.join(out, nom + '_Lueur.png'), optimize=True)
     print(nom)

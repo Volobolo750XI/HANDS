@@ -1,16 +1,16 @@
-# Machine à mains (UEFN)
+# Morsure (UEFN)
 
 Jeu de table : chacun son tour, on appuie sur un bouton de la machine. Certains boutons sont piégés :
 la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu gagne.
 
 ## Fichiers
-- `Verse/machine_a_mains.verse` : tout le système (un seul appareil `hands_manager`).
+- `Verse/morsure.verse` : tout le système (un seul appareil `morsure_device`).
 - `Modeles/Machine.glb` : la machine stylisée, découpée (Corps, Plaque, Gueule, Bouton_01 à Bouton_24).
 - `Modeles/Grange.glb` : le décor (grange, enclos, salle avec la table ronde).
 
 ## Déroulé d'un tour
 Les joueurs sont **assis** (appareil Chaise) autour de la machine, chacun son tour (sens des aiguilles d'une montre,
-ou l'inverse après un REVERSE). Les mains sont **secrètes** : on voit ses cartes en bas de l'écran, et seulement
+ou l'inverse après un REVERSE). Les jeux de chacun sont **secrets** : on voit ses cartes en bas de l'écran, et seulement
 le **nombre** de cartes des autres.
 1. La machine **pivote vers le joueur** (le chemin le plus court ; seul en TestSolo : un tour complet dans le vide).
    Il **pioche 1 carte** (3 max ; chacun commence avec 1 carte).
@@ -35,13 +35,13 @@ Les cartes :
 ## Installation dans UEFN
 1. Importe `Machine.glb` avec **Combine Meshes décoché**. Fais de chaque morceau un **accessoire** (Gueule et chaque bouton).
 2. Copie le widget **TEST1** de Football Pillars dans un dossier **BOUTON** du projet.
-3. Importe les 12 images de `Textures/CartesHands/` dans un dossier **CartesHands** (Hands_Defuse … Hands_Steal + leurs versions `_Hover`).
+3. Importe les 12 images de `Textures/Reliques/` dans un dossier **Reliques** (Relique_Bouclier, _Serrure, _Sablier, _Chaine, _Etau, _Corbeau + leurs versions `_Lueur`).
 4. Pose autour de la table **une place par joueur** (petit accessoire invisible devant chaque chaise) et **une Chaise** par place.
 5. Pose un **Déclencheur d'entrée** (Input Trigger) réglé sur l'action **Tir** : c'est le clic du jeu.
-6. Crée un dossier **MateriauxHands** avec 3 matériaux : **M_Normal** (copie du matériau actuel des boutons),
-   **M_Blanc** (le bouton visé, blanc lumineux) et **M_Vert** (le bouton sûr du PEEK, vert lumineux).
+6. Crée un dossier **Teintes** avec 3 matériaux : **T_Base** (copie du matériau actuel des boutons),
+   **T_Clair** (le bouton visé, blanc lumineux) et **T_Sur** (le bouton sûr du PEEK, vert lumineux).
 7. FACULTATIF : une **caméra fixe** par place, devant la bouche de la machine, qui regarde le clavier.
-8. Pose l'appareil `hands_manager` et remplis :
+8. Pose l'appareil `morsure_device` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;
