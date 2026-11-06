@@ -378,7 +378,7 @@ hands_manager := class(creative_device):
     # ASSIS SANS CHAISE : sur une chaise, Fortnite force la 3e personne. Avec cette animation (Mixamo
     # "Sitting Idle", In Place), le joueur n'utilise PAS la chaise : il est fige a sa Place, joue l'animation
     # assise en boucle, et reste a la PREMIERE PERSONNE (il peut tourner la tete). Vide = la chaise.
-    @editable AnimAssis : ?animation_sequence = false
+    @editable AnimationAssise : ?animation_sequence = false
     # Reglages
     @editable JoueursMinimum : int = 2
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
@@ -529,7 +529,7 @@ hands_manager := class(creative_device):
             C := Centre.GetTransform().Translation
             Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
             if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-            if (AnimAssis?):
+            if (AnimationAssise?):
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
                 spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
@@ -540,7 +540,7 @@ hands_manager := class(creative_device):
 
     # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
     Rasseoir() : void =
-        for (I -> J : Assis, not AnimAssis?, Contient(Vivants, J)?, Ch := Chaises[I]):
+        for (I -> J : Assis, not AnimationAssise?, Contient(Vivants, J)?, Ch := Chaises[I]):
             Ch.Seat(J)
 
     # l'animation assise, en boucle, jusqu'a la fin de la manche (pause pendant qu'il se penche)
@@ -548,7 +548,7 @@ hands_manager := class(creative_device):
         race:
             FinAssis.Await()
             loop:
-                if (Anim := AnimAssis?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[], not Penches[J]?):
+                if (Anim := AnimationAssise?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[], not Penches[J]?):
                     Controle.PlayAndAwait(Anim)
                 else:
                     Sleep(0.2)
