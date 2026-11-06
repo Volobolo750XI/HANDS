@@ -561,12 +561,13 @@ hands_manager := class(creative_device):
             # SA main, en images, en bas de l'ecran (lui seul la voit)
             Main : []int = if (M := Mains[J]) then M else array{}
             for (I -> Id : Main):
-                X := (I * 1.0 - (Main.Length - 1) * 0.5) * 170.0
-                set S += array{PlaceH(ImgH(ImageCarte(Id), 150.0, 225.0), 0.5, 1.0, X, -130.0, 150.0, 225.0)}
+                # (images 1024 x 1024 : la carte, plus haute que large, est au milieu de l'image carree)
+                X := (I * 1.0 - (Main.Length - 1) * 0.5) * 180.0
+                set S += array{PlaceH(ImgH(ImageCarte(Id), 240.0, 240.0), 0.5, 1.0, X, -135.0, 240.0, 240.0)}
             var Clavier : logic = false
             if (DefiEnCours?):
                 # une annonce est en cours : LIAR! pour les autres joueurs encore en jeu
-                set S += array{PlaceH(ImgH(ImageCarte(DefiCarte), 180.0, 270.0), 0.5, 0.5, 0.0, -40.0, 180.0, 270.0)}
+                set S += array{PlaceH(ImgH(ImageCarte(DefiCarte), 340.0, 340.0), 0.5, 0.5, 0.0, -40.0, 340.0, 340.0)}
                 if (J = Actif):
                     set S += array{TexteH("YOU CLAIMED {NomCarte(DefiCarte)} - WILL THEY BELIEVE YOU?", 0.5, 0.0, 0.0, 110.0)}
                 else if (Contient(Vivants, J)?):
