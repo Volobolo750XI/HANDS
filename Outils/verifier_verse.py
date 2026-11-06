@@ -35,4 +35,15 @@ for f in glob.glob('Verse/*.verse'):
     for i, l in enumerate(L):
         if re.search(r'option\{[^}]*\.Await\(', l):
             print(f, i + 1, '3512 Await dans option{...} :', l.strip()[:80])
+    # chaque fonction appelee doit exister (dans le fichier ou dans Verse) : evite d'en supprimer une par erreur
+    sans_textes = re.sub(r'"[^"]*"', '""', '\n'.join(L))
+    definies = set(re.findall(r'^\s*([A-Z]\w*)(?:<[^>]*>)?\(', sans_textes, re.M))
+    variables = set(re.findall(r'\b([A-Z]\w*)\s*:=', sans_textes))
+    appels = set(re.findall(r'(?<![\.\w])([A-Z]\w*)\(', sans_textes))
+    connues = {'Sleep', 'Max', 'Min', 'Abs', 'Floor', 'Ceil', 'Mod', 'ArcTan', 'Tan', 'Sin', 'Cos', 'Sqrt', 'DotProduct',
+               'DegreesToRadians', 'MakeRotation', 'MakeRotationFromYawPitchRollDegrees', 'GetRandomInt', 'GetRandomFloat',
+               'GetSimulationElapsedTime', 'GetSecondsSinceEpoch', 'GetPlayspace', 'GetPlayerUI', 'ToString', 'ConcatenateMaps',
+               'IdentityRotation', 'Distance', 'Lerp', 'TEST1'}
+    for fn in sorted(appels - definies - variables - connues):
+        print(f, '3506 fonction appelee mais introuvable :', fn)
 print('verification terminee')

@@ -1139,6 +1139,18 @@ hands_manager := class(creative_device):
         spawn{ BT.Suivre() }
         Slots + array{PlaceH(Zone, AX, AY, X, Y, Largeur + 20.0, Taille * 0.9)}
 
+    Montrer(J : player, S : []canvas_slot, Chrono : text_block, Souris : logic) : void =
+        if (UI := GetPlayerUI[J]):
+            C := canvas{Slots := S}
+            if (Souris?):
+                UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+            else:
+                UI.AddWidget(C)
+            if (set Ecrans[J] = C, set Chronos[J] = Chrono) {}
+
+    NouveauChrono() : text_block =
+        text_block{DefaultText := TexteJeu(""), DefaultTextColor := color{R := 1.0, G := 0.85, B := 0.2}}
+
     # LES REGLES, au debut de la manche, pour tout le monde
     EcranRegles() : void =
         FermerEcrans()
