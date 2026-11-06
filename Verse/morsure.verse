@@ -60,13 +60,200 @@ TexteH(S : string, AX : float, AY : float, X : float, Y : float) : canvas_slot =
 
 # Une carte cliquable de l'ecran : son image (plus claire au survol) + la zone de clic TEST1 par-dessus.
 # Clic -> Ev.Signal(Code). S'arrete quand l'ecran est reconstruit (Fin).
-relique_cliquable := class:
+# --- ECRITURE pinceau sec : une image par caractere (dossier Ecriture : E_A ... et E_A_Clair pour le survol)
+GlypheNormal(C : char)<transacts> : ?texture =
+    if (C = 'A') then option{Ecriture.E_A}
+    else if (C = 'B') then option{Ecriture.E_B}
+    else if (C = 'C') then option{Ecriture.E_C}
+    else if (C = 'D') then option{Ecriture.E_D}
+    else if (C = 'E') then option{Ecriture.E_E}
+    else if (C = 'F') then option{Ecriture.E_F}
+    else if (C = 'G') then option{Ecriture.E_G}
+    else if (C = 'H') then option{Ecriture.E_H}
+    else if (C = 'I') then option{Ecriture.E_I}
+    else if (C = 'J') then option{Ecriture.E_J}
+    else if (C = 'K') then option{Ecriture.E_K}
+    else if (C = 'L') then option{Ecriture.E_L}
+    else if (C = 'M') then option{Ecriture.E_M}
+    else if (C = 'N') then option{Ecriture.E_N}
+    else if (C = 'O') then option{Ecriture.E_O}
+    else if (C = 'P') then option{Ecriture.E_P}
+    else if (C = 'Q') then option{Ecriture.E_Q}
+    else if (C = 'R') then option{Ecriture.E_R}
+    else if (C = 'S') then option{Ecriture.E_S}
+    else if (C = 'T') then option{Ecriture.E_T}
+    else if (C = 'U') then option{Ecriture.E_U}
+    else if (C = 'V') then option{Ecriture.E_V}
+    else if (C = 'W') then option{Ecriture.E_W}
+    else if (C = 'X') then option{Ecriture.E_X}
+    else if (C = 'Y') then option{Ecriture.E_Y}
+    else if (C = 'Z') then option{Ecriture.E_Z}
+    else if (C = '0') then option{Ecriture.E_0}
+    else if (C = '1') then option{Ecriture.E_1}
+    else if (C = '2') then option{Ecriture.E_2}
+    else if (C = '3') then option{Ecriture.E_3}
+    else if (C = '4') then option{Ecriture.E_4}
+    else if (C = '5') then option{Ecriture.E_5}
+    else if (C = '6') then option{Ecriture.E_6}
+    else if (C = '7') then option{Ecriture.E_7}
+    else if (C = '8') then option{Ecriture.E_8}
+    else if (C = '9') then option{Ecriture.E_9}
+    else if (C = '!') then option{Ecriture.E_Excl}
+    else if (C = '?') then option{Ecriture.E_Inter}
+    else if (C = '.') then option{Ecriture.E_Point}
+    else if (C = ',') then option{Ecriture.E_Virgule}
+    else if (C = ':') then option{Ecriture.E_DeuxPoints}
+    else if (C = '-') then option{Ecriture.E_Tiret}
+    else if (C = '+') then option{Ecriture.E_Plus}
+    else if (C = '%') then option{Ecriture.E_Pourcent}
+    else if (C = '/') then option{Ecriture.E_Slash}
+    else if (C = '(') then option{Ecriture.E_ParenG}
+    else if (C = ')') then option{Ecriture.E_ParenD}
+    else if (C = 'x') then option{Ecriture.E_Fois}
+    else false
+
+GlypheClair(C : char)<transacts> : ?texture =
+    if (C = 'A') then option{Ecriture.E_A_Clair}
+    else if (C = 'B') then option{Ecriture.E_B_Clair}
+    else if (C = 'C') then option{Ecriture.E_C_Clair}
+    else if (C = 'D') then option{Ecriture.E_D_Clair}
+    else if (C = 'E') then option{Ecriture.E_E_Clair}
+    else if (C = 'F') then option{Ecriture.E_F_Clair}
+    else if (C = 'G') then option{Ecriture.E_G_Clair}
+    else if (C = 'H') then option{Ecriture.E_H_Clair}
+    else if (C = 'I') then option{Ecriture.E_I_Clair}
+    else if (C = 'J') then option{Ecriture.E_J_Clair}
+    else if (C = 'K') then option{Ecriture.E_K_Clair}
+    else if (C = 'L') then option{Ecriture.E_L_Clair}
+    else if (C = 'M') then option{Ecriture.E_M_Clair}
+    else if (C = 'N') then option{Ecriture.E_N_Clair}
+    else if (C = 'O') then option{Ecriture.E_O_Clair}
+    else if (C = 'P') then option{Ecriture.E_P_Clair}
+    else if (C = 'Q') then option{Ecriture.E_Q_Clair}
+    else if (C = 'R') then option{Ecriture.E_R_Clair}
+    else if (C = 'S') then option{Ecriture.E_S_Clair}
+    else if (C = 'T') then option{Ecriture.E_T_Clair}
+    else if (C = 'U') then option{Ecriture.E_U_Clair}
+    else if (C = 'V') then option{Ecriture.E_V_Clair}
+    else if (C = 'W') then option{Ecriture.E_W_Clair}
+    else if (C = 'X') then option{Ecriture.E_X_Clair}
+    else if (C = 'Y') then option{Ecriture.E_Y_Clair}
+    else if (C = 'Z') then option{Ecriture.E_Z_Clair}
+    else if (C = '0') then option{Ecriture.E_0_Clair}
+    else if (C = '1') then option{Ecriture.E_1_Clair}
+    else if (C = '2') then option{Ecriture.E_2_Clair}
+    else if (C = '3') then option{Ecriture.E_3_Clair}
+    else if (C = '4') then option{Ecriture.E_4_Clair}
+    else if (C = '5') then option{Ecriture.E_5_Clair}
+    else if (C = '6') then option{Ecriture.E_6_Clair}
+    else if (C = '7') then option{Ecriture.E_7_Clair}
+    else if (C = '8') then option{Ecriture.E_8_Clair}
+    else if (C = '9') then option{Ecriture.E_9_Clair}
+    else if (C = '!') then option{Ecriture.E_Excl_Clair}
+    else if (C = '?') then option{Ecriture.E_Inter_Clair}
+    else if (C = '.') then option{Ecriture.E_Point_Clair}
+    else if (C = ',') then option{Ecriture.E_Virgule_Clair}
+    else if (C = ':') then option{Ecriture.E_DeuxPoints_Clair}
+    else if (C = '-') then option{Ecriture.E_Tiret_Clair}
+    else if (C = '+') then option{Ecriture.E_Plus_Clair}
+    else if (C = '%') then option{Ecriture.E_Pourcent_Clair}
+    else if (C = '/') then option{Ecriture.E_Slash_Clair}
+    else if (C = '(') then option{Ecriture.E_ParenG_Clair}
+    else if (C = ')') then option{Ecriture.E_ParenD_Clair}
+    else if (C = 'x') then option{Ecriture.E_Fois_Clair}
+    else false
+
+# largeur de chaque caractere (fraction de sa taille) pour les poser cote a cote
+LargeurGlyphe(C : char)<transacts> : float =
+    if (C = 'A') then 0.512
+    else if (C = 'B') then 0.527
+    else if (C = 'C') then 0.469
+    else if (C = 'D') then 0.418
+    else if (C = 'E') then 0.570
+    else if (C = 'F') then 0.715
+    else if (C = 'G') then 0.668
+    else if (C = 'H') then 0.523
+    else if (C = 'I') then 0.516
+    else if (C = 'J') then 0.609
+    else if (C = 'K') then 0.570
+    else if (C = 'L') then 0.457
+    else if (C = 'M') then 0.730
+    else if (C = 'N') then 0.523
+    else if (C = 'O') then 0.520
+    else if (C = 'P') then 0.492
+    else if (C = 'Q') then 0.551
+    else if (C = 'R') then 0.469
+    else if (C = 'S') then 0.539
+    else if (C = 'T') then 0.570
+    else if (C = 'U') then 0.488
+    else if (C = 'V') then 0.535
+    else if (C = 'W') then 0.770
+    else if (C = 'X') then 0.535
+    else if (C = 'Y') then 0.516
+    else if (C = 'Z') then 0.664
+    else if (C = '0') then 0.500
+    else if (C = '1') then 0.188
+    else if (C = '2') then 0.484
+    else if (C = '3') then 0.414
+    else if (C = '4') then 0.402
+    else if (C = '5') then 0.535
+    else if (C = '6') then 0.391
+    else if (C = '7') then 0.496
+    else if (C = '8') then 0.418
+    else if (C = '9') then 0.348
+    else if (C = '!') then 0.203
+    else if (C = '?') then 0.520
+    else if (C = '.') then 0.230
+    else if (C = ',') then 0.184
+    else if (C = ':') then 0.254
+    else if (C = '-') then 0.461
+    else if (C = '+') then 0.398
+    else if (C = '%') then 0.484
+    else if (C = '/') then 0.457
+    else if (C = '(') then 0.477
+    else if (C = ')') then 0.340
+    else if (C = 'x') then 0.422
+    else 0.30
+
+# largeur totale d'un texte ecrit au pinceau (Taille = hauteur d'une lettre a l'ecran)
+LargeurTexte(S : string, Taille : float) : float =
+    var L : float = 0.0
+    for (C : S):
+        set L += LargeurGlyphe(C) * Taille + Taille * 0.06
+    L
+
+# une image posee a sa taille propre (elle peut grossir au survol), centree en (X, Y)
+PlaceLibre(W : widget, AX : float, AY : float, X : float, Y : float) : canvas_slot =
+    canvas_slot{Widget := W, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
+        Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := 0.0, Bottom := 0.0}, SizeToContent := true}
+
+# un TEXTE au pinceau (non cliquable), centre en (X, Y)
+TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : float) : []canvas_slot =
+    var Slots : []canvas_slot = array{}
+    var Cx : float = X - LargeurTexte(S, Taille) * 0.5
+    for (C : S):
+        L := LargeurGlyphe(C) * Taille
+        if (T := GlypheNormal(C)?):
+            set Slots += array{PlaceLibre(ImgH(T, Taille, Taille), AX, AY, Cx + L * 0.5, Y)}
+        set Cx += L + Taille * 0.06
+    Slots
+
+# une carte face cachee (le dos) : cadre gris use + fond sombre + un "?" au pinceau
+DosCarte(AX : float, AY : float, X : float, Y : float, Taille : float) : []canvas_slot =
+    L := Taille * 0.72
+    H := Taille * 0.96
+    array{PlaceH(color_block{DefaultColor := color{R := 0.33, G := 0.33, B := 0.32}}, AX, AY, X, Y, L, H),
+        PlaceH(color_block{DefaultColor := color{R := 0.07, G := 0.07, B := 0.075}}, AX, AY, X, Y, L - Taille * 0.06, H - Taille * 0.06)} + TexteEcrit("?", AX, AY, X, Y, Taille * 0.45)
+
+# un TEXTE-BOUTON : au survol, il devient blanc pur et grossit un peu ; clic -> Ev.Signal(Code)
+bouton_texte := class:
     Ev : event(int)
     Fin : event()
     Code : int
-    Image : texture_block
-    Normale : texture
-    Survol : texture
+    Lettres : []texture_block
+    Normales : []texture
+    Claires : []texture
+    Taille : float
     Zone : TEST1
 
     Suivre()<suspends> : void =
@@ -77,9 +264,38 @@ relique_cliquable := class:
                 Ev.Signal(Code)
             loop:
                 Zone.Entre.Await()
-                Image.SetImage(Survol)
+                for (I -> Img : Lettres, T := Claires[I]):
+                    Img.SetImage(T)
+                    Img.SetDesiredSize(vector2{X := Taille * 1.18, Y := Taille * 1.18})
+                Zone.Sort.Await()
+                for (I -> Img : Lettres, T := Normales[I]):
+                    Img.SetImage(T)
+                    Img.SetDesiredSize(vector2{X := Taille, Y := Taille})
+
+# une CARTE de sa main, cliquable : au survol elle s'eclaircit et grossit (on la "prend")
+carte_main := class:
+    Ev : event(int)
+    Fin : event()
+    Code : int
+    Image : texture_block
+    Normale : texture
+    Lueur : texture
+    Taille : float
+    Zone : TEST1
+
+    Suivre()<suspends> : void =
+        race:
+            Fin.Await()
+            loop:
+                Zone.Clic.Await()
+                Ev.Signal(Code)
+            loop:
+                Zone.Entre.Await()
+                Image.SetImage(Lueur)
+                Image.SetDesiredSize(vector2{X := Taille * 1.15, Y := Taille * 1.15})
                 Zone.Sort.Await()
                 Image.SetImage(Normale)
+                Image.SetDesiredSize(vector2{X := Taille, Y := Taille})
 
 # Avec la CAMERA FIXE : une zone de clic invisible posee a l'ecran PILE sur un bouton de la machine.
 # Souris dessus -> le vrai bouton devient blanc ; clic -> il est enfonce.
@@ -136,6 +352,8 @@ hands_manager := class(creative_device):
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
     @editable SonRotation : audio_player_device = audio_player_device{}
+    # Son "CLAC" quand la machine s'arrete sur un joueur (Audio Player : lecture automatique NON)
+    @editable SonArret : audio_player_device = audio_player_device{}
     # Direction (degres, vue du dessus dans UEFN) vers laquelle la gueule regarde au depart. Ajuste si elle
     # ne fait pas face au bon joueur (ex. 90, 180, -90).
     @editable FaceDepart : float = 0.0
@@ -159,7 +377,7 @@ hands_manager := class(creative_device):
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
     @editable Enfoncement : float = 2.0          # cm : un bouton appuye descend de ca
     Colonnes : int = 4
-    PaquetMax : int = 3
+    PaquetMax : int = 4
 
     # codes des clics sur les cartes de l'ecran : 100 + Id = annoncer la carte Id, 199 = pas de carte
     Choix : event(int) = event(int){}
@@ -228,7 +446,8 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, I)
-            if (set Paquets[J] = array{TirerRelique()}) {}
+            # 3 cartes au depart
+            if (set Paquets[J] = array{TirerRelique(), TirerRelique(), TirerRelique()}) {}
         NouvelleGrille()
         for (N := 0..2):
             Bandeau("ROUND STARTS IN {3 - N}")
@@ -364,6 +583,7 @@ hands_manager := class(creative_device):
                     Sleep(Dt)
                 set LacetMachine = Depart + Ecart
                 SonRotation.Stop()
+                SonArret.Play()
 
     Bouger(T : creative_prop, Ou : transform, Duree : float)<suspends> : void =
         T.MoveTo(Ou.Translation, Ou.Rotation, Duree)
@@ -463,8 +683,6 @@ hands_manager := class(creative_device):
     TourDe(J : player)<suspends> : logic =
         Rasseoir()
         TournerVers(J)
-        if (M := Paquets[J], M.Length < PaquetMax, set Paquets[J] = M + array{TirerRelique()}):
-            SonCarte.Play()
         Penalite := if (P := Penalites[J]) then P else 0
         if (set Penalites[J] = 0) {}
         var Requis : int = 1 + Bloque + Penalite
@@ -474,14 +692,23 @@ hands_manager := class(creative_device):
         var Passe : logic = false
         var Elimine : logic = false
 
-        # --- 1. LA CARTE : les 6 cartes a l'ecran (il peut bluffer), ou NO CARD
-        Id := ChoisirRelique(J)
-        if (Id >= 0):
-            Possede := IndexRelique(J, Id)
+        # --- 1. PIOCHER : il clique sur la pile (a droite) -> une carte arrive dans sa main
+        Piocher(J)
+
+        # --- 2. JOUER : il clique une carte de SA main, puis dit ce qu'elle est (la verite... ou pas)
+        Jeu := JouerCarte(J)
+        Index := Jeu(0)
+        Id := Jeu(1)
+        if (Index >= 0, Paquet := Paquets[J], Reelle := Paquet[Index]):
+            # la carte part sur la table, face cachee (elle quitte sa main dans tous les cas)
+            RetirerRelique(J, Index)
+            Ment := if (Reelle <> Id) then true else false
             Accusateur := Annoncer(J, Id)
             var Effet : logic = true
             if (A := Accusateur?):
-                if (Possede < 0):
+                # accuse : la carte est RETOURNEE devant tout le monde
+                Reveler(J, Reelle, Ment)
+                if (Ment?):
                     # il mentait : pas d'effet, 1 bouton de plus
                     set Effet = false
                     set Requis += 1
@@ -496,9 +723,7 @@ hands_manager := class(creative_device):
             else:
                 Bandeau("NOBODY CALLED LIAR - {NomRelique(Id)} WORKS")
             spawn{ EffacerBandeau(2.5) }
-            # s'il avait vraiment la carte, elle est defaussee
-            if (Possede >= 0, Effet?):
-                RetirerRelique(J, Possede)
+            # l'effet de la carte ANNONCEE (si personne ne l'a demasque)
             if (Effet?):
                 SonCarte.Play()
                 if (Id = 0):
@@ -674,9 +899,38 @@ hands_manager := class(creative_device):
                     Avertir(X, "P{NumeroDe(J)} STOLE A CARD FROM P{NumeroDe(C)}")
 
     # les 6 cartes a l'ecran (survol plus clair) + NO CARD. Renvoie la carte annoncee, ou -1.
-    ChoisirRelique(J : player)<suspends> : int =
-        EcranReliques(J)
-        var Id : int = -1
+    # PIOCHER : clic sur la pile (ou bouton DRAW). Main pleine : on ne pioche pas. 8 s max, sinon pioche auto.
+    Piocher(J : player)<suspends> : void =
+        if (NombreDe(J) >= PaquetMax):
+            Avertir(J, "YOUR HAND IS FULL")
+            return
+        EcranPioche(J)
+        Fin := GetSimulationElapsedTime() + 8.0
+        loop:
+            Reste := Fin - GetSimulationElapsedTime()
+            MajChronos(Reste)
+            if (Reste <= 0.0):
+                break
+            var Recu : int = -2
+            race:
+                Sleep(Min(0.5, Reste))
+                block:
+                    set Recu = Choix.Await()
+            if (Recu = 50):
+                break
+        if (M := Paquets[J], M.Length < PaquetMax, set Paquets[J] = M + array{TirerRelique()}):
+            SonCarte.Play()
+        FermerEcrans()
+
+    # JOUER : clic sur une carte de sa main -> "WHAT DO YOU SAY IT IS?" -> il choisit ce qu'il annonce.
+    # Renvoie (place de la carte dans sa main, carte annoncee), ou (-1, -1) = pas de carte.
+    JouerCarte(J : player)<suspends> : tuple(int, int) =
+        if (NombreDe(J) = 0):
+            Avertir(J, "NO CARD IN YOUR HAND")
+            return (-1, -1)
+        var Choisie : int = -1
+        var Resultat : tuple(int, int) = (-1, -1)
+        EcranJouer(J, Choisie)
         Fin := GetSimulationElapsedTime() + DureeChoixCarte
         loop:
             Reste := Fin - GetSimulationElapsedTime()
@@ -688,13 +942,32 @@ hands_manager := class(creative_device):
                 Sleep(Min(0.5, Reste))
                 block:
                     set Recu = Choix.Await()
-            if (Recu >= 100, Recu <= 105):
-                set Id = Recu - 100
+            if (Recu >= 100, Recu < 100 + PaquetMax, Recu - 100 < NombreDe(J)):
+                set Choisie = Recu - 100
+                EcranJouer(J, Choisie)
+            else if (Recu >= 300, Recu <= 305, Choisie >= 0):
+                set Resultat = (Choisie, Recu - 300)
                 break
-            if (Recu = 199):
+            else if (Recu = 198):
+                set Choisie = -1
+                EcranJouer(J, Choisie)
+            else if (Recu = 199):
                 break
         FermerEcrans()
-        Id
+        Resultat
+
+    # la carte posee est retournee devant tout le monde (apres une accusation)
+    Reveler(J : player, Reelle : int, Ment : logic)<suspends> : void =
+        FermerEcrans()
+        for (X : Assis, EstLa(X)?):
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(X, Chrono)
+            set S += array{PlaceH(ImgH(ImageRelique(Reelle), 400.0, 400.0), 0.5, 0.5, 0.0, -20.0, 400.0, 400.0)}
+            set S += TexteEcrit(if (Ment?) then "LIE!" else "TRUTH!", 0.5, 0.5, 0.0, -270.0, 110.0)
+            set S += TexteEcrit("P{NumeroDe(J)} PLAYED {NomRelique(Reelle)}", 0.5, 0.5, 0.0, 220.0, 50.0)
+            Montrer(X, S, Chrono, false)
+        Sleep(2.2)
+        FermerEcrans()
 
     # l'annonce : DureeDefi s pendant lesquelles les autres joueurs en jeu peuvent CLIQUER pour crier LIAR!
     # renvoie le premier accusateur (ou rien)
@@ -824,10 +1097,111 @@ hands_manager := class(creative_device):
         S
 
     # sa main, en petit, en bas de l'ecran (non cliquable)
+    # SA MAIN en bas de l'ecran, en eventail (non cliquable)
     PaquetEnBas(J : player) : []canvas_slot =
         Paquet : []int = if (M := Paquets[J]) then M else array{}
         for (I -> Id : Paquet):
-            PlaceH(ImgH(ImageRelique(Id), 200.0, 200.0), 0.5, 1.0, (I * 1.0 - (Paquet.Length - 1) * 0.5) * 150.0, -110.0, 200.0, 200.0)
+            PlaceH(ImgH(ImageRelique(Id), 230.0, 230.0), 0.5, 1.0, (I * 1.0 - (Paquet.Length - 1) * 0.5) * 175.0, -125.0, 230.0, 230.0)
+
+    # SA MAIN cliquable (codes 100 + place) ; la carte choisie reste grande et claire
+    MainCliquable(J : player, Choisie : int) : []canvas_slot =
+        var S : []canvas_slot = array{}
+        Paquet : []int = if (M := Paquets[J]) then M else array{}
+        for (I -> Id : Paquet):
+            X := (I * 1.0 - (Paquet.Length - 1) * 0.5) * 175.0
+            if (I = Choisie):
+                set S += array{PlaceLibre(ImgH(ImageReliqueSurvol(Id), 280.0, 280.0), 0.5, 1.0, X, -160.0)}
+            else:
+                Img := ImgH(ImageRelique(Id), 230.0, 230.0)
+                Zone := TEST1{}
+                CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 100 + I, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 230.0, Zone := Zone}
+                spawn{ CM.Suivre() }
+                set S += array{PlaceLibre(Img, 0.5, 1.0, X, -125.0), PlaceH(Zone, 0.5, 1.0, X, -125.0, 165.0, 220.0)}
+        S
+
+    # LA PILE (a droite) : quelques dos de cartes empiles
+    Pile(Texte : string) : []canvas_slot =
+        var S : []canvas_slot = array{}
+        for (K := 0..2):
+            set S += DosCarte(1.0, 0.5, -230.0 + K * 6.0, -40.0 - K * 6.0, 230.0)
+        S + TexteEcrit(Texte, 1.0, 0.5, -218.0, 120.0, 46.0)
+
+    # un TEXTE-BOUTON au pinceau (blanc + plus gros au survol)
+    BoutonTexte(S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
+        var Slots : []canvas_slot = array{}
+        var Lettres : []texture_block = array{}
+        var Normales : []texture = array{}
+        var Claires : []texture = array{}
+        Largeur := LargeurTexte(S, Taille)
+        var Cx : float = X - Largeur * 0.5
+        for (C : S):
+            L := LargeurGlyphe(C) * Taille
+            if (T := GlypheNormal(C)?, T2 := GlypheClair(C)?):
+                Img := ImgH(T, Taille, Taille)
+                set Lettres += array{Img}
+                set Normales += array{T}
+                set Claires += array{T2}
+                set Slots += array{PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y)}
+            set Cx += L + Taille * 0.06
+        Zone := TEST1{}
+        BT := bouton_texte{Ev := Choix, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := Taille, Zone := Zone}
+        spawn{ BT.Suivre() }
+        Slots + array{PlaceH(Zone, AX, AY, X, Y, Largeur + 20.0, Taille * 0.9)}
+
+    # 1. PIOCHER : la pile a droite (cliquable pour le joueur actif)
+    EcranPioche(Actif : player) : void =
+        FermerEcrans()
+        for (J : Assis, EstLa(J)?):
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(J, Chrono)
+            if (J = Actif):
+                set S += TexteEcrit("YOUR TURN", 0.5, 0.0, 0.0, 250.0, 90.0)
+                set S += TexteEcrit("CLICK THE DECK TO DRAW A CARD", 0.5, 0.0, 0.0, 330.0, 44.0)
+                set S += Pile("")
+                Zone := TEST1{}
+                BT := bouton_texte{Ev := Choix, Fin := FinEcran, Code := 50, Lettres := array{}, Normales := array{}, Claires := array{}, Taille := 1.0, Zone := Zone}
+                spawn{ BT.Suivre() }
+                set S += array{PlaceH(Zone, 1.0, 0.5, -224.0, -46.0, 190.0, 240.0)}
+                set S += BoutonTexte("DRAW", 1.0, 0.5, -218.0, 120.0, 56.0, 50)
+                set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, true)
+            else:
+                set S += TexteEcrit("P{NumeroDe(Actif)} IS DRAWING...", 0.5, 0.0, 0.0, 250.0, 54.0)
+                set S += Pile("")
+                set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, false)
+
+    # 2. JOUER : clic sur une carte de sa main ; puis "WHAT DO YOU SAY IT IS?" (les 6 cartes ; la vraie = TRUTH)
+    EcranJouer(Actif : player, Choisie : int) : void =
+        FermerEcrans()
+        for (J : Assis, EstLa(J)?):
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(J, Chrono)
+            set S += Pile("")
+            if (J = Actif):
+                if (Choisie < 0):
+                    set S += TexteEcrit("PLAY A CARD", 0.5, 0.0, 0.0, 250.0, 90.0)
+                    set S += TexteEcrit("CLICK A CARD OF YOUR HAND", 0.5, 0.0, 0.0, 330.0, 44.0)
+                    set S += BoutonTexte("NO CARD", 0.5, 1.0, 560.0, -130.0, 56.0, 199)
+                else:
+                    set S += TexteEcrit("WHAT DO YOU SAY IT IS?", 0.5, 0.0, 0.0, 250.0, 70.0)
+                    set S += TexteEcrit("TELL THE TRUTH... OR BLUFF", 0.5, 0.0, 0.0, 320.0, 40.0)
+                    Reelle := if (Paquet := Paquets[J], R := Paquet[Choisie]) then R else -1
+                    for (Id := 0..5):
+                        X := (Id * 1.0 - 2.5) * 190.0
+                        Img := ImgH(ImageRelique(Id), 200.0, 200.0)
+                        Zone := TEST1{}
+                        CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 300 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 200.0, Zone := Zone}
+                        spawn{ CM.Suivre() }
+                        set S += array{PlaceLibre(Img, 0.5, 0.5, X, -10.0), PlaceH(Zone, 0.5, 0.5, X, -10.0, 145.0, 190.0)}
+                        set S += TexteEcrit(if (Id = Reelle) then "TRUTH" else "BLUFF", 0.5, 0.5, X, 115.0, 34.0)
+                    set S += BoutonTexte("BACK", 0.5, 1.0, 560.0, -130.0, 56.0, 198)
+                set S += MainCliquable(J, Choisie)
+                Montrer(J, S, Chrono, true)
+            else:
+                set S += TexteEcrit("P{NumeroDe(Actif)} IS CHOOSING A CARD...", 0.5, 0.0, 0.0, 250.0, 54.0)
+                set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, false)
 
     Montrer(J : player, S : []canvas_slot, Chrono : text_block, Souris : logic) : void =
         if (UI := GetPlayerUI[J]):
@@ -841,50 +1215,18 @@ hands_manager := class(creative_device):
     NouveauChrono() : text_block =
         text_block{DefaultText := TexteJeu(""), DefaultTextColor := color{R := 1.0, G := 0.85, B := 0.2}}
 
-    # DEBUT DU TOUR : le joueur actif voit les 6 cartes (il peut annoncer n'importe laquelle = bluff) ;
-    # celles qu'il a vraiment sont marquees. Les autres attendent.
-    EcranReliques(Actif : player) : void =
-        FermerEcrans()
-        for (J : Assis, EstLa(J)?):
-            Chrono := NouveauChrono()
-            var S : []canvas_slot = Entete(J, Chrono)
-            if (J = Actif):
-                set S += array{TexteH("YOUR TURN - CLAIM A CARD (YOU CAN BLUFF!)", 0.5, 0.0, 0.0, 110.0)}
-                for (Id := 0..5):
-                    X := (Id * 1.0 - 2.5) * 250.0
-                    Img := ImgH(ImageRelique(Id), 300.0, 300.0)
-                    Zone := TEST1{}
-                    B := relique_cliquable{Ev := Choix, Fin := FinEcran, Code := 100 + Id, Image := Img, Normale := ImageRelique(Id), Survol := ImageReliqueSurvol(Id), Zone := Zone}
-                    spawn{ B.Suivre() }
-                    set S += array{PlaceH(Img, 0.5, 0.5, X, -20.0, 300.0, 300.0), PlaceH(Zone, 0.5, 0.5, X, -20.0, 220.0, 290.0)}
-                    N := CombienDe(J, Id)
-                    if (N > 0):
-                        set S += array{TexteH("OWNED x{N}", 0.5, 0.5, X, 150.0)}
-                # pas de carte : on passe directement a la machine
-                TexteNo := TexteH("NO CARD - GO TO THE MACHINE", 0.5, 0.5, 0.0, 240.0)
-                ZoneNo := TEST1{}
-                Rien := relique_cliquable{Ev := Choix, Fin := FinEcran, Code := 199, Image := ImgH(ImageRelique(0), 1.0, 1.0), Normale := ImageRelique(0), Survol := ImageRelique(0), Zone := ZoneNo}
-                spawn{ Rien.Suivre() }
-                set S += array{TexteNo, PlaceH(ZoneNo, 0.5, 0.5, 0.0, 240.0, 520.0, 60.0)}
-                Montrer(J, S, Chrono, true)
-            else:
-                set S += array{TexteH("P{NumeroDe(Actif)} IS CHOOSING A CARD...", 0.5, 0.0, 0.0, 110.0)}
-                set S += PaquetEnBas(J)
-                Montrer(J, S, Chrono, false)
-
-    # L'ANNONCE : la carte annoncee au centre pour tout le monde ; les autres joueurs en jeu CLIQUENT pour LIAR!
+    # L'ANNONCE : sa carte FACE CACHEE au centre, et ce qu'il dit qu'elle est. Les autres CLIQUENT pour LIAR!
     EcranDefi(Auteur : player) : void =
         FermerEcrans()
         for (J : Assis, EstLa(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
-            set S += array{PlaceH(ImgH(ImageRelique(DefiRelique), 380.0, 380.0), 0.5, 0.5, 0.0, -30.0, 380.0, 380.0)}
+            set S += DosCarte(0.5, 0.5, 0.0, -20.0, 380.0)
+            set S += TexteEcrit("P{DefiAuteur} SAYS: {NomRelique(DefiRelique)}", 0.5, 0.5, 0.0, -270.0, 70.0)
             if (J = Auteur):
-                set S += array{TexteH("YOU CLAIMED {NomRelique(DefiRelique)} - WILL THEY BELIEVE YOU?", 0.5, 0.0, 0.0, 110.0)}
+                set S += TexteEcrit("WILL THEY BELIEVE YOU?", 0.5, 0.5, 0.0, 220.0, 46.0)
             else if (Contient(Vivants, J)?):
-                set S += array{TexteH("P{DefiAuteur} CLAIMS {NomRelique(DefiRelique)}! CLICK TO CALL LIAR!", 0.5, 0.0, 0.0, 110.0)}
-            else:
-                set S += array{TexteH("P{DefiAuteur} CLAIMS {NomRelique(DefiRelique)}!", 0.5, 0.0, 0.0, 110.0)}
+                set S += TexteEcrit("CLICK TO CALL LIAR!", 0.5, 0.5, 0.0, 220.0, 56.0)
             set S += PaquetEnBas(J)
             Montrer(J, S, Chrono, false)
 

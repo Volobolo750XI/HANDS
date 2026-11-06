@@ -7,12 +7,13 @@ for f in glob.glob('Verse/*.verse'):
     L = open(f).read().split('\n')
     trans, toutes = set(), set()
     for l in L:
-        m = re.match(r'^    ([A-Z]\w*)(<[^>]*>)?\((.*?)\)', l)
+        m = re.match(r'^(?:    )?([A-Z]\w*)(<[^>]*>)?\((.*?)\)', l)
         if m and ':' in l:
             toutes.add(m.group(1))
             if re.search(r'\)\s*<[^>]*(transacts|decides|computes|converges)', l):
                 trans.add(m.group(1))
     for i, l in enumerate(L):
+        l = re.sub(r"'[^'\\]'", "'c'", l)          # un caractere entre apostrophes ('(' ...) n'est pas une parenthese
         m = re.match(r'\s*(else if|if|for)\s*\(', l)
         if not m:
             continue

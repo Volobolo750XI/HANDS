@@ -9,33 +9,29 @@ la mâchoire claque et le joueur est éliminé de la manche. Le dernier en jeu g
 - `Modeles/Grange.glb` : le décor (grange, enclos, salle avec la table ronde).
 
 ## Déroulé d'un tour
-Les joueurs sont **assis** (appareil Chaise) autour de la machine, chacun son tour (sens des aiguilles d'une montre,
-ou l'inverse après un REVERSE). Les jeux de chacun sont **secrets** : on voit ses cartes en bas de l'écran, et seulement
-le **nombre** de cartes des autres.
-1. La machine **pivote vers le joueur** (le chemin le plus court ; seul en TestSolo : un tour complet dans le vide).
-   Il **pioche 1 carte** (3 max ; chacun commence avec 1 carte).
-2. **La carte** : les 6 cartes s'affichent (plus claires au survol). Il en **annonce une en cliquant dessus**,
-   **même s'il ne l'a pas** (bluff ; celles qu'il a sont marquées IN HAND), ou clique **NO CARD**.
-3. **LIAR!** : pendant 5 s, les autres joueurs **cliquent** pour l'accuser :
-   - personne n'accuse → l'effet marche, même si c'était un mensonge ;
-   - accusé et il mentait → pas d'effet, **+1 bouton** pour le menteur ;
-   - accusé mais c'était vrai → l'effet marche, l'accusateur **perd une carte** et aura **+1 bouton** à son prochain tour.
-4. **La machine** : la caméra se place devant la bouche. Il **vise un bouton** (il devient **blanc**, tout le monde le voit)
-   et **clique** pour l'enfoncer. 25 s max, sinon un bouton au hasard.
-5. Si c'est un **piège**, la mâchoire se **ferme complètement** (60°), le joueur est éliminé et la grille repart à zéro.
+Les joueurs sont **assis** autour de la machine. Chacun commence avec **3 cartes** (4 max en main).
+On voit **sa main en bas de l'écran** ; des autres, on ne voit que le **nombre** de cartes.
+1. La machine **pivote vers le joueur** (son de rotation, puis **« clac »** à l'arrêt).
+2. **PIOCHER** : il clique sur la **pile** (à droite) ou sur **DRAW** → une carte arrive dans sa main.
+3. **JOUER** : il clique **une carte de sa main**, puis **« WHAT DO YOU SAY IT IS? »** : il choisit ce qu'il annonce
+   parmi les 6 cartes (la vraie est marquée **TRUTH**, les autres **BLUFF**). Ou **NO CARD**.
+4. Sa carte est posée **face cachée** au centre : « P1 SAYS: JAM ». Les autres ont 5 s pour **cliquer** (LIAR!) :
+   - personne n'accuse → l'effet de la carte **annoncée** s'applique, même si c'était un bluff ;
+   - accusé → la carte est **retournée** devant tout le monde : **LIE!** (pas d'effet, +1 bouton pour le menteur)
+     ou **TRUTH!** (l'effet s'applique, l'accusateur perd une carte et aura +1 bouton).
+5. **LA MACHINE** : avec la caméra fixe, il clique un bouton de la machine (il devient blanc au survol).
+6. Piège → la mâchoire se ferme (60°), il est éliminé, la grille repart à zéro.
 
-Les cartes :
-- **DEFUSE** : le piège ne mord pas ce tour-ci ;
-- **PEEK** : un bouton sûr devient **vert** sur la machine jusqu'à la fin de son tour ;
-- **PASS** : il passe son tour ;
-- **REVERSE** : le sens change ;
-- **JAM** : le suivant doit appuyer sur 2 boutons ;
-- **STEAL** : il **regarde un joueur** et clique : il lui vole une carte au hasard.
+Les cartes : **DEFUSE** (le piège ne mord pas), **PEEK** (un bouton sûr devient vert), **PASS** (il passe),
+**REVERSE** (le sens change), **JAM** (le suivant appuie sur 2 boutons), **STEAL** (il regarde un joueur et clique :
+il lui vole une carte).
+
+Les textes et les boutons sont écrits au **pinceau** (dossier **Ecriture**) ; un bouton devient blanc et grossit au survol.
 
 ## Installation dans UEFN
 1. Importe `Machine.glb` avec **Combine Meshes décoché**. Fais de chaque morceau un **accessoire** (Gueule et chaque bouton).
 2. Copie le widget **TEST1** de Football Pillars dans un dossier **BOUTON** du projet.
-3. Importe les 12 images de `Textures/Reliques/` dans un dossier **Reliques** (Relique_Bouclier, _Serrure, _Sablier, _Chaine, _Etau, _Corbeau + leurs versions `_Lueur`).
+3. Importe les 100 images de `Textures/Ecriture/` dans un dossier **Ecriture**, et les 12 images de `Textures/Reliques/` dans un dossier **Reliques** (Relique_Bouclier, _Serrure, _Sablier, _Chaine, _Etau, _Corbeau + leurs versions `_Lueur`).
 4. Pose autour de la table **une place par joueur** (petit accessoire invisible devant chaque chaise) et **une Chaise** par place.
 5. Pose un **Déclencheur d'entrée** (Input Trigger) réglé sur l'action **Tir** : c'est le clic du jeu.
 6. Crée un dossier **Teintes** avec 3 matériaux : **T_Base** (copie du matériau actuel des boutons),
@@ -45,7 +41,8 @@ Les cartes :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;
-   - les 4 **Audio Players** : clic, claquement, carte, et **SonRotation** (en boucle pendant que la machine tourne).
+   - les **Audio Players** : clic, claquement, carte, **SonRotation** (en boucle pendant que la machine tourne)
+     et **SonArret** (le « clac » quand elle s'arrête sur un joueur).
 9. Si la machine ne fait pas face au bon joueur, change **FaceDepart** (90, 180 ou -90).
    Si la mâchoire tourne dans le mauvais sens, change **AxeFermeture** (0, 1 ou 2) ou mets un **AngleFermeture** négatif.
    Si le bouton visé ne suit pas bien le regard, augmente **PorteeVisee** (en cm).
