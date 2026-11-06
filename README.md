@@ -44,6 +44,7 @@ Les textes et les boutons sont écrits au **pinceau** (dossier **Ecriture**) ; u
 8. Pose l'appareil `hands_manager` et remplis :
    - **Places**, **Chaises** (même ordre), **CamerasClavier** (même ordre, facultatif) ;
    - **CamerasPremierePersonne** : ta « Caméra à la première personne » (priorité 0 ; caméras fixes : 10) ;
+   - **CamerasTete** : une « Caméra orbitale » réglée en vue dans la tête (assis, Fortnite force la 3e personne) ;
    - **RegardCartes** (25 par défaut) : de combien de degrés on baisse la tête pour prendre ses cartes ;
    - **Centre** (Corps), **Gueule**, **Plaque**, **Touches** (Bouton_01 → Bouton_24) ;
    - **ToucheClic** (le Déclencheur d'entrée) ; **IndexMateriau** = l'emplacement de matériau du bouton (0 en général) ;

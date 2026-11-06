@@ -352,6 +352,10 @@ hands_manager := class(creative_device):
     # FACULTATIF : ta "Camera a la premiere personne" (une seule suffit). Remise a chaque joueur assis, et
     # apres son tour a la machine : il est toujours a la premiere personne.
     @editable CamerasPremierePersonne : []gameplay_camera_first_person_device = array{}
+    # ASSIS, Fortnite repasse en 3e personne (la camera premiere personne ne marche pas sur une chaise).
+    # Solution : une "Camera orbitale" reglee en vue dans la tete (distance 0, decalage a hauteur des yeux).
+    # Une seule suffit : elle est donnee a chaque joueur assis et enlevee a la fin de la manche.
+    @editable CamerasTete : []gameplay_camera_orbit_device = array{}
     # LES CARTES : on regarde librement autour de soi. On BAISSE LA TETE vers ses cartes (de plus de ces
     # degres sous l'horizon) -> le curseur apparait et on choisit. Souris tout en HAUT de l'ecran -> on relache.
     @editable RegardCartes : float = 25.0
@@ -480,9 +484,13 @@ hands_manager := class(creative_device):
     EnleverCameras() : void =
         for (Cam : CamerasClavier, J : GetPlayspace().GetPlayers()):
             Cam.RemoveFrom(J)
+        for (Cam : CamerasTete, J : GetPlayspace().GetPlayers()):
+            Cam.RemoveFrom(J)
 
     PremierePersonne(J : player) : void =
         for (Cam : CamerasPremierePersonne):
+            Cam.AddTo(J)
+        for (Cam : CamerasTete):
             Cam.AddTo(J)
 
     # toutes les 0,1 s : qui baisse la tete vers ses cartes ? (il les prend) / qui l'a relevee ? (il pourra les reprendre)
@@ -582,6 +590,8 @@ hands_manager := class(creative_device):
         Bandeau("")
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
+        for (Cam : CamerasTete, J : Assis):
+            Cam.RemoveFrom(J)
 
     # le joueur va a sa place, tourne vers la machine, et s'assoit sur sa chaise (ou reste fige sur place)
     Asseoir(J : player, I : int) : void =
@@ -602,6 +612,7 @@ hands_manager := class(creative_device):
     Rasseoir() : void =
         for (I -> J : Assis, Contient(Vivants, J)?, Ch := Chaises[I]):
             Ch.Seat(J)
+            PremierePersonne(J)
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 5)
 
