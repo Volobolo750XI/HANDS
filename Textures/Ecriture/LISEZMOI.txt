@@ -1,0 +1,4 @@
+Ecriture "pinceau sec" du jeu : une image par caractere (E_A ... E_Z, E_0 ... E_9, ponctuation),
+en blanc os (E_X) et en blanc pur pour le survol (E_X_Clair). 256 x 256, fond transparent.
+Faite a partir de la police Permanent Marker (Font Diner, licence Apache 2.0, libre pour un jeu)
+avec Outils/police_horreur.py. Largeurs des caracteres : Outils/ecriture_largeurs.json.
