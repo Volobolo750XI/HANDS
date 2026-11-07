@@ -822,7 +822,7 @@ hands_manager := class(creative_device):
         var Somme : vector3 = vector3{}
         var N : float = 0.0
         for (Pl : Places):
-            set Somme += Pl.GetTransform().Translation
+            set Somme = Somme + Pl.GetTransform().Translation
             set N += 1.0
         if (N > 0.0) then Somme / N else BaseCentre.Translation
 
