@@ -745,6 +745,12 @@ hands_manager := class(creative_device):
                     if (set EchecsTete[J] = 0) {}
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
+    RetourPlace(J : player)<suspends> : void =
+        Sleep(0.8)
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?):
+            Perso.ReleaseFromStasis()
+            Asseoir(J, PlaceIndex(J))
+
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
         FaceMachineApres(J, Lacet, array{0.25, 0.35})
@@ -1273,9 +1279,10 @@ hands_manager := class(creative_device):
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
-            # retour a sa place : de nouveau face a la machine
-            if (Vue := Orientations[J]):
-                spawn{ FaceMachineApres(J, Vue, array{0.5, 0.5, 0.8, 1.0}) }
+            # retour a sa place : on le RE-POSE exactement comme au debut de la manche (le debut marche
+            # parfaitement), une fois la transition de la camera terminee
+            if (not Elimine?):
+                spawn{ RetourPlace(J) }
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
