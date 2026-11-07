@@ -5,7 +5,7 @@
 #  la machoire se referme et le joueur est elimine de la manche. Le dernier en jeu gagne.
 #
 #  BLUFF : au debut de son tour, on peut ANNONCER une carte, meme si on ne l'a pas. Les autres ont DureeDefi s
-#  pour crier LIAR! (en cliquant) :
+#  pour crier LIAR! (touche E) :
 #    - personne n'accuse        -> l'effet s'applique (meme si c'etait un mensonge)
 #    - accuse et il mentait     -> pas d'effet, le menteur appuie sur 1 bouton de plus
 #    - accuse mais c'etait vrai -> l'effet s'applique, l'accusateur perd une carte et appuiera sur 1 bouton de plus
@@ -435,6 +435,11 @@ hands_manager := class(creative_device):
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
+    # LIAR! : un 2e Declencheur d'entree, regle sur la touche E (Interagir, ou une action personnalisee sur E).
+    # Pendant une annonce, les autres appuient dessus pour crier LIAR!
+    @editable ToucheLiar : input_trigger_device = input_trigger_device{}
+    # la voix "LIAR!" jouee quand quelqu'un accuse (Audio Player : lecture automatique NON, entendu par tous)
+    @editable SonLiar : audio_player_device = audio_player_device{}
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -484,6 +489,8 @@ hands_manager := class(creative_device):
     Choix : event(int) = event(int){}
     # un clic (action Tir) d'un joueur
     ClicJoueur : event(agent) = event(agent){}
+    # un joueur a appuye sur la touche LIAR (E)
+    LiarJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
     var EnMachine : [player]logic = map{}          # il clique sur la machine (camera fixe) : ses textes sont a gauche
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
@@ -521,6 +528,7 @@ hands_manager := class(creative_device):
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
+        ToucheLiar.PressedEvent.Subscribe(QuandLiar)
         spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
@@ -575,6 +583,9 @@ hands_manager := class(creative_device):
 
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
+
+    QuandLiar(Agent : agent) : void =
+        LiarJoueur.Signal(Agent)
 
     # =========================================================================
     #  UNE MANCHE
@@ -1260,7 +1271,7 @@ hands_manager := class(creative_device):
         Sleep(2.2)
         FermerEcrans()
 
-    # l'annonce : DureeDefi s pendant lesquelles les autres joueurs en jeu peuvent CLIQUER pour crier LIAR!
+    # l'annonce : DureeDefi s pendant lesquelles les autres joueurs en jeu peuvent appuyer sur E pour crier LIAR!
     # renvoie le premier accusateur (ou rien)
     Annoncer(J : player, Id : int)<suspends> : ?player =
         set DefiEnCours = true
@@ -1281,10 +1292,11 @@ hands_manager := class(creative_device):
                 Sleep(Min(0.5, Reste))
                 block:
                     # (pas d'Await dans option{...} : erreur 3512)
-                    Cliqueur := ClicJoueur.Await()
+                    Cliqueur := LiarJoueur.Await()
                     set Qui = option{Cliqueur}
             if (Ag := Qui?, A := player[Ag], A <> J, Contient(Vivants, A)?):
                 set Accuse = option{A}
+                SonLiar.Play()
                 Bandeau("P{NumeroDe(A)} SAYS P{NumeroDe(J)} IS LYING!")
                 Sleep(1.2)
         set DefiEnCours = false
@@ -1591,7 +1603,7 @@ hands_manager := class(creative_device):
             if (J = Auteur):
                 set S += TexteEcrit("WILL THEY BELIEVE YOU?", 0.5, 0.5, 0.0, 220.0, 50.0)
             else if (Contient(Vivants, J)?):
-                set S += TexteEcrit("LIAR? CLICK TO ACCUSE!", 0.5, 0.5, 0.0, 220.0, 64.0)
+                set S += TexteEcrit("LIAR? PRESS E TO ACCUSE!", 0.5, 0.5, 0.0, 220.0, 64.0)
             set S += PaquetEnBas(J)
             Montrer(J, S, Chrono, false)
 
