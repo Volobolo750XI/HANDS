@@ -308,6 +308,7 @@ carte_main := class:
     Lueur : texture
     Taille : float
     Zone : TEST1
+    var Gardee : logic = false                 # carte prise (choix du debut) : elle reste grande et claire
 
     Suivre()<suspends> : void =
         race:
@@ -317,11 +318,22 @@ carte_main := class:
                 Ev.Signal(Code)
             loop:
                 Zone.Entre.Await()
-                Image.SetImage(Lueur)
-                Image.SetDesiredSize(vector2{X := Taille * 1.15, Y := Taille * 1.15})
+                Grande(true)
                 Zone.Sort.Await()
-                Image.SetImage(Normale)
-                Image.SetDesiredSize(vector2{X := Taille, Y := Taille})
+                if (not Gardee?):
+                    Grande(false)
+
+    Grande(Oui : logic) : void =
+        if (Oui?):
+            Image.SetImage(Lueur)
+            Image.SetDesiredSize(vector2{X := Taille * 1.15, Y := Taille * 1.15})
+        else:
+            Image.SetImage(Normale)
+            Image.SetDesiredSize(vector2{X := Taille, Y := Taille})
+
+    Garder(Oui : logic) : void =
+        set Gardee = Oui
+        Grande(Oui)
 
 # Avec la CAMERA FIXE : une zone de clic invisible posee a l'ecran PILE sur un bouton de la machine.
 # Souris dessus -> le vrai bouton devient blanc ; clic -> il est enfonce.
@@ -346,9 +358,9 @@ zone_bouton := class:
 choix_depart := class:
     Manager : hands_manager
     J : player
-    Cadres : []color_block
+    Cartes : []carte_main
     Compteur : texture_block
-    Ev : event(int) = event(int){}
+    Ev : event(int)
     var Pris : []int = array{}
     var Confirme : logic = false
 
@@ -371,12 +383,12 @@ choix_depart := class:
     Basculer(Id : int) : void =
         if (Dedans(Pris, Id)?):
             set Pris = for (P : Pris, P <> Id) do P
-            if (Cadre := Cadres[Id]):
-                Cadre.SetVisibility(widget_visibility.Hidden)
+            if (Carte := Cartes[Id]):
+                Carte.Garder(false)
         else if (Pris.Length < 3):
             set Pris += array{Id}
-            if (Cadre := Cadres[Id]):
-                Cadre.SetVisibility(widget_visibility.Visible)
+            if (Carte := Cartes[Id]):
+                Carte.Garder(true)
         if (G := GlypheChiffre(Pris.Length)?):
             Compteur.SetImage(G)
 
@@ -1438,27 +1450,27 @@ hands_manager := class(creative_device):
         var Liste : []choix_depart = array{}
         for (J : Assis, EstLa(J)?):
             Chrono := NouveauChrono()
-            Cadres := for (Id := 0..5) do color_block{DefaultColor := color{R := 1.0, G := 1.0, B := 1.0}, DefaultOpacity := 0.3}
             Compteur := ImgH(Ecriture.E_0, 56.0, 56.0)
-            CD := choix_depart{Manager := Self, J := J, Cadres := Cadres, Compteur := Compteur}
+            EvJ := event(int){}
             var S : []canvas_slot = Entete(J, Chrono)
             set S += TexteEcrit("CHOOSE YOUR CARDS", 0.5, 0.0, 0.0, 300.0, 80.0)
             set S += array{PlaceLibre(Compteur, 0.5, 0.0, -30.0, 375.0)}
             set S += TexteEcrit("/3", 0.5, 0.0, 25.0, 375.0, 56.0)
-            for (Id := 0..5, Cadre := Cadres[Id]):
+            var Cartes : []carte_main = array{}
+            for (Id := 0..5):
                 X := (Id * 1.0 - 2.5) * 290.0
                 Img := ImgH(ImageRelique(Id), 240.0, 240.0)
                 Zone := TEST1{}
-                CM := carte_main{Ev := CD.Ev, Fin := FinEcran, Code := 500 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
+                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 500 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
                 spawn{ CM.Suivre() }
-                set S += array{PlaceH(Cadre, 0.5, 0.5, X, 0.0, 270.0, 280.0), PlaceLibre(Img, 0.5, 0.5, X, 0.0), PlaceH(Zone, 0.5, 0.5, X, 0.0, 200.0, 240.0)}
+                set Cartes += array{CM}
+                set S += array{PlaceLibre(Img, 0.5, 0.5, X, 0.0), PlaceH(Zone, 0.5, 0.5, X, 0.0, 200.0, 240.0)}
                 set S += TexteEcrit(NomRelique(Id), 0.5, 0.5, X, 160.0, 40.0)
                 set S += TexteEcrit(DescriptionRelique(Id, 0), 0.5, 0.5, X, 205.0, 24.0)
                 set S += TexteEcrit(DescriptionRelique(Id, 1), 0.5, 0.5, X, 235.0, 24.0)
-            set S += BoutonTexteSur(CD.Ev, "CONFIRM", 0.5, 1.0, 0.0, -110.0, 80.0, 599)
+            CD := choix_depart{Manager := Self, J := J, Cartes := Cartes, Compteur := Compteur, Ev := EvJ}
+            set S += BoutonTexteSur(EvJ, "CONFIRM", 0.5, 1.0, 0.0, -110.0, 80.0, 599)
             Montrer(J, S, Chrono, true)
-            for (Cadre : Cadres):
-                Cadre.SetVisibility(widget_visibility.Hidden)
             spawn{ CD.Suivre(FinEcran) }
             set Liste += array{CD}
         Fin := GetSimulationElapsedTime() + DureeChoixDepart
