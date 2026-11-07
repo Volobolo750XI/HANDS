@@ -606,6 +606,9 @@ hands_manager := class(creative_device):
     @editable DistanceMain : float = 50.0
     @editable DecalageMainDroite : float = 16.0
     @editable DecalageMainBas : float = 9.0
+    # sens de la main (degres autour de la verticale) : 0 normalement ; si tu vois la PAUME au lieu du dos de
+    # la main mets 180 ; si elle est de profil mets 90 ou -90
+    @editable AngleMain : float = 0.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -723,11 +726,18 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
-        # les cameras sont rangees DANS LE MEME ORDRE que les Places : la camera de SA place
-        if (TouchesClavier.Length > 0, CamJ := CamerasClavier[PlaceIndex(J)]):
-            return option{CamJ}
-        if (TouchesClavier.Length > 0, Cam0 := CamerasClavier[0]):
-            return option{Cam0}
+        # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
+        # les cameras de la table sont ignorees)
+        if (T0 := TouchesClavier[0]):
+            Ici0 := T0.GetTransform().Translation
+            var Pres0 : float = 100000000.0
+            for (Cam : CamerasClavier):
+                V0 := Cam.GetTransform().Translation - Ici0
+                D0 := DotProduct(V0, V0)
+                if (D0 < Pres0):
+                    set Pres0 = D0
+                    set Meilleure = option{Cam}
+            return Meilleure
         if (Pl := Places[PlaceIndex(J)]):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 100000000.0
@@ -881,7 +891,7 @@ hands_manager := class(creative_device):
         Droite := vector3{X := -Avant.Y, Y := Avant.X, Z := 0.0}
         # DEVANT lui, en bas a droite de sa vue (comme sa propre main) : il la voit, et les autres aussi
         Ou := Oeil + F * DistanceMain + Droite * DecalageMainDroite - vector3{X := 0.0, Y := 0.0, Z := DecalageMainBas}
-        (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + 90.0, 0.0, 0.0))
+        (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + AngleMain, 0.0, 0.0))
 
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
     var Vues : [player]canvas = map{}
