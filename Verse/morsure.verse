@@ -616,7 +616,7 @@ hands_manager := class(creative_device):
     @editable CorpsTourne : logic = true
     # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
     # coche pour limiter la tete (desactive : la tete est libre)
-    @editable LimiterTete : logic = false
+    @editable LimiterTete : logic = true
     @editable TeteMaxDroite : float = 60.0
     @editable TeteMaxGauche : float = 60.0
     # Reglages
@@ -640,6 +640,7 @@ hands_manager := class(creative_device):
     ClicJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
     var EnMachine : [player]logic = map{}          # il clique sur la machine (camera fixe) : ses textes sont a gauche
+    var EchecsTete : [player]int = map{}            # corrections de la tete qui n'ont pas pris (securite)
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
     var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise
     var BaseTouches : []transform = array{}
@@ -732,8 +733,20 @@ hands_manager := class(creative_device):
                 Yaw := ArcTan(F.Y, F.X) * 180.0 / PiFloat
                 Ecart := AngleCourt(Yaw - Cible)
                 Borne := if (Ecart > TeteMaxDroite) then TeteMaxDroite else if (Ecart < -TeteMaxGauche) then -TeteMaxGauche else Ecart
-                if (Borne <> Ecart):
+                Echecs := if (E := EchecsTete[J]) then E else 0
+                if (Borne <> Ecart, Echecs < 15):
                     if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Cible + Borne, 0.0, 0.0)]) {}
+                    # SECURITE : si la vue ne se laisse pas corriger (15 fois de suite), on arrete de la limiter pour lui
+                    if (set EchecsTete[J] = Echecs + 1) {}
+                else if (Borne = Ecart):
+                    if (set EchecsTete[J] = 0) {}
+
+    # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
+    FaceMachine(J : player, Lacet : float)<suspends> : void =
+        for (Attente : array{0.25, 0.6}):
+            Sleep(Attente)
+            if (Perso := J.GetFortCharacter[]):
+                if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -888,7 +901,8 @@ hands_manager := class(creative_device):
             if (TestSolo?):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
-                if (set Orientations[J] = Lacet) {}
+                if (set Orientations[J] = Lacet, set EchecsTete[J] = 0) {}
+                spawn{ FaceMachine(J, Lacet) }
                 Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
             else if (Ch := Chaises[I]):
                 # teleportation refusee partout : pas fige au point d'apparition, il est assis sur la vraie chaise
