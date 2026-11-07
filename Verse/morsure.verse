@@ -544,6 +544,14 @@ choix_depart := class:
                 set Pris += array{Place}
             set Essais += 1
 
+# une touche 1..4 -> le signe I pour celui qui appuie
+touche_signe := class:
+    Manager : hands_manager
+    I : int
+    Quand(Agent : agent) : void =
+        if (J := player[Agent]):
+            spawn{ Manager.FaireSigne(J, I) }
+
 hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
     # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
@@ -589,12 +597,15 @@ hands_manager := class(creative_device):
     # sur une main -> le signe pendant DureeSigne s : la main 3D flotte a cote de sa tete et suit son regard.
     # MainsSignes : les 4 accessoires des mains 3D, DANS L'ORDRE : ouverte, pouce leve, doigt pointe, OK.
     @editable ToucheSignes : input_trigger_device = input_trigger_device{}
+    # LES TOUCHES 1, 2, 3, 4 (comme dans Hands Over) : 4 Declencheurs d'entree, DANS L'ORDRE (1 = main ouverte,
+    # 2 = pouce leve, 3 = doigt pointe, 4 = OK). Le signe a TOUT moment, meme sans curseur.
+    @editable TouchesSignes : []input_trigger_device = array{}
     @editable MainsSignes : []creative_prop_asset = array{}
     @editable DureeSigne : float = 5.0
     # ou est la main 3D par rapport a ses yeux (cm) : devant, a droite, en dessous
-    @editable DistanceMain : float = 40.0
+    @editable DistanceMain : float = 50.0
     @editable DecalageMainDroite : float = 16.0
-    @editable DecalageMainBas : float = 20.0
+    @editable DecalageMainBas : float = 9.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -695,6 +706,8 @@ hands_manager := class(creative_device):
         ToucheClic.PressedEvent.Subscribe(QuandClic)
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         ToucheSignes.PressedEvent.Subscribe(QuandSignes)
+        for (I -> T : TouchesSignes):
+            T.PressedEvent.Subscribe(touche_signe{Manager := Self, I := I}.Quand)
         spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
@@ -710,6 +723,9 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
+        # avec le CLAVIER CACHE : une seule camera, la premiere de la liste, pour tout le monde
+        if (TouchesClavier.Length > 0, Cam0 := CamerasClavier[0]):
+            return option{Cam0}
         if (Pl := Places[NumeroDe(J) - 1]):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 100000000.0
