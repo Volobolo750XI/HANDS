@@ -618,7 +618,7 @@ hands_manager := class(creative_device):
     # coche pour limiter la tete (desactive : la tete est libre)
     @editable LimiterTete : logic = true
     # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
-    @editable CorrectionVue : float = 90.0
+    @editable CorrectionVue : float = 0.0
     @editable TeteMaxDroite : float = 60.0
     @editable TeteMaxGauche : float = 60.0
     # Reglages
