@@ -1309,14 +1309,25 @@ hands_manager := class(creative_device):
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
         # TEST DE L'ANIMATION : un clic gauche (ou la fin du temps) -> un bouton libre au hasard
         if (TestAnimation?):
-            MessagePour(J, "TEST: CLICK TO PRESS A BUTTON")
-            race:
-                Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
-                loop:
-                    A := ClicJoueur.Await()
-                    if (player[A] = J):
-                        break
-            MessagePour(J, "")
+            # un vrai bouton a l'ecran, avec le curseur (comme les cartes)
+            FermerEcrans()
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(J, Chrono)
+            set S += BoutonTexte("PRESS A BUTTON", 0.5, 0.5, 0.0, 0.0, 90.0, 950)
+            Montrer(J, S, Chrono, true)
+            loop:
+                Reste := Fin - GetSimulationElapsedTime()
+                MajChronos(Reste)
+                if (Reste <= 0.0):
+                    break
+                var Recu : int = -1
+                race:
+                    Sleep(Min(0.5, Reste))
+                    block:
+                        set Recu = Choix.Await()
+                if (Recu = 950):
+                    break
+            FermerEcrans()
             return BoutonLibre()
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
