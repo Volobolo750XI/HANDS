@@ -609,6 +609,8 @@ hands_manager := class(creative_device):
     # TEST DE L'ANIMATION : pas de camera fixe, on reste dans sa vue ; un clic gauche = l'animation d'appui puis un
     # bouton au hasard. Decoche une fois l'animation reglee.
     @editable TestAnimation : logic = false
+    # direction du CORPS pendant l'animation, par rapport a la machine (degres) : -90 = un quart de tour a gauche
+    @editable CorrectionCorps : float = -90.0
     @editable ImagesParSecondeAppui : float = 30.0
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
     # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
@@ -1272,7 +1274,11 @@ hands_manager := class(creative_device):
             loop:
                 if (Requis <= 0 or Elimine? or LibresRestants() = 0):
                     break
+                # l'animation part tout de suite et reste figee a l'image d'arret jusqu'au clic
+                Pret := LancerAppui(J)
                 K := ViserEtCliquer(J, Requis, Vu, Fin)
+                # clic avant que la pose soit atteinte : on attend qu'elle le soit
+                Sleep(Max(0.0, Pret - GetSimulationElapsedTime()))
                 if (K >= 0):
                     if (K = Vu):
                         set Vu = -1
@@ -1595,18 +1601,6 @@ hands_manager := class(creative_device):
 
     # le personnage se penche (animation), puis le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
-        # le geste jusqu'a l'image d'arret, puis il reste fige dessus (le doigt sur le bouton)
-        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            # le CORPS face a la machine et bloque (il ne tourne plus avec la souris) : il appuie droit devant lui
-            if (Vue := Orientations[J]):
-                Ici := Perso.GetTransform().Translation
-                Perso.ReleaseFromStasis()
-                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Vue, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
-            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            Controle.Play(Anim)
-            Sleep(Arret)
-            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0)
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
@@ -1616,6 +1610,27 @@ hands_manager := class(creative_device):
         Sleep(0.1)
         SonClic.Play()
         Sleep(0.4)
+
+    # DES QUE C'EST A LUI D'APPUYER : le corps face a la machine (bloque), le geste jusqu'a l'image d'arret, et il
+    # reste FIGE dessus (le doigt sur le bouton) tant qu'il n'a pas clique. Renvoie le moment ou la pose est atteinte.
+    LancerAppui(J : player) : float =
+        var Pret : float = GetSimulationElapsedTime()
+        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            if (Vue := Orientations[J]):
+                Ici := Perso.GetTransform().Translation
+                Perso.ReleaseFromStasis()
+                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Vue + CorrectionCorps, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
+            Controle.Play(Anim)
+            spawn{ FigerAppui(J, Arret) }
+            set Pret = GetSimulationElapsedTime() + Arret
+        Pret
+
+    FigerAppui(J : player, Arret : float)<suspends> : void =
+        Sleep(Arret)
+        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0)
 
     ReprendreAppui(J : player) : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
