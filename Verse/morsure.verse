@@ -302,6 +302,109 @@ DosCarte(AX : float, AY : float, X : float, Y : float, Taille : float) : []canva
     array{PlaceH(color_block{DefaultColor := color{R := 0.33, G := 0.33, B := 0.32}}, AX, AY, X, Y, L, H),
         PlaceH(color_block{DefaultColor := color{R := 0.07, G := 0.07, B := 0.075}}, AX, AY, X, Y, L - Taille * 0.06, H - Taille * 0.06)} + TexteEcrit("?", AX, AY, X, Y, Taille * 0.45)
 
+# LE JUMPSCARE (quand on se fait mordre) : 81 images du dossier Cauchemar, jouees en plein ecran
+ImagesCauchemar : []texture = array{
+    Cauchemar.Cauchemar_001,
+    Cauchemar.Cauchemar_002,
+    Cauchemar.Cauchemar_003,
+    Cauchemar.Cauchemar_004,
+    Cauchemar.Cauchemar_005,
+    Cauchemar.Cauchemar_006,
+    Cauchemar.Cauchemar_007,
+    Cauchemar.Cauchemar_008,
+    Cauchemar.Cauchemar_009,
+    Cauchemar.Cauchemar_010,
+    Cauchemar.Cauchemar_011,
+    Cauchemar.Cauchemar_012,
+    Cauchemar.Cauchemar_013,
+    Cauchemar.Cauchemar_014,
+    Cauchemar.Cauchemar_015,
+    Cauchemar.Cauchemar_016,
+    Cauchemar.Cauchemar_017,
+    Cauchemar.Cauchemar_018,
+    Cauchemar.Cauchemar_019,
+    Cauchemar.Cauchemar_020,
+    Cauchemar.Cauchemar_021,
+    Cauchemar.Cauchemar_022,
+    Cauchemar.Cauchemar_023,
+    Cauchemar.Cauchemar_024,
+    Cauchemar.Cauchemar_025,
+    Cauchemar.Cauchemar_026,
+    Cauchemar.Cauchemar_027,
+    Cauchemar.Cauchemar_028,
+    Cauchemar.Cauchemar_029,
+    Cauchemar.Cauchemar_030,
+    Cauchemar.Cauchemar_031,
+    Cauchemar.Cauchemar_032,
+    Cauchemar.Cauchemar_033,
+    Cauchemar.Cauchemar_034,
+    Cauchemar.Cauchemar_035,
+    Cauchemar.Cauchemar_036,
+    Cauchemar.Cauchemar_037,
+    Cauchemar.Cauchemar_038,
+    Cauchemar.Cauchemar_039,
+    Cauchemar.Cauchemar_040,
+    Cauchemar.Cauchemar_041,
+    Cauchemar.Cauchemar_042,
+    Cauchemar.Cauchemar_043,
+    Cauchemar.Cauchemar_044,
+    Cauchemar.Cauchemar_045,
+    Cauchemar.Cauchemar_046,
+    Cauchemar.Cauchemar_047,
+    Cauchemar.Cauchemar_048,
+    Cauchemar.Cauchemar_049,
+    Cauchemar.Cauchemar_050,
+    Cauchemar.Cauchemar_051,
+    Cauchemar.Cauchemar_052,
+    Cauchemar.Cauchemar_053,
+    Cauchemar.Cauchemar_054,
+    Cauchemar.Cauchemar_055,
+    Cauchemar.Cauchemar_056,
+    Cauchemar.Cauchemar_057,
+    Cauchemar.Cauchemar_058,
+    Cauchemar.Cauchemar_059,
+    Cauchemar.Cauchemar_060,
+    Cauchemar.Cauchemar_061,
+    Cauchemar.Cauchemar_062,
+    Cauchemar.Cauchemar_063,
+    Cauchemar.Cauchemar_064,
+    Cauchemar.Cauchemar_065,
+    Cauchemar.Cauchemar_066,
+    Cauchemar.Cauchemar_067,
+    Cauchemar.Cauchemar_068,
+    Cauchemar.Cauchemar_069,
+    Cauchemar.Cauchemar_070,
+    Cauchemar.Cauchemar_071,
+    Cauchemar.Cauchemar_072,
+    Cauchemar.Cauchemar_073,
+    Cauchemar.Cauchemar_074,
+    Cauchemar.Cauchemar_075,
+    Cauchemar.Cauchemar_076,
+    Cauchemar.Cauchemar_077,
+    Cauchemar.Cauchemar_078,
+    Cauchemar.Cauchemar_079,
+    Cauchemar.Cauchemar_080,
+    Cauchemar.Cauchemar_081}
+
+# Pour qu'il n'y ait JAMAIS d'image blanche (image pas encore chargee) : les images A VENIR sont posees en plein
+# ecran SOUS l'image affichee (invisibles, mais le jeu les charge en vraie taille avant qu'on en ait besoin).
+# Fenetre glissante : seules les prochaines images sont posees, les images passees sont retirees.
+fenetre_images := class:
+    Scene : canvas
+    Couches : []texture_block
+    Plein : anchors
+    var Bas : int = 0
+    var Haut : int = -1
+
+    Avancer(Debut : int, Avance : int) : void =
+        Fin := Min(Couches.Length - 1, Debut + Avance)
+        for (K := Haut + 1..Fin, W := Couches[K]):
+            Scene.AddWidget(canvas_slot{Widget := W, Anchors := Plein, Offsets := margin{}, ZOrder := 0})
+        set Haut = Max(Haut, Fin)
+        for (K := Bas..Debut - 1, W := Couches[K]):
+            Scene.RemoveWidget(W)
+        set Bas = Max(Bas, Debut)
+
 # un TEXTE-BOUTON : au survol, il devient blanc pur et grossit un peu ; clic -> Ev.Signal(Code)
 bouton_texte := class:
     Ev : event(int)
@@ -492,6 +595,11 @@ hands_manager := class(creative_device):
     # Sons (Audio Player : lecture automatique NON)
     @editable SonClic : audio_player_device = audio_player_device{}
     @editable SonBoom : audio_player_device = audio_player_device{}
+    # LE JUMPSCARE : le son, entendu SEULEMENT par celui qui se fait mordre (Audio Player : lecture automatique NON)
+    @editable SonCauchemar : audio_player_device = audio_player_device{}
+    @editable ImagesParSecondeCauchemar : float = 24.0
+    # LA FEINTE : a chaque bouton sur, la machoire claque un peu (degres) puis se rouvre
+    @editable AngleFeinte : float = 14.0
     @editable SonCarte : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
@@ -1049,6 +1157,7 @@ hands_manager := class(creative_device):
                             Croc(J)
                             set Elimine = true
                     else:
+                        Feinte()
                         set Requis -= 1
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
@@ -1381,29 +1490,68 @@ hands_manager := class(creative_device):
         SonClic.Play()
         Sleep(0.4)
 
-    # piege : la machoire claque (fermee completement), flash rouge pour la victime, puis elle se rouvre
+    # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
     # et la grille repart a zero
     Croc(J : player)<suspends> : void =
-        Axe := if (AxeFermeture = 0) then vector3{X := 1.0, Y := 0.0, Z := 0.0} else if (AxeFermeture = 2) then vector3{X := 0.0, Y := 0.0, Z := 1.0} else vector3{X := 0.0, Y := 1.0, Z := 0.0}
-        Lacet := MakeRotation(vector3{X := 0.0, Y := 0.0, Z := 1.0}, DegreesToRadians(LacetMachine))
         PoseG := Tournee(BaseGueule, LacetMachine)
-        Fermee := PoseG.Rotation.RotateBy(MakeRotation(Lacet.RotateVector(Axe), DegreesToRadians(AngleFermeture)))
         SonBoom.Play()
-        spawn{ FlashRouge(J) }
-        Gueule.MoveTo(PoseG.Translation, Fermee, 0.12)
-        Bandeau("P{NumeroDe(J)} GOT BITTEN!")
-        Sleep(1.6)
-        Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.8)
+        # la victime : le JUMPSCARE en plein ecran ; les autres : la machoire qui claque et le message
+        sync:
+            JouerCauchemar(J)
+            block:
+                Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFermeture), 0.12)
+                for (X : GetPlayspace().GetPlayers(), X <> J):
+                    MessagePour(X, "P{NumeroDe(J)} GOT BITTEN!")
+                Sleep(1.6)
+                Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.8)
         Bandeau("")
         NouvelleGrille()
 
-    FlashRouge(J : player)<suspends> : void =
-        if (UI := GetPlayerUI[J]):
-            Voile := color_block{DefaultColor := color{R := 0.8, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}
-            C := canvas{Slots := array{canvas_slot{Widget := Voile, Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}}}}
-            UI.AddWidget(C)
-            Sleep(0.5)
-            UI.RemoveWidget(C)
+    # la machoire fermee de Angle degres (machine tournee vers le joueur actuel)
+    RotationGueule(Angle : float) : rotation =
+        Axe := if (AxeFermeture = 0) then vector3{X := 1.0, Y := 0.0, Z := 0.0} else if (AxeFermeture = 2) then vector3{X := 0.0, Y := 0.0, Z := 1.0} else vector3{X := 0.0, Y := 1.0, Z := 0.0}
+        Lacet := MakeRotation(vector3{X := 0.0, Y := 0.0, Z := 1.0}, DegreesToRadians(LacetMachine))
+        PoseG := Tournee(BaseGueule, LacetMachine)
+        PoseG.Rotation.RotateBy(MakeRotation(Lacet.RotateVector(Axe), DegreesToRadians(Angle)))
+
+    # LA FEINTE : bouton sur -> la machoire claque un peu, d'un coup, puis se rouvre (on a eu peur pour rien)
+    Feinte()<suspends> : void =
+        PoseG := Tournee(BaseGueule, LacetMachine)
+        Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFeinte), 0.07)
+        Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.25)
+
+    # LE JUMPSCARE, pour la victime seulement : ecran noir le temps de charger les premieres images (0,35 s),
+    # puis les images calees sur l'horloge, avec le son (pour elle seule)
+    JouerCauchemar(J : player)<suspends> : void =
+        if (UI := GetPlayerUI[J], Premiere := ImagesCauchemar[0]):
+            Plein := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}
+            Couches := for (Im : ImagesCauchemar) do texture_block{DefaultImage := Im, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
+            Ecran := texture_block{DefaultImage := Premiere, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
+            Noir := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 1.0}
+            Scene := canvas{Slots := array{canvas_slot{Widget := Noir, Anchors := Plein, Offsets := margin{}, ZOrder := 3}}}
+            UI.AddWidget(Scene)
+            Fenetre := fenetre_images{Scene := Scene, Couches := Couches, Plein := Plein}
+            Fenetre.Avancer(0, 30)
+            Sleep(0.35)
+            Scene.AddWidget(canvas_slot{Widget := Ecran, Anchors := Plein, Offsets := margin{}, ZOrder := 2})
+            Scene.RemoveWidget(Noir)
+            SonCauchemar.Register(J)
+            SonCauchemar.Play(J)
+            N := ImagesCauchemar.Length
+            Debut := GetSimulationElapsedTime()
+            var Affichee : int = 0
+            loop:
+                Sleep(0.0)
+                I := if (V := Floor[(GetSimulationElapsedTime() - Debut) * Max(1.0, ImagesParSecondeCauchemar)]) then V else 0
+                if (I >= N):
+                    break
+                if (I <> Affichee, Im := ImagesCauchemar[I]):
+                    Ecran.SetImage(Im)
+                    set Affichee = I
+                    Fenetre.Avancer(I, 30)
+            UI.RemoveWidget(Scene)
+            SonCauchemar.Stop(J)
+            SonCauchemar.Unregister(J)
 
     # =========================================================================
     #  INTERFACE (seulement des images et du texte : on joue sur la vraie machine)
