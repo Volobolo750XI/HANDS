@@ -702,13 +702,17 @@ hands_manager := class(creative_device):
     # =========================================================================
     #  LA MACHINE
     # =========================================================================
+    # pieges par grille : 1 par joueur (2 a 2 joueurs, 3 a 3, 4 a 4, jamais plus de 4), au moins PiegesParGrille
+    NombrePieges()<transacts> : int =
+        Max(PiegesParGrille, Min(4, Assis.Length))
+
     NouvelleGrille() : void =
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         var Poses : int = 0
         var Essais : int = 0
         loop:
-            if (Poses >= Min(PiegesParGrille, Touches.Length - 1) or Essais > 500):
+            if (Poses >= Min(NombrePieges(), Touches.Length - 1) or Essais > 500):
                 break
             set Essais += 1
             K := GetRandomInt(0, Touches.Length - 1)
@@ -747,11 +751,17 @@ hands_manager := class(creative_device):
                 if (Ecart > -180.0):
                     break
                 set Ecart += 360.0
+            # la machine tourne TOUJOURS dans le sens du jeu : apres un REVERSE, elle repart dans l'autre sens
+            Dir := SensRotation()
+            if (Dir > 0.0, Ecart < -2.0):
+                set Ecart += 360.0
+            if (Dir < 0.0, Ecart > 2.0):
+                set Ecart -= 360.0
             if (Abs(Ecart) <= 2.0, TestSolo?, DernierTourne = I, Tours = 0, not ApresRoulette?):
-                set Ecart = 360.0
+                set Ecart = 360.0 * Dir
             set ApresRoulette = if (Tours > 0) then true else false
             if (Tours > 0):
-                set Ecart += 360.0 * (Tours * 1.0)
+                set Ecart += 360.0 * (Tours * 1.0) * Dir
             set DernierTourne = I
             if (Abs(Ecart) > 2.0):
                 Duree := if (Tours > 0) then DureeRoulette else Max(0.2, DureeRotation * (if (Abs(Ecart) > 300.0) then 1.6 else 1.0))
@@ -776,6 +786,18 @@ hands_manager := class(creative_device):
                 set LacetMachine = Depart + Ecart
                 SonRotation.Stop()
                 SonArret.Play()
+
+    # +1 / -1 : le sens dans lequel la machine tourne pour aller au joueur SUIVANT (selon la position des Places
+    # autour de la table), inverse par REVERSE
+    SensRotation()<transacts> : float =
+        var Naturel : float = 1.0
+        if (P0 := Places[0], P1 := Places[1]):
+            C := BaseCentre.Translation
+            A0 := ArcTan(P0.GetTransform().Translation.Y - C.Y, P0.GetTransform().Translation.X - C.X) * 180.0 / PiFloat
+            A1 := ArcTan(P1.GetTransform().Translation.Y - C.Y, P1.GetTransform().Translation.X - C.X) * 180.0 / PiFloat
+            if (AngleCourt(A1 - A0) < 0.0):
+                set Naturel = -1.0
+        Naturel * (Sens * 1.0)
 
     Bouger(T : creative_prop, Ou : transform, Duree : float)<suspends> : void =
         T.MoveTo(Ou.Translation, Ou.Rotation, Duree)
@@ -1076,33 +1098,40 @@ hands_manager := class(creative_device):
         if (Victimes.Length = 0):
             Avertir(J, "NOBODY HAS A CARD TO STEAL")
             return
+        # un ecran : il CLIQUE sur le joueur a voler (10 s, sinon un joueur au hasard)
+        FermerEcrans()
+        for (X : Assis, EstLa(X)?):
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(X, Chrono)
+            if (X = J):
+                set S += TexteEcrit("STEAL A CARD FROM...", 0.5, 0.0, 0.0, 300.0, 90.0)
+                for (N -> V : Victimes):
+                    Y := (N * 1.0 - (Victimes.Length - 1) * 0.5) * 120.0
+                    set S += BoutonTexte("P{NumeroDe(V)} ({NombreDe(V)} CARDS)", 0.5, 0.5, 0.0, Y, 70.0, 700 + N)
+                set S += PaquetEnBas(X)
+                Montrer(X, S, Chrono, true)
+            else:
+                set S += TexteEcrit("P{NumeroDe(J)} IS STEALING A CARD...", 0.5, 0.0, 0.0, 300.0, 54.0)
+                set S += PaquetEnBas(X)
+                Montrer(X, S, Chrono, false)
         var Cible : ?player = false
-        var Vue : ?player = false
         Fin := GetSimulationElapsedTime() + 10.0
         loop:
             Reste := Fin - GetSimulationElapsedTime()
+            MajChronos(Reste)
             if (Reste <= 0.0):
-                if (X := Victimes[GetRandomInt(0, Victimes.Length - 1)]):
-                    set Cible = option{X}
                 break
-            Regarde := JoueurVise(J)
-            if (V := Regarde?):
-                MessagePour(J, "STEAL FROM P{NumeroDe(V)} ({NombreDe(V)} CARDS)? CLICK!")
-            else:
-                MessagePour(J, "LOOK AT A PLAYER AND CLICK TO STEAL A CARD")
-            set Vue = Regarde
-            var Clic : logic = false
+            var Recu : int = -1
             race:
-                Sleep(0.1)
-                loop:
-                    A := ClicJoueur.Await()
-                    if (player[A] = J):
-                        set Clic = true
-                        break
-            if (Clic?, V := Vue?):
+                Sleep(Min(0.5, Reste))
+                block:
+                    set Recu = Choix.Await()
+            if (V := Victimes[Recu - 700]):
                 set Cible = option{V}
                 break
-        MessagePour(J, "")
+        if (not Cible?, X := Victimes[GetRandomInt(0, Victimes.Length - 1)]):
+            set Cible = option{X}
+        FermerEcrans()
         if (C := Cible?, MC := Paquets[C], MC.Length > 0):
             I := GetRandomInt(0, MC.Length - 1)
             if (Volee := MC[I]):
