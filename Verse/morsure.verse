@@ -4,12 +4,8 @@
 #  machine : on vise le bouton avec la camera (il devient blanc) et on clique. Certains boutons sont pieges :
 #  la machoire se referme et le joueur est elimine de la manche. Le dernier en jeu gagne.
 #
-#  BLUFF : au debut de son tour, on peut ANNONCER une carte, meme si on ne l'a pas. Les autres ont DureeDefi s
-#  pour crier LIAR! (touche E) :
-#    - personne n'accuse        -> l'effet s'applique (meme si c'etait un mensonge)
-#    - accuse et il mentait     -> pas d'effet, le menteur appuie sur 1 bouton de plus
-#    - accuse mais c'etait vrai -> l'effet s'applique, l'accusateur perd une carte et appuiera sur 1 bouton de plus
-#  Les jeux de chacun sont secrets : les autres ne voient que le NOMBRE de cartes.
+#  CARTES : au debut de la manche, 6 cartes au hasard, on en garde 3. A son tour, on joue une carte (elle agit
+#  tout de suite) ou NO CARD. Les jeux de chacun sont secrets : les autres ne voient que le NOMBRE de cartes.
 #
 #  Un seul appareil Verse a poser : hands_manager
 # ============================================================================
@@ -580,11 +576,9 @@ hands_manager := class(creative_device):
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
-    # LIAR! : un 2e Declencheur d'entree, regle sur la touche E (Interagir, ou une action personnalisee sur E).
-    # Pendant une annonce, les autres appuient dessus pour crier LIAR!
-    @editable ToucheLiar : input_trigger_device = input_trigger_device{}
-    # la voix "LIAR!" jouee quand quelqu'un accuse (Audio Player : lecture automatique NON, entendu par tous)
-    @editable SonLiar : audio_player_device = audio_player_device{}
+    # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
+    # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
+    @editable ToucheVue : input_trigger_device = input_trigger_device{}
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -628,7 +622,6 @@ hands_manager := class(creative_device):
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
-    @editable DureeDefi : float = 10.0           # secondes pour crier LIAR! apres une annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
     @editable Enfoncement : float = 2.0          # cm : un bouton appuye descend de ca
@@ -639,8 +632,6 @@ hands_manager := class(creative_device):
     Choix : event(int) = event(int){}
     # un clic (action Tir) d'un joueur
     ClicJoueur : event(agent) = event(agent){}
-    # un joueur a appuye sur la touche LIAR (E)
-    LiarJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
     var EnMachine : [player]logic = map{}          # il clique sur la machine (camera fixe) : ses textes sont a gauche
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
@@ -682,7 +673,7 @@ hands_manager := class(creative_device):
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
-        ToucheLiar.PressedEvent.Subscribe(QuandLiar)
+        ToucheVue.PressedEvent.Subscribe(QuandVue)
         spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
@@ -738,8 +729,62 @@ hands_manager := class(creative_device):
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
 
-    QuandLiar(Agent : agent) : void =
-        LiarJoueur.Signal(Agent)
+    # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
+    var Vues : [player]canvas = map{}
+    QuandVue(Agent : agent) : void =
+        if (J := player[Agent], UI := GetPlayerUI[J]):
+            if (Ancienne := Vues[J]):
+                UI.RemoveWidget(Ancienne)
+                OterVue(J)
+            else if (Contient(Assis, J)?):
+                V := DessinerVue(J)
+                UI.AddWidget(V)
+                if (set Vues[J] = V) {}
+                spawn{ CacherVue(J, V) }
+
+    OterVue(J : player) : void =
+        var Reste : [player]canvas = map{}
+        for (X -> W : Vues, X <> J):
+            if (set Reste[X] = W) {}
+        set Vues = Reste
+
+    CacherVue(J : player, V : canvas)<suspends> : void =
+        Sleep(5.0)
+        if (Actuelle := Vues[J], Actuelle = V, UI := GetPlayerUI[J]):
+            UI.RemoveWidget(V)
+            OterVue(J)
+
+    # la table vue du dessus, TOI en bas : la machine au milieu, chaque joueur a sa vraie place autour
+    DessinerVue(J : player) : canvas =
+        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.82}, 0.5, 0.5, 0.0, 0.0, 820.0, 820.0)}
+        C := BaseCentre.Translation
+        if (PlMoi := Places[NumeroDe(J) - 1]):
+            Moi := PlMoi.GetTransform().Translation
+            L0 := Max(1.0, Sqrt((C.X - Moi.X) * (C.X - Moi.X) + (C.Y - Moi.Y) * (C.Y - Moi.Y)))
+            # vers l'avant (de moi vers la machine) = le HAUT de l'ecran ; ma droite = la droite de l'ecran
+            FX := (C.X - Moi.X) / L0
+            FY := (C.Y - Moi.Y) / L0
+            set S += TexteEcrit("THE MACHINE", 0.5, 0.5, 0.0, 0.0, 38.0)
+            for (I -> X : Assis, Pl := Places[I]):
+                P := Pl.GetTransform().Translation
+                RX := P.X - C.X
+                RY := P.Y - C.Y
+                L := Max(1.0, Sqrt(RX * RX + RY * RY))
+                SX := (RX * (-FY) + RY * FX) / L * 280.0
+                SY := -(RX * FX + RY * FY) / L * 280.0
+                Nom := if (X = J) then "YOU" else "P{I + 1}"
+                set S += TexteEcrit(Nom, 0.5, 0.5, SX, SY - 55.0, 44.0)
+                if (I = DernierTourne):
+                    set S += TexteEcrit("HIS TURN", 0.5, 0.5, SX, SY - 100.0, 30.0)
+                if (not Contient(Vivants, X)?):
+                    set S += TexteEcrit("OUT", 0.5, 0.5, SX, SY + 10.0, 40.0)
+                else:
+                    N := NombreDe(X)
+                    if (N = 0):
+                        set S += TexteEcrit("NO CARD", 0.5, 0.5, SX, SY + 10.0, 28.0)
+                    for (K := 0..N - 1):
+                        set S += DosCarte(0.5, 0.5, SX + (K * 1.0 - (N - 1) * 0.5) * 44.0, SY + 15.0, 50.0)
+        canvas{Slots := S}
 
     # =========================================================================
     #  UNE MANCHE
@@ -1099,32 +1144,11 @@ hands_manager := class(creative_device):
             else:
                 break
         if (Index >= 0, Paquet := Paquets[J], Reelle := Paquet[Index]):
-            # la carte part sur la table, face cachee (elle quitte sa main dans tous les cas)
+            # la carte quitte sa main, tout le monde la voit, et elle agit tout de suite
             RetirerRelique(J, Index)
-            Ment := if (Reelle <> Id) then true else false
-            Accusateur := Annoncer(J, Id)
-            var Effet : logic = true
-            if (A := Accusateur?):
-                # accuse : la carte est RETOURNEE devant tout le monde
-                Reveler(J, Reelle, Ment)
-                if (Ment?):
-                    # il mentait : pas d'effet, 1 bouton de plus
-                    set Effet = false
-                    set Requis += 1
-                    SonBoom.Play()
-                    Bandeau("P{NumeroDe(J)} WAS LYING! +1 BUTTON")
-                else:
-                    # il disait vrai : l'accusateur perd une carte et appuiera sur 1 bouton de plus
-                    RetirerReliqueAuHasard(A)
-                    PA := if (P := Penalites[A]) then P else 0
-                    if (set Penalites[A] = PA + 1) {}
-                    Bandeau("P{NumeroDe(J)} TOLD THE TRUTH! P{NumeroDe(A)} LOSES A CARD AND +1 BUTTON")
-            else:
-                Bandeau("NOBODY CALLED LIAR - {NomRelique(Id)} WORKS")
-            spawn{ EffacerBandeau(2.5) }
-            # l'effet de la carte ANNONCEE (si personne ne l'a demasque)
+            CartePosee(J, Reelle)
+            Effet := true
             if (Effet?):
-                SonCarte.Play()
                 if (Id = 0):
                     set Bouclier = true
                 else if (Id = 1):
@@ -1397,73 +1421,28 @@ hands_manager := class(creative_device):
                 Sleep(Min(0.5, Reste))
                 block:
                     set Recu = Choix.Await()
-            Reelle := if (Paquet := Paquets[J], R := Paquet[Choisie]) then R else -1
-            if (Recu >= 100, Recu < 100 + PaquetMax, Recu - 100 < NombreDe(J)):
-                set Choisie = Recu - 100
-                set Mensonge = false
-                EcranJouer(J, Choisie, Mensonge)
-            else if (Recu = 400, Reelle >= 0):
-                set Resultat = (Choisie, Reelle)
+            # un clic sur une carte de sa main : elle est jouee tout de suite (plus de mensonge)
+            if (Recu >= 100, Recu < 100 + PaquetMax, Paquet := Paquets[J], Reelle := Paquet[Recu - 100]):
+                set Resultat = (Recu - 100, Reelle)
                 break
-            else if (Recu = 401, Reelle >= 0):
-                set Mensonge = true
-                EcranJouer(J, Choisie, Mensonge)
-            else if (Recu >= 300, Recu <= 305, Mensonge?, Choisie >= 0):
-                set Resultat = (Choisie, Recu - 300)
-                break
-            else if (Recu = 198):
-                set Mensonge = false
-                EcranJouer(J, Choisie, Mensonge)
             else if (Recu = 197):
                 set Resultat = (-2, -2)
                 break
         FermerEcrans()
         Resultat
 
-    # la carte posee est retournee devant tout le monde (apres une accusation)
-    Reveler(J : player, Reelle : int, Ment : logic)<suspends> : void =
+    # la carte jouee, en grand, pour tout le monde (1,6 s)
+    CartePosee(J : player, Id : int)<suspends> : void =
         FermerEcrans()
+        SonCarte.Play()
         for (X : Assis, EstLa(X)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(X, Chrono)
-            set S += array{PlaceH(ImgH(ImageRelique(Reelle), 400.0, 400.0), 0.5, 0.5, 0.0, -20.0, 400.0, 400.0)}
-            set S += TexteEcrit(if (Ment?) then "LIE!" else "TRUTH!", 0.5, 0.5, 0.0, -270.0, 110.0)
-            set S += TexteEcrit("P{NumeroDe(J)} PLAYED {NomRelique(Reelle)}", 0.5, 0.5, 0.0, 220.0, 50.0)
+            set S += array{PlaceH(ImgH(ImageRelique(Id), 400.0, 400.0), 0.5, 0.5, 0.0, -20.0, 400.0, 400.0)}
+            set S += TexteEcrit("P{NumeroDe(J)} PLAYS {NomRelique(Id)}!", 0.5, 0.5, 0.0, -270.0, 80.0)
             Montrer(X, S, Chrono, false)
-        Sleep(2.2)
+        Sleep(1.6)
         FermerEcrans()
-
-    # l'annonce : DureeDefi s pendant lesquelles les autres joueurs en jeu peuvent appuyer sur E pour crier LIAR!
-    # renvoie le premier accusateur (ou rien)
-    Annoncer(J : player, Id : int)<suspends> : ?player =
-        set DefiEnCours = true
-        set DefiRelique = Id
-        set DefiAuteur = NumeroDe(J)
-        SonCarte.Play()
-        EcranDefi(J)
-        var Accuse : ?player = false
-        # seul (TEST SOLO) : personne ne peut crier LIAR, on n'attend qu'une seconde
-        FinDefi := GetSimulationElapsedTime() + (if (TestSolo?) then 1.0 else DureeDefi)
-        loop:
-            Reste := FinDefi - GetSimulationElapsedTime()
-            MajChronos(Reste)
-            if (Reste <= 0.0 or Accuse?):
-                break
-            var Qui : ?agent = false
-            race:
-                Sleep(Min(0.5, Reste))
-                block:
-                    # (pas d'Await dans option{...} : erreur 3512)
-                    Cliqueur := LiarJoueur.Await()
-                    set Qui = option{Cliqueur}
-            if (Ag := Qui?, A := player[Ag], A <> J, Contient(Vivants, A)?):
-                set Accuse = option{A}
-                SonLiar.Play()
-                Bandeau("P{NumeroDe(A)} SAYS P{NumeroDe(J)} IS LYING!")
-                Sleep(1.2)
-        set DefiEnCours = false
-        FermerEcrans()
-        Accuse
 
     EffacerBandeau(Apres : float)<suspends> : void =
         Sleep(Apres)
@@ -1749,8 +1728,8 @@ hands_manager := class(creative_device):
             Chrono := NouveauChrono()
             var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.75}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
             set S += TexteEcrit("HOW TO PLAY", 0.5, 0.5, 0.0, -260.0, 100.0)
-            set S += TexteEcrit("EACH TURN: PLAY A CARD - TRUTH OR LIE", 0.5, 0.5, 0.0, -110.0, 56.0)
-            set S += TexteEcrit("OTHERS CAN CALL LIAR!", 0.5, 0.5, 0.0, -20.0, 56.0)
+            set S += TexteEcrit("EACH TURN: PLAY A CARD TO HELP YOU", 0.5, 0.5, 0.0, -110.0, 56.0)
+            set S += TexteEcrit("OR TO TRAP THE OTHERS", 0.5, 0.5, 0.0, -20.0, 56.0)
             set S += TexteEcrit("THEN PRESS A BUTTON ON THE MACHINE...", 0.5, 0.5, 0.0, 70.0, 56.0)
             set S += TexteEcrit("AND PRAY.", 0.5, 0.5, 0.0, 170.0, 80.0)
             Montrer(J, S, Chrono, false)
@@ -1814,20 +1793,6 @@ hands_manager := class(creative_device):
                 Montrer(J, S, Chrono, false)
 
     # L'ANNONCE : sa carte FACE CACHEE au centre, et ce qu'il dit qu'elle est. Les autres CLIQUENT pour LIAR!
-    EcranDefi(Auteur : player) : void =
-        FermerEcrans()
-        for (J : Assis, EstLa(J)?):
-            Chrono := NouveauChrono()
-            var S : []canvas_slot = Entete(J, Chrono)
-            set S += DosCarte(0.5, 0.5, 0.0, -20.0, 380.0)
-            set S += TexteEcrit("P{DefiAuteur} PLAYS: {NomRelique(DefiRelique)}", 0.5, 0.5, 0.0, -270.0, 70.0)
-            if (J = Auteur):
-                set S += TexteEcrit("WILL THEY BELIEVE YOU?", 0.5, 0.5, 0.0, 220.0, 50.0)
-            else if (Contient(Vivants, J)?):
-                set S += TexteEcrit("LIAR? PRESS E TO ACCUSE!", 0.5, 0.5, 0.0, 220.0, 64.0)
-            set S += PaquetEnBas(J)
-            Montrer(J, S, Chrono, false)
-
     # A LA MACHINE : pas de curseur, il vise avec la camera. PEEK : le bouton sur, sur SON ecran seulement.
     EcranVisee(Actif : player, Requis : int, Vu : int, Souris : logic) : void =
         FermerEcrans()
