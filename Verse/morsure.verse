@@ -724,11 +724,11 @@ hands_manager := class(creative_device):
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
         # les cameras sont rangees DANS LE MEME ORDRE que les Places : la camera de SA place
-        if (TouchesClavier.Length > 0, CamJ := CamerasClavier[NumeroDe(J) - 1]):
+        if (TouchesClavier.Length > 0, CamJ := CamerasClavier[PlaceIndex(J)]):
             return option{CamJ}
         if (TouchesClavier.Length > 0, Cam0 := CamerasClavier[0]):
             return option{Cam0}
-        if (Pl := Places[NumeroDe(J) - 1]):
+        if (Pl := Places[PlaceIndex(J)]):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 100000000.0
             for (Cam : CamerasClavier):
@@ -912,14 +912,14 @@ hands_manager := class(creative_device):
     DessinerVue(J : player) : canvas =
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.82}, 0.5, 0.5, 0.0, 0.0, 820.0, 820.0)}
         C := BaseCentre.Translation
-        if (PlMoi := Places[NumeroDe(J) - 1]):
+        if (PlMoi := Places[PlaceIndex(J)]):
             Moi := PlMoi.GetTransform().Translation
             L0 := Max(1.0, Sqrt((C.X - Moi.X) * (C.X - Moi.X) + (C.Y - Moi.Y) * (C.Y - Moi.Y)))
             # vers l'avant (de moi vers la machine) = le HAUT de l'ecran ; ma droite = la droite de l'ecran
             FX := (C.X - Moi.X) / L0
             FY := (C.Y - Moi.Y) / L0
             set S += TexteEcrit("THE MACHINE", 0.5, 0.5, 0.0, 0.0, 38.0)
-            for (I -> X : Assis, Pl := Places[I]):
+            for (I -> X : Assis, Pl := Places[PlaceIndex(X)]):
                 P := Pl.GetTransform().Translation
                 RX := P.X - C.X
                 RY := P.Y - C.Y
@@ -928,7 +928,7 @@ hands_manager := class(creative_device):
                 SY := -(RX * FX + RY * FY) / L * 280.0
                 Nom := if (X = J) then "YOU" else "P{I + 1}"
                 set S += TexteEcrit(Nom, 0.5, 0.5, SX, SY - 55.0, 44.0)
-                if (I = DernierTourne):
+                if (PlaceIndex(X) = DernierTourne):
                     set S += TexteEcrit("HIS TURN", 0.5, 0.5, SX, SY - 100.0, 30.0)
                 if (not Contient(Vivants, X)?):
                     set S += TexteEcrit("OUT", 0.5, 0.5, SX, SY + 10.0, 40.0)
@@ -944,10 +944,18 @@ hands_manager := class(creative_device):
     #  UNE MANCHE
     # =========================================================================
     Manche()<suspends> : void =
-        var Liste : []player = array{}
+        var Liste0 : []player = array{}
         for (J : GetPlayspace().GetPlayers()):
-            if (Liste.Length < Places.Length):
-                set Liste += array{J}
+            if (Liste0.Length < Places.Length):
+                set Liste0 += array{J}
+        # PLACES AU HASARD : on tire au hasard QUELLES places sont prises et QUI va ou ; l'ordre du jeu suit le tour
+        # de la table (places triees), pour que la machine tourne toujours dans le bon sens
+        ToutesPlaces := for (K := 0..Places.Length - 1) do K
+        Choisies := if (Sl := Shuffle(ToutesPlaces).Slice[0, Liste0.Length]) then TrierEntiers(Sl) else ToutesPlaces
+        Liste := Shuffle(Liste0)
+        set PlaceDe = map{}
+        for (K -> J : Liste, P := Choisies[K]):
+            if (set PlaceDe[J] = P) {}
         set Assis = Liste
         set Vivants = Liste
         EnleverCameras()
@@ -957,7 +965,7 @@ hands_manager := class(creative_device):
         set Sens = 1
         set Bloque = 0
         for (I -> J : Liste):
-            Asseoir(J, I)
+            Asseoir(J, PlaceIndex(J))
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
@@ -1040,7 +1048,7 @@ hands_manager := class(creative_device):
 
     # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
     Rasseoir() : void =
-        for (I -> J : Assis, SurVraieChaise[J]?, Contient(Vivants, J)?, Ch := Chaises[I]):
+        for (J : Assis, SurVraieChaise[J]?, Contient(Vivants, J)?, Ch := Chaises[PlaceIndex(J)]):
             Ch.Seat(J)
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 5)
@@ -1056,6 +1064,19 @@ hands_manager := class(creative_device):
         for (X : Liste, X = J):
             set Trouve = true
         Trouve
+
+    # la place (index dans Places) tiree au hasard pour ce joueur
+    var PlaceDe : [player]int = map{}
+    PlaceIndex(J : player)<transacts> : int =
+        if (P := PlaceDe[J]) then P else NumeroDe(J) - 1
+
+    TrierEntiers(L : []int)<transacts> : []int =
+        var R : []int = L
+        for (A := 0..R.Length - 1):
+            for (B := 0..R.Length - 2):
+                if (X := R[B], Y := R[B + 1], X > Y):
+                    if (set R[B] = Y, set R[B + 1] = X) {}
+        R
 
     NumeroDe(J : player)<transacts> : int =
         var N : int = 0
@@ -1103,7 +1124,7 @@ hands_manager := class(creative_device):
 
     # Tours > 0 : la ROULETTE du debut de manche (plusieurs tours complets, puis elle s'arrete d'un coup sur J)
     TournerVersAvec(J : player, Tours : int)<suspends> : void =
-        I := NumeroDe(J) - 1
+        I := PlaceIndex(J)
         if (Pl := Places[I]):
             Ici := Pl.GetTransform().Translation
             C := BaseCentre.Translation
