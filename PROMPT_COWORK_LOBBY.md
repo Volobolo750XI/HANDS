@@ -13,6 +13,7 @@ CE QUE LE LOBBY DOIT CONTENIR (contraintes de gameplay, obligatoires)
 1. Un point d'apparition (spawn) pour 12 joueurs.
 2. TROIS EMPLACEMENTS DE DÉPART (numérotés 1, 2, 3), assez grands pour 4 joueurs chacun. Les joueurs s'y placent pour lancer une partie ; ils sont alors emmenés ailleurs (les tables de jeu sont dans un autre lieu, loin, invisible depuis le lobby : NE LES MODÉLISE PAS). Chaque emplacement doit être très lisible pour un enfant : on comprend tout de suite "je me mets ici pour jouer" (sol marqué, cercle de lumière, panneau, grand numéro...).
 3. Des zones d'attente agréables autour des emplacements (les joueurs attendent qu'un ami arrive).
+3 bis. BEAUCOUP DE DÉCORATION, partout : le lobby doit être riche, vivant et plein de détails, jamais vide. Exemples : bottes de foin, outils de ferme (fourches, pelles, seaux, brouettes), vieilles caisses et tonneaux, lanternes, chaînes et cordes, toiles d'araignée, vieux meubles, sacs de grain, cadres poussiéreux, animaux empaillés ou mannequins inquiétants, plumes, planches cassées, objets mystérieux liés à la machine-mâchoire (affiches anciennes, plans, boîtes de boutons...). Chaque coin raconte une petite histoire. Toujours SANS sang ni gore.
 4. Un point de retour au lobby (où les joueurs reviennent après une partie).
 5. (Plus tard, à prévoir mais pas à détailler maintenant) un emplacement pour un futur shop.
 
