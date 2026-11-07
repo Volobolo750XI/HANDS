@@ -576,6 +576,13 @@ hands_manager := class(creative_device):
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
+    # LE LOBBY (ou on apparait) : les joueurs sont suspendus cote a cote, une camera fixe les filme, un panneau a
+    # gauche avec READY. Quand tout le monde est pret (au moins JoueursMinimum), tout le monde va a la table.
+    # PlacesLobby : un accessoire invisible par joueur (1, 2, 3, 4), aligne ; CameraLobby : la camera fixe qui les
+    # regarde (Ajouter aux joueurs au debut : Non) ; AnimLobby : l'animation "suspendu" jouee en boucle.
+    @editable PlacesLobby : []creative_prop = array{}
+    @editable CameraLobby : []gameplay_camera_fixed_point_device = array{}
+    @editable AnimLobby : ?animation_sequence = false
     # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
     # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
     @editable ToucheVue : input_trigger_device = input_trigger_device{}
@@ -606,11 +613,6 @@ hands_manager := class(creative_device):
     # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
     # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
     @editable ImageArretAppui : float = 210.0
-    # VOIR SON ANIMATION (test) : pendant son tour, pas de camera fixe ; la Camera orbitale ci-dessous (3e personne,
-    # priorite plus haute que la 1re personne, "Ajouter aux joueurs au debut" : Non) le montre de dos, et un bouton
-    # PRESS A BUTTON a l'ecran sert a cliquer. Decoche apres le test.
-    @editable VoirAnimation : logic = false
-    @editable CameraVueAnimation : []gameplay_camera_orbit_device = array{}
     # direction du CORPS pendant l'animation, par rapport a la machine (degres) : -90 = un quart de tour a gauche
     @editable CorrectionCorps : float = -90.0
     @editable ImagesParSecondeAppui : float = 30.0
@@ -693,20 +695,119 @@ hands_manager := class(creative_device):
         spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
-            Presents := GetPlayspace().GetPlayers()
+            Lobby()
+            Manche()
+            Sleep(4.0)
+
+    # =========================================================================
+    #  LE LOBBY : suspendus cote a cote, panneau a gauche (READY / CANCEL), on part quand tout le monde est pret
+    # =========================================================================
+    var Prets : [player]logic = map{}
+    FinLobby : event() = event(){}
+
+    Lobby()<suspends> : void =
+        set Prets = map{}
+        var Installes : []player = array{}
+        var Dernier : string = ""
+        loop:
+            Presents := for (J : GetPlayspace().GetPlayers(), J.GetFortCharacter[]) do J
+            # les nouveaux arrivants : suspendus a leur place du lobby
+            for (I -> J : Presents, not Contient(Installes, J)?):
+                InstallerLobby(J, I)
+                set Installes += array{J}
+            set Installes = for (J : Installes, Contient(Presents, J)?) do J
             Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
-            if (Presents.Length >= Requis):
-                Manche()
-                Sleep(6.0)
-            else:
-                Bandeau("WAITING FOR PLAYERS {Presents.Length}/{Requis}")
-                Sleep(1.0)
+            NbPrets := (for (J : Presents, Prets[J]?) do J).Length
+            # on redessine seulement quand quelque chose a change
+            Etat := "{Presents.Length}/{NbPrets}/" + (if (Presents.Length >= Requis) then "ok" else "attente")
+            if (Etat <> Dernier):
+                set Dernier = Etat
+                DessinerLobbyTous(Presents, Requis)
+            if (Presents.Length >= Requis, NbPrets = Presents.Length):
+                break
+            Sleep(0.3)
+        # tout le monde est pret : depart
+        FermerEcrans()
+        Bandeau("GET READY...")
+        Sleep(1.2)
+        Bandeau("")
+        FinLobby.Signal()
+        for (J : GetPlayspace().GetPlayers()):
+            for (Cam : CameraLobby):
+                Cam.RemoveFrom(J)
+            if (Perso := J.GetFortCharacter[]):
+                Perso.ReleaseFromStasis()
+
+    InstallerLobby(J : player, I : int) : void =
+        if (Perso := J.GetFortCharacter[]):
+            if (Pl := PlacesLobby[I]):
+                T := Pl.GetTransform()
+                if (Perso.TeleportTo[T.Translation, T.Rotation]) {}
+            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+            for (Cam : CameraLobby):
+                Cam.AddTo(J)
+            if (AnimLobby?):
+                spawn{ AnimEnBoucle(J) }
+
+    # l'animation du lobby (suspendu) en boucle, jusqu'au depart
+    AnimEnBoucle(J : player)<suspends> : void =
+        race:
+            FinLobby.Await()
+            loop:
+                if (Anim := AnimLobby?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+                    Instance := Controle.Play(Anim)
+                    # au depart du lobby (course interrompue) l'animation est ARRETEE
+                    defer:
+                        Instance.Stop()
+                    Instance.Await()
+                else:
+                    Sleep(0.5)
+                Sleep(0.0)
+
+    # le panneau de gauche (comme Hands Over) pour chaque joueur
+    DessinerLobbyTous(Presents : []player, Requis : int) : void =
+        FermerEcrans()
+        NbPrets := (for (J : Presents, Prets[J]?) do J).Length
+        for (J : Presents):
+            EvJ := event(int){}
+            var S : []canvas_slot = array{
+                canvas_slot{Widget := color_block{DefaultColor := color{R := 0.03, G := 0.03, B := 0.035}, DefaultOpacity := 0.72},
+                    Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 0.0, Y := 1.0}},
+                    Offsets := margin{Left := 60.0, Top := 60.0, Right := 560.0, Bottom := 60.0}}}
+            set S += TexteEcrit("MORSURE", 0.0, 0.0, 340.0, 140.0, 96.0)
+            set S += TexteEcrit("{NbPrets}/{Presents.Length} READY", 0.0, 0.0, 340.0, 250.0, 64.0)
+            set S += TexteEcrit("PRESS THE BUTTONS OF THE MACHINE.", 0.0, 0.0, 340.0, 340.0, 28.0)
+            set S += TexteEcrit("ONE OF THEM BITES.", 0.0, 0.0, 340.0, 378.0, 28.0)
+            set S += TexteEcrit("THE LAST ONE STANDING WINS.", 0.0, 0.0, 340.0, 416.0, 28.0)
+            if (Presents.Length < Requis):
+                set S += TexteEcrit("WAITING FOR PLAYERS ({Presents.Length}/{Requis})", 0.0, 0.0, 340.0, 480.0, 28.0)
+            # la liste des joueurs
+            var Y : float = 560.0
+            for (I -> X : Presents):
+                Nom := if (X = J) then "YOU" else "PLAYER {I + 1}"
+                set S += TexteGauche("{I + 1}. {Nom}", 0.0, 0.0, 130.0, Y, 34.0)
+                if (Prets[X]?):
+                    set S += TexteGauche("READY", 0.0, 0.0, 430.0, Y, 34.0)
+                set Y += 46.0
+            # le bouton
+            Texte := if (Prets[J]?) then "CANCEL" else "READY"
+            set S += BoutonTexteSur(EvJ, Texte, 0.0, 1.0, 340.0, -150.0, 90.0, 960)
+            Montrer(J, S, NouveauChrono(), true)
+            spawn{ ClicLobby(J, EvJ) }
+
+    ClicLobby(J : player, EvJ : event(int))<suspends> : void =
+        race:
+            FinEcran.Await()
+            block:
+                EvJ.Await()
+                Etait := if (Prets[J]?) then true else false
+                if (set Prets[J] = (if (Etait?) then false else true)) {}
+                Presents := for (X : GetPlayspace().GetPlayers(), X.GetFortCharacter[]) do X
+                DessinerLobbyTous(Presents, if (TestSolo?) then 1 else Max(2, JoueursMinimum))
 
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
-        if (VoirAnimation?):
-            return Meilleure
         # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
         # les cameras de la table sont ignorees)
         if (T0 := TouchesClavier[0]):
@@ -1330,31 +1431,6 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
-        # VOIR SON ANIMATION : vue de dos (camera orbitale) + un bouton a l'ecran ; la fin du temps = bouton au hasard
-        if (VoirAnimation?):
-            for (Cam : CameraVueAnimation):
-                Cam.AddTo(J)
-            FermerEcrans()
-            Chrono := NouveauChrono()
-            var S : []canvas_slot = Entete(J, Chrono)
-            set S += BoutonTexte("PRESS A BUTTON", 0.5, 1.0, 0.0, -160.0, 70.0, 950)
-            Montrer(J, S, Chrono, true)
-            loop:
-                Reste := Fin - GetSimulationElapsedTime()
-                MajChronos(Reste)
-                if (Reste <= 0.0):
-                    break
-                var Recu : int = -1
-                race:
-                    Sleep(Min(0.5, Reste))
-                    block:
-                        set Recu = Choix.Await()
-                if (Recu = 950):
-                    break
-            FermerEcrans()
-            # on garde la vue de dos encore 3 s pour voir la fin du geste
-            spawn{ RetirerVueAnimation(J) }
-            return BoutonLibre()
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
@@ -1699,11 +1775,6 @@ hands_manager := class(creative_device):
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
             Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
-
-    RetirerVueAnimation(J : player)<suspends> : void =
-        Sleep(3.0)
-        for (Cam : CameraVueAnimation):
-            Cam.RemoveFrom(J)
 
     # (Num : on ne fige que si l'animation n'a pas deja repris entre-temps)
     var NumAppui : [player]int = map{}
