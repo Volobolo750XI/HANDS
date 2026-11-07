@@ -453,8 +453,6 @@ hands_manager := class(creative_device):
     @editable AnimAppui : ?animation_sequence = false
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
     # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
-    # FACULTATIF : animation assise (Mixamo "Sitting Idle", In Place) jouee en boucle. Vide = debout.
-    @editable AnimAssiseJoueur : ?animation_sequence = false
     # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
     @editable AvanceAssis : float = 0.0
     @editable HauteurAssis : float = 0.0
@@ -484,10 +482,9 @@ hands_manager := class(creative_device):
     # un clic (action Tir) d'un joueur
     ClicJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
-    FinAssis : event() = event(){}
-    var Penches : [player]logic = map{}
+    var EnMachine : [player]logic = map{}          # il clique sur la machine (camera fixe) : ses textes sont a gauche
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
-    var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise            # en train de se pencher vers la machine (AnimAppui)
+    var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise
     var BaseTouches : []transform = array{}
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
@@ -631,7 +628,6 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
-        FinAssis.Signal()
         set Orientations = map{}
         set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
@@ -655,8 +651,6 @@ hands_manager := class(creative_device):
             if (Resultat >= 0):
                 if (set Orientations[J] = Lacet) {}
                 Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
-                if (AnimAssiseJoueur?):
-                    spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
                 # teleportation refusee partout : pas fige au point d'apparition, il est assis sur la vraie chaise
                 if (set SurVraieChaise[J] = true) {}
@@ -681,21 +675,6 @@ hands_manager := class(creative_device):
     Rasseoir() : void =
         for (I -> J : Assis, SurVraieChaise[J]?, Contient(Vivants, J)?, Ch := Chaises[I]):
             Ch.Seat(J)
-
-    # l'animation assise, en boucle, jusqu'a la fin de la manche (pause pendant qu'il se penche)
-    GarderAssis(J : player)<suspends> : void =
-        race:
-            FinAssis.Await()
-            loop:
-                if (Anim := AnimAssiseJoueur?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[], not Penches[J]?):
-                    Controle.PlayAndAwait(Anim)
-                else:
-                    Sleep(0.2)
-                Sleep(0.0)
-
-    Redresser(J : player)<suspends> : void =
-        Sleep(1.2)
-        if (set Penches[J] = false) {}
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 5)
 
@@ -977,6 +956,7 @@ hands_manager := class(creative_device):
         if (not Passe?):
             if (Camera := CameraDe(J)?):
                 Camera.AddTo(J)
+                if (set EnMachine[J] = true) {}
             Fin := GetSimulationElapsedTime() + DureeTour
             loop:
                 if (Requis <= 0 or Elimine? or LibresRestants() = 0):
@@ -1001,6 +981,7 @@ hands_manager := class(creative_device):
                         set Requis -= 1
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
+            if (set EnMachine[J] = false) {}
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
@@ -1312,10 +1293,8 @@ hands_manager := class(creative_device):
     # le personnage se penche (animation), puis le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            if (set Penches[J] = true) {}
             Controle.Play(Anim)
             Sleep(0.6)
-            spawn{ Redresser(J) }
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
@@ -1382,6 +1361,17 @@ hands_manager := class(creative_device):
         for (I -> X : Assis, X <> J, Contient(Vivants, X)?):
             set S += TexteGauche("P{I + 1} : {NombreDe(X)} CARD(S)", 0.0, 0.0, 110.0, Ligne, 30.0)
             set Ligne += 36.0
+        S
+
+    # comme Entete, mais le chrono et le DANGER sont sur le cote gauche (pendant qu'il clique sur la machine)
+    EnteteGauche(J : player, Chrono : []texture_block) : []canvas_slot =
+        var S : []canvas_slot = array{}
+        Libres := LibresRestants()
+        Risque := if (Libres > 0, P := Floor[PiegesRestants() * 100.0 / (Libres * 1.0) + 0.5]) then P else 0
+        for (I -> Chiffre : Chrono):
+            set S += array{PlaceLibre(Chiffre, 0.0, 0.5, 310.0 + I * 40.0, -130.0)}
+        set S += TexteEcrit("DANGER {Risque}%", 0.0, 0.5, 330.0, -70.0, 42.0)
+        set S += TexteGauche("YOU ARE P{NumeroDe(J)}", 0.0, 0.0, 110.0, 50.0, 48.0)
         S
 
     # sa main, en petit, en bas de l'ecran (non cliquable)
@@ -1580,14 +1570,20 @@ hands_manager := class(creative_device):
         for (J : Assis, EstLa(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
-            if (J = Actif):
-                Consigne := if (Souris?) then "CLICK A BUTTON OF THE MACHINE - {Requis} TO PRESS" else "AIM AT A BUTTON AND CLICK - {Requis} TO PRESS"
-                set S += TexteEcrit(Consigne, 0.5, 0.0, 0.0, 280.0, 46.0)
+            if (J = Actif, Souris?):
+                # le clavier de la machine occupe le milieu de l'ecran : tout est sur le cote gauche
+                var G : []canvas_slot = EnteteGauche(J, Chrono)
+                set G += TexteEcrit("CLICK A BUTTON", 0.0, 0.5, 330.0, 20.0, 46.0)
+                set G += TexteEcrit("{Requis} TO PRESS", 0.0, 0.5, 330.0, 75.0, 46.0)
+                if (Vu >= 0):
+                    set G += TexteEcrit("GREEN = SAFE", 0.0, 0.5, 330.0, 135.0, 40.0)
+                Montrer(J, G, Chrono, true)
+            else if (J = Actif):
+                set S += TexteEcrit("AIM AT A BUTTON AND CLICK - {Requis} TO PRESS", 0.5, 0.0, 0.0, 280.0, 46.0)
                 if (Vu >= 0):
                     set S += TexteEcrit("THE GREEN BUTTON IS SAFE", 0.5, 0.0, 0.0, 335.0, 42.0)
-                if (not Souris?):
-                    set S += PaquetEnBas(J)
-                Montrer(J, S, Chrono, Souris)
+                set S += PaquetEnBas(J)
+                Montrer(J, S, Chrono, false)
             else:
                 set S += TexteEcrit("P{NumeroDe(Actif)} IS CHOOSING A BUTTON...", 0.5, 0.0, 0.0, 280.0, 46.0)
                 set S += PaquetEnBas(J)
@@ -1611,6 +1607,6 @@ hands_manager := class(creative_device):
         if (UI := GetPlayerUI[J]):
             if (Ancien := Bandeaux[J]):
                 UI.RemoveWidget(Ancien)
-            C := canvas{Slots := TexteEcrit(S, 0.5, 0.0, 0.0, 90.0, 46.0)}
+            C := canvas{Slots := if (EnMachine[J]?) then TexteEcrit(S, 0.0, 0.5, 330.0, 220.0, 30.0) else TexteEcrit(S, 0.5, 0.0, 0.0, 90.0, 46.0)}
             UI.AddWidget(C)
             if (set Bandeaux[J] = C) {}
