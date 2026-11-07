@@ -404,9 +404,9 @@ hands_manager := class(creative_device):
     # de l'ecran (0 = gauche / haut, 1 = droite / bas). 7 valeurs = les 7 lignes qui separent les 6 rangees de
     # boutons, de haut en bas : hauteur de la ligne, bord gauche et bord droit du clavier a cette hauteur.
     # (valeurs mesurees sur ta capture d'ecran ; a retoucher seulement si la camera bouge)
-    @editable LignesY : []float = array{0.175, 0.269, 0.378, 0.4995, 0.634, 0.785, 0.9355}
-    @editable BordGauche : []float = array{0.409, 0.406, 0.4025, 0.3975, 0.3915, 0.384, 0.376}
-    @editable BordDroit : []float = array{0.6225, 0.6275, 0.634, 0.641, 0.649, 0.659, 0.669}
+    @editable LignesY : []float = array{0.1084, 0.2018, 0.3129, 0.4356, 0.5707, 0.7262, 0.8889}
+    @editable BordGauche : []float = array{0.4, 0.396, 0.39, 0.384, 0.376, 0.3675, 0.358}
+    @editable BordDroit : []float = array{0.634, 0.638, 0.644, 0.65, 0.657, 0.665, 0.674}
     # quel bouton (Bouton_01...) est ou a l'ecran : si le bouton qui devient blanc n'est pas celui sous la
     # souris, coche / decoche ces cases
     @editable InverserColonnes : logic = false
@@ -439,18 +439,18 @@ hands_manager := class(creative_device):
     @editable SonCarte : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
-    # ASSIS SANS CHAISE : sur une chaise, Fortnite force la 3e personne. Avec cette animation (Mixamo
-    # "Sitting Idle", In Place), le joueur n'utilise PAS la chaise : il est fige a sa Place, joue l'animation
-    # assise en boucle, et reste a la PREMIERE PERSONNE (il peut tourner la tete). Vide = la chaise.
+    # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
+    # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
+    # FACULTATIF : animation assise (Mixamo "Sitting Idle", In Place) jouee en boucle. Vide = debout.
     @editable AnimAssiseJoueur : ?animation_sequence = false
-    # Avec l'animation assise, le joueur est pose PILE sur SA Place (mets l'accessoire invisible SUR l'assise de la
-    # chaise 3D), tourne vers la machine. Pour le caler : AvanceAssis = cm vers la table (negatif = vers le dossier),
-    # HauteurAssis = cm vers le haut (negatif = plus bas).
+    # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
     @editable AvanceAssis : float = 0.0
     @editable HauteurAssis : float = 0.0
-    # Assis par l'animation : decoche pour essayer de garder le CORPS immobile sur la chaise (si la tete ne
-    # bouge plus du tout, recoche-la).
+    # decoche pour essayer de garder le CORPS immobile (si la tete ne bouge plus du tout, recoche-la)
     @editable CorpsTourne : logic = true
+    # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
+    @editable TeteMaxDroite : float = 60.0
+    @editable TeteMaxGauche : float = 60.0
     # Reglages
     @editable JoueursMinimum : int = 2
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
@@ -473,7 +473,9 @@ hands_manager := class(creative_device):
     ClicJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
     FinAssis : event() = event(){}
-    var Penches : [player]logic = map{}            # en train de se pencher vers la machine (AnimAppui)
+    var Penches : [player]logic = map{}
+    var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
+    var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise            # en train de se pencher vers la machine (AnimAppui)
     var BaseTouches : []transform = array{}
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
@@ -492,6 +494,7 @@ hands_manager := class(creative_device):
     var Chronos : [player][]texture_block = map{}   # les 2 chiffres du chrono (ecriture pinceau)
     var Bandeaux : [player]canvas = map{}           # le message du haut (ecriture pinceau)
     var DernierTourne : int = -1                 # place vers laquelle la machine est tournee
+    var ApresRoulette : logic = false            # la roulette vient de choisir le joueur : son 1er tour ne refait pas un tour
     # BLUFF : l'annonce en cours (les autres peuvent crier LIAR!)
     var DefiEnCours : logic = false
     var DefiRelique : int = 0
@@ -506,6 +509,7 @@ hands_manager := class(creative_device):
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
+        spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
             Presents := GetPlayspace().GetPlayers()
@@ -535,6 +539,27 @@ hands_manager := class(creative_device):
     EnleverCameras() : void =
         for (Cam : CamerasClavier, J : GetPlayspace().GetPlayers()):
             Cam.RemoveFrom(J)
+
+    # LA TETE : si un joueur a sa place tourne trop a droite / a gauche, il est remis a la limite
+    LimiterTetes()<suspends> : void =
+        loop:
+            Sleep(0.1)
+            for (J -> Cible : Orientations, Perso := J.GetFortCharacter[], Perso.IsActive[]):
+                F := Perso.GetViewRotation().GetLocalForward()
+                Yaw := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+                Ecart := AngleCourt(Yaw - Cible)
+                Borne := if (Ecart > TeteMaxDroite) then TeteMaxDroite else if (Ecart < -TeteMaxGauche) then -TeteMaxGauche else Ecart
+                if (Borne <> Ecart):
+                    if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Cible + Borne, 0.0, 0.0)]) {}
+
+    AngleCourt(A0 : float)<transacts> : float =
+        var A : float = A0
+        for (K := 1..4):
+            if (A > 180.0):
+                set A -= 360.0
+            else if (A < -180.0):
+                set A += 360.0
+        A
 
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
@@ -567,7 +592,10 @@ hands_manager := class(creative_device):
             Bandeau("ROUND STARTS IN {3 - N}")
             Sleep(1.0)
         Bandeau("")
+        # LA ROULETTE : la machine fait plusieurs tours et s'arrete sur le premier joueur (1 chance sur N)
         var Index : int = GetRandomInt(0, Max(0, Vivants.Length - 1))
+        if (Premier := Vivants[Index]):
+            TournerVersAvec(Premier, 3)
         loop:
             set Vivants = for (J : Vivants, EstLa(J)?) do J
             # a plusieurs : le dernier en jeu gagne. En TEST SOLO : on joue jusqu'a tomber sur un piege.
@@ -592,49 +620,36 @@ hands_manager := class(creative_device):
         Sleep(4.0)
         Bandeau("")
         FinAssis.Signal()
+        set Orientations = map{}
+        set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
 
-    # le joueur va a sa place, tourne vers la machine, et s'assoit sur sa chaise (ou reste fige sur place)
+    # le joueur va a sa place (debout, ou assis avec l'animation), tourne vers la machine, fige, a la premiere personne
     Asseoir(J : player, I : int) : void =
         if (Pl := Places[I], Perso := J.GetFortCharacter[]):
             Ici := Pl.GetTransform().Translation
             C := Centre.GetTransform().Translation
-            Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
-            if (AnimAssiseJoueur?):
-                # assis par l'animation : pose PILE sur sa Place (l'accessoire invisible que tu as mis SUR la chaise 3D),
-                # tourne vers la machine. AvanceAssis / HauteurAssis : petit reglage autour de la Place.
-                LacetAssis := ArcTan(C.Y - Ici.Y, C.X - Ici.X)
-                Avant := vector3{X := Cos(LacetAssis), Y := Sin(LacetAssis), Z := 0.0}
-                Pose := Ici + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
-                Rot := MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)
-                # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit (la chaise le gene) : il
-                # restait alors au point d'apparition (dehors). On essaie donc de plus en plus haut au-dessus de la Place
-                # (il tombe sur l'assise), puis devant la chaise, cote table.
-                Resultat := PoserPres(Perso, Pose, Avant, Rot)
-                Exact := if (Resultat = 0) then true else false
-                Ou := if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: CHAIR IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: CHAIR IN THE WAY - IN FRONT OF THE CHAIR" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE / REMOVE CHAIR COLLISION"
-                # TEST SOLO : on te dit ou tu as ete pose (pour regler la Place)
-                if (TestSolo?):
-                    Avertir(J, Ou)
-                if (Resultat < 0, Ch := Chaises[I]):
-                    # teleportation refusee partout : on ne le laisse PAS fige au point d'apparition,
-                    # on l'assoit sur la vraie chaise (elle le deplace elle-meme jusqu'a sa place)
-                    Ch.Enable()
-                    Ch.Seat(J)
-                else if (Resultat >= 0):
-                    # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
-                    Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+            LacetRad := ArcTan(C.Y - Ici.Y, C.X - Ici.X)
+            Lacet := LacetRad * 180.0 / PiFloat
+            Avant := vector3{X := Cos(LacetRad), Y := Sin(LacetRad), Z := 0.0}
+            Pose := Ici + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
+            Rot := MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)
+            # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit : on essaie plus haut, puis devant
+            Resultat := PoserPres(Perso, Pose, Avant, Rot)
+            Exact := if (Resultat = 0) then true else false
+            if (TestSolo?):
+                Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
+            if (Resultat >= 0):
+                if (set Orientations[J] = Lacet) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+                if (AnimAssiseJoueur?):
                     spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
-                if (TestSolo?):
-                    Avertir(J, "SEAT: NO ANIMATION IN ANIMASSISEJOUEUR - REAL CHAIR")
-                PoserPres(Perso, Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
+                # teleportation refusee partout : pas fige au point d'apparition, il est assis sur la vraie chaise
+                if (set SurVraieChaise[J] = true) {}
+                Ch.Enable()
                 Ch.Seat(J)
-            else:
-                PoserPres(Perso, Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
-                # pas de chaise : il ne peut pas se deplacer, mais il peut tourner la tete
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := true})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : chaise, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
@@ -652,7 +667,7 @@ hands_manager := class(creative_device):
 
     # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
     Rasseoir() : void =
-        for (I -> J : Assis, not AnimAssiseJoueur?, Contient(Vivants, J)?, Ch := Chaises[I]):
+        for (I -> J : Assis, SurVraieChaise[J]?, Contient(Vivants, J)?, Ch := Chaises[I]):
             Ch.Seat(J)
 
     # l'animation assise, en boucle, jusqu'a la fin de la manche (pause pendant qu'il se penche)
@@ -720,6 +735,10 @@ hands_manager := class(creative_device):
     # TOUTE la machine pivote vers le joueur J (le chemin le plus court), avec le son de rotation.
     # TEST SOLO : deja tournee vers lui -> un tour complet dans le vide, et elle revient sur lui.
     TournerVers(J : player)<suspends> : void =
+        TournerVersAvec(J, 0)
+
+    # Tours > 0 : la ROULETTE du debut de manche (plusieurs tours complets, puis elle ralentit et s'arrete sur J)
+    TournerVersAvec(J : player, Tours : int)<suspends> : void =
         I := NumeroDe(J) - 1
         if (Pl := Places[I]):
             Ici := Pl.GetTransform().Translation
@@ -734,17 +753,25 @@ hands_manager := class(creative_device):
                 if (Ecart > -180.0):
                     break
                 set Ecart += 360.0
-            if (Abs(Ecart) <= 2.0, TestSolo?, DernierTourne = I):
+            if (Abs(Ecart) <= 2.0, TestSolo?, DernierTourne = I, Tours = 0, not ApresRoulette?):
                 set Ecart = 360.0
+            set ApresRoulette = if (Tours > 0) then true else false
+            if (Tours > 0):
+                set Ecart += 360.0 * (Tours * 1.0)
             set DernierTourne = I
             if (Abs(Ecart) > 2.0):
-                Duree := Max(0.2, DureeRotation * (if (Abs(Ecart) > 300.0) then 1.6 else 1.0))
-                Pas := if (N := Ceil[Abs(Ecart) / 8.0]) then Max(1, N) else 1
+                Duree := if (Tours > 0) then DureeRotation * (1.5 + Tours * 1.0) else Max(0.2, DureeRotation * (if (Abs(Ecart) > 300.0) then 1.6 else 1.0))
+                # pas de 15 degres (8 pour la roulette, qui part vite) : moins d'ordres de deplacement qu'avant (8 degres)
+                # = les boutons restent mieux colles a la machine, sans qu'elle se deforme entre deux pas
+                Pas := if (N := Ceil[Abs(Ecart) / (if (Tours > 0) then 8.0 else 15.0)]) then Max(1, N) else 1
                 Dt := Duree / (Pas * 1.0)
                 Depart := LacetMachine
                 SonRotation.Play()
                 for (K := 1..Pas):
-                    L := Depart + Ecart * (K * 1.0) / (Pas * 1.0)
+                    Frac := (K * 1.0) / (Pas * 1.0)
+                    # roulette : elle ralentit a la fin (le pas d'angle diminue)
+                    Avance := if (Tours > 0) then 1.0 - (1.0 - Frac) * (1.0 - Frac) else Frac
+                    L := Depart + Ecart * Avance
                     spawn{ Bouger(Centre, Tournee(BaseCentre, L), Dt) }
                     spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
                     spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
