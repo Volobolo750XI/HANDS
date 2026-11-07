@@ -528,7 +528,7 @@ choix_depart := class:
             Compteur.SetImage(G)
 
     # ses 3 cartes (les cartes des places prises)
-    Main() : []int =
+    Main()<transacts> : []int =
         for (P : Pris, Id := Offre[P]) do Id
 
     # temps ecoule : on complete au hasard
