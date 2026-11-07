@@ -774,6 +774,29 @@ hands_manager := class(creative_device):
                 if (set MenusSignes[J] = C, set FinsMenuSigne[J] = Fin) {}
                 spawn{ AttendreSigne(J, EvJ, Fin) }
 
+    # les 4 mains en losange en bas a droite (1 gauche, 2 haut, 3 droite, 4 bas) ; Cliquable : survol + clic
+    IconesSignes(EvJ : event(int), Cliquable : logic) : []canvas_slot =
+        var S : []canvas_slot = array{}
+        Positions : []vector2 = array{vector2{X := -300.0, Y := -200.0}, vector2{X := -195.0, Y := -295.0}, vector2{X := -90.0, Y := -200.0}, vector2{X := -195.0, Y := -105.0}}
+        for (I -> Pos : Positions):
+            Img := ImgH(ImageSigne(I), 115.0, 115.0)
+            set S += array{PlaceLibre(Img, 1.0, 1.0, Pos.X, Pos.Y)}
+            if (Cliquable?):
+                Zone := TEST1{}
+                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 800 + I, Image := Img, Normale := ImageSigne(I), Lueur := ImageSigneClair(I), Taille := 115.0, Zone := Zone}
+                spawn{ CM.Suivre() }
+                set S += array{PlaceH(Zone, 1.0, 1.0, Pos.X, Pos.Y, 100.0, 100.0)}
+            set S += TexteEcrit("{I + 1}", 1.0, 1.0, Pos.X - 52.0, Pos.Y - 46.0, 28.0)
+        S
+
+    # un clic sur une main (tant que l'ecran est affiche) : le signe pendant DureeSigne s
+    SignesEcran(J : player, EvJ : event(int))<suspends> : void =
+        race:
+            FinEcran.Await()
+            loop:
+                Code := EvJ.Await()
+                spawn{ FaireSigne(J, Code - 800) }
+
     AttendreSigne(J : player, EvJ : event(int), Fin : event())<suspends> : void =
         race:
             Fin.Await()
@@ -800,7 +823,7 @@ hands_manager := class(creative_device):
         if (set SigneEnCours[J] = true) {}
         var Image : ?canvas = false
         if (UI := GetPlayerUI[J]):
-            C := canvas{Slots := array{PlaceLibre(ImgH(ImageSigne(I), 300.0, 300.0), 1.0, 1.0, -200.0, -190.0)}}
+            C := canvas{Slots := array{PlaceLibre(ImgH(ImageSigneClair(I), 230.0, 230.0), 1.0, 1.0, -195.0, -490.0)}}
             UI.AddWidget(C)
             set Image = option{C}
         var Main : ?creative_prop = false
@@ -1781,7 +1804,14 @@ hands_manager := class(creative_device):
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
         if (UI := GetPlayerUI[J]):
-            C := canvas{Slots := S}
+            # LES SIGNES toujours en bas a droite ; avec le curseur, on clique dessus (clic gauche), comme les cartes
+            var T : []canvas_slot = S
+            if (Contient(Assis, J)?):
+                EvJ := event(int){}
+                set T += IconesSignes(EvJ, Souris)
+                if (Souris?):
+                    spawn{ SignesEcran(J, EvJ) }
+            C := canvas{Slots := T}
             if (Souris?):
                 UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
             else:
