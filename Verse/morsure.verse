@@ -606,9 +606,6 @@ hands_manager := class(creative_device):
     # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
     # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
     @editable ImageArretAppui : float = 210.0
-    # TEST DE L'ANIMATION : pas de camera fixe, on reste dans sa vue ; un clic gauche = l'animation d'appui puis un
-    # bouton au hasard. Decoche une fois l'animation reglee.
-    @editable TestAnimation : logic = false
     # direction du CORPS pendant l'animation, par rapport a la machine (degres) : -90 = un quart de tour a gauche
     @editable CorrectionCorps : float = -90.0
     @editable ImagesParSecondeAppui : float = 30.0
@@ -703,8 +700,6 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
-        if (TestAnimation?):
-            return Meilleure
         # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
         # les cameras de la table sont ignorees)
         if (T0 := TouchesClavier[0]):
@@ -865,7 +860,11 @@ hands_manager := class(creative_device):
         # PLACES AU HASARD : on tire au hasard QUELLES places sont prises et QUI va ou ; l'ordre du jeu suit le tour
         # de la table (places triees), pour que la machine tourne toujours dans le bon sens
         ToutesPlaces := for (K := 0..Places.Length - 1) do K
-        Choisies := if (Sl := Shuffle(ToutesPlaces).Slice[0, Liste0.Length]) then TrierEntiers(Sl) else ToutesPlaces
+        # decalage tire de l'HEURE (en millisecondes) : change a chaque manche et a chaque session
+        Decal := if (T := Floor[GetSimulationElapsedTime() * 1000.0], M := Mod[T, Max(1, Places.Length)]) then M else 0
+        Melangees := Shuffle(ToutesPlaces)
+        Tournees := for (K := 0..Melangees.Length - 1, I2 := Mod[K + Decal, Melangees.Length], V := Melangees[I2]) do V
+        Choisies := if (Sl := Tournees.Slice[0, Liste0.Length]) then TrierEntiers(Sl) else ToutesPlaces
         Liste := Shuffle(Liste0)
         set PlaceDe = map{}
         for (K -> J : Liste, P := Choisies[K]):
@@ -1313,28 +1312,6 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
-        # TEST DE L'ANIMATION : un clic gauche (ou la fin du temps) -> un bouton libre au hasard
-        if (TestAnimation?):
-            # un vrai bouton a l'ecran, avec le curseur (comme les cartes)
-            FermerEcrans()
-            Chrono := NouveauChrono()
-            var S : []canvas_slot = Entete(J, Chrono)
-            set S += BoutonTexte("PRESS A BUTTON", 0.5, 0.5, 0.0, 0.0, 90.0, 950)
-            Montrer(J, S, Chrono, true)
-            loop:
-                Reste := Fin - GetSimulationElapsedTime()
-                MajChronos(Reste)
-                if (Reste <= 0.0):
-                    break
-                var Recu : int = -1
-                race:
-                    Sleep(Min(0.5, Reste))
-                    block:
-                        set Recu = Choix.Await()
-                if (Recu = 950):
-                    break
-            FermerEcrans()
-            return BoutonLibre()
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
@@ -1556,8 +1533,54 @@ hands_manager := class(creative_device):
         FermerEcrans()
         Resultat
 
+    # LA NOTIFICATION en haut a gauche pour tout le monde : "P2 PLAYED REVERSE" + la petite carte, qui glisse et
+    # dont le fond sombre transparent apparait / disparait en fondu
+    NotifierCarte(J : player, Id : int) : void =
+        for (X : GetPlayspace().GetPlayers()):
+            spawn{ Notification(X, "P{NumeroDe(J)} PLAYED", NomRelique(Id), ImageRelique(Id)) }
+
+    Notification(X : player, Ligne1 : string, Ligne2 : string, Image : texture)<suspends> : void =
+        if (UI := GetPlayerUI[X]):
+            Fond := color_block{DefaultColor := color{R := 0.05, G := 0.05, B := 0.06}, DefaultOpacity := 0.0}
+            Opa : []type{_X:float where 0.0 <= _X, _X <= 1.0} = array{0.0, 0.12, 0.24, 0.36, 0.48, 0.55}
+            var Actuel : ?canvas = false
+            Positions : []float = array{-420.0, -300.0, -190.0, -100.0, -40.0, 0.0}
+            # entree : glisse depuis la gauche, le fond apparait
+            for (K -> Dx : Positions):
+                if (O := Opa[K]):
+                    Fond.SetOpacity(O)
+                C := DessinerNotif(Fond, Ligne1, Ligne2, Image, Dx)
+                if (A := Actuel?):
+                    UI.RemoveWidget(A)
+                UI.AddWidget(C)
+                set Actuel = option{C}
+                Sleep(0.04)
+            Sleep(3.0)
+            # sortie : le fond s'efface et ca repart a gauche
+            for (K := 0..5):
+                if (O := Opa[5 - K], Dx := Positions[5 - K]):
+                    Fond.SetOpacity(O)
+                    C := DessinerNotif(Fond, Ligne1, Ligne2, Image, Dx)
+                    if (A := Actuel?):
+                        UI.RemoveWidget(A)
+                    UI.AddWidget(C)
+                    set Actuel = option{C}
+                Sleep(0.04)
+            if (A := Actuel?):
+                UI.RemoveWidget(A)
+
+    DessinerNotif(Fond : color_block, Ligne1 : string, Ligne2 : string, Image : texture, Dx : float) : canvas =
+        X0 := 30.0 + Dx
+        var S : []canvas_slot = array{canvas_slot{Widget := Fond, Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 0.0, Y := 0.0}},
+            Offsets := margin{Left := X0, Top := 330.0, Right := 380.0, Bottom := 110.0}, SizeToContent := false}}
+        set S += array{PlaceH(ImgH(Image, 96.0, 96.0), 0.0, 0.0, X0 + 58.0, 385.0, 96.0, 96.0)}
+        set S += TexteGauche(Ligne1, 0.0, 0.0, X0 + 118.0, 360.0, 30.0)
+        set S += TexteGauche(Ligne2, 0.0, 0.0, X0 + 118.0, 405.0, 44.0)
+        canvas{Slots := S}
+
     # la carte jouee, en grand, pour tout le monde (1,6 s)
     CartePosee(J : player, Id : int)<suspends> : void =
+        NotifierCarte(J, Id)
         FermerEcrans()
         SonCarte.Play()
         for (X : Assis, EstLa(X)?):
