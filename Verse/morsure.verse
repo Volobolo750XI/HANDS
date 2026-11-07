@@ -617,9 +617,15 @@ hands_manager := class(creative_device):
                 # TEST SOLO : on te dit ou tu as ete pose (pour regler la Place)
                 if (TestSolo?):
                     Avertir(J, Ou)
-                # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
-                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
-                spawn{ GarderAssis(J) }
+                if (Resultat < 0, Ch := Chaises[I]):
+                    # teleportation refusee partout : on ne le laisse PAS fige au point d'apparition,
+                    # on l'assoit sur la vraie chaise (elle le deplace elle-meme jusqu'a sa place)
+                    Ch.Enable()
+                    Ch.Seat(J)
+                else if (Resultat >= 0):
+                    # pose exacte : il reste a cette hauteur ; sinon il tombe sur l'assise
+                    Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+                    spawn{ GarderAssis(J) }
             else if (Ch := Chaises[I]):
                 if (TestSolo?):
                     Avertir(J, "SEAT: NO ANIMATION IN ANIMASSISEJOUEUR - REAL CHAIR")
