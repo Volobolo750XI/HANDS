@@ -647,6 +647,8 @@ hands_manager := class(creative_device):
     # decoche pour essayer de garder le CORPS immobile (si la tete ne bouge plus du tout, recoche-la)
     @editable CorpsTourne : logic = true
     # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
+    # coche pour limiter la tete (desactive : la tete est libre)
+    @editable LimiterTete : logic = false
     @editable TeteMaxDroite : float = 60.0
     @editable TeteMaxGauche : float = 60.0
     # Reglages
@@ -760,7 +762,7 @@ hands_manager := class(creative_device):
     LimiterTetes()<suspends> : void =
         loop:
             Sleep(0.1)
-            for (J -> Cible : Orientations, Perso := J.GetFortCharacter[], Perso.IsActive[]):
+            for (J -> Cible : Orientations, LimiterTete?, Perso := J.GetFortCharacter[], Perso.IsActive[]):
                 F := Perso.GetViewRotation().GetLocalForward()
                 Yaw := ArcTan(F.Y, F.X) * 180.0 / PiFloat
                 Ecart := AngleCourt(Yaw - Cible)
