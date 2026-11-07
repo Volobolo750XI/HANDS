@@ -608,13 +608,12 @@ hands_manager := class(creative_device):
                 Avant := vector3{X := Cos(LacetAssis), Y := Sin(LacetAssis), Z := 0.0}
                 Pose := Ici + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
                 Rot := MakeRotationFromYawPitchRollDegrees(LacetAssis * 180.0 / PiFloat, 0.0, 0.0)
-                var Exact : logic = false
-                var Ou : string = "SEAT: BLOCKED BY THE CHAIR - REMOVE ITS COLLISION"
-                if (Perso.TeleportTo[Pose, Rot]):
-                    set Exact = true
-                    set Ou = "SEAT: ON YOUR PLACE"
-                else if (Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := 30.0}, Rot]):
-                    set Ou = "SEAT: CHAIR IN THE WAY - DROPPED FROM ABOVE"
+                # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit (la chaise le gene) : il
+                # restait alors au point d'apparition (dehors). On essaie donc de plus en plus haut au-dessus de la Place
+                # (il tombe sur l'assise), puis devant la chaise, cote table.
+                Resultat := PoserPres(Perso, Pose, Avant, Rot)
+                Exact := if (Resultat = 0) then true else false
+                Ou := if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: CHAIR IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: CHAIR IN THE WAY - IN FRONT OF THE CHAIR" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE / REMOVE CHAIR COLLISION"
                 # TEST SOLO : on te dit ou tu as ete pose (pour regler la Place)
                 if (TestSolo?):
                     Avertir(J, Ou)
@@ -624,12 +623,26 @@ hands_manager := class(creative_device):
             else if (Ch := Chaises[I]):
                 if (TestSolo?):
                     Avertir(J, "SEAT: NO ANIMATION IN ANIMASSISEJOUEUR - REAL CHAIR")
-                if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                PoserPres(Perso, Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
                 Ch.Seat(J)
             else:
-                if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                PoserPres(Perso, Ici + vector3{X := 0.0, Y := 0.0, Z := 20.0}, vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
                 # pas de chaise : il ne peut pas se deplacer, mais il peut tourner la tete
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := true})
+
+    # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : chaise, mur...), plus haut, puis devant.
+    # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
+    PoserPres(Perso : fort_character, Pose : vector3, Avant : vector3, Rot : rotation) : int =
+        var Resultat : int = -1
+        if (Perso.TeleportTo[Pose, Rot]):
+            set Resultat = 0
+        for (H : array{40.0, 80.0, 130.0, 200.0}, Resultat < 0):
+            if (Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := H}, Rot]):
+                set Resultat = 1
+        for (D : array{60.0, 120.0}, Resultat < 0):
+            if (Perso.TeleportTo[Pose + Avant * D + vector3{X := 0.0, Y := 0.0, Z := 40.0}, Rot]):
+                set Resultat = 2
+        Resultat
 
     # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
     Rasseoir() : void =
