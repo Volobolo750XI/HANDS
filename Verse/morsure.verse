@@ -616,7 +616,7 @@ hands_manager := class(creative_device):
     @editable CorpsTourne : logic = true
     # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
     # coche pour limiter la tete (desactive : la tete est libre)
-    @editable LimiterTete : logic = true
+    @editable LimiterTete : logic = false
     # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
     @editable CorrectionVue : float = 0.0
     @editable TeteMaxDroite : float = 90.0
@@ -747,7 +747,12 @@ hands_manager := class(creative_device):
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
-        for (Attente : array{0.25, 0.6}):
+        FaceMachineApres(J, Lacet, array{0.25, 0.35})
+
+    # Delais : les attentes successives avant chaque correction (apres la camera du clavier, la transition
+    # de Fortnite remet la vue ailleurs : on corrige plus tard et plusieurs fois)
+    FaceMachineApres(J : player, Lacet : float, Delais : []float)<suspends> : void =
+        for (Attente : Delais):
             Sleep(Attente)
             if (Perso := J.GetFortCharacter[]):
                 Ici := Perso.GetTransform().Translation
@@ -1270,7 +1275,7 @@ hands_manager := class(creative_device):
             if (set EnMachine[J] = false) {}
             # retour a sa place : de nouveau face a la machine
             if (Vue := Orientations[J]):
-                spawn{ FaceMachine(J, Vue) }
+                spawn{ FaceMachineApres(J, Vue, array{0.5, 0.5, 0.8, 1.0}) }
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
