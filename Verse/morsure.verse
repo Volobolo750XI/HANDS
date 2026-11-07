@@ -617,6 +617,8 @@ hands_manager := class(creative_device):
     # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
     # coche pour limiter la tete (desactive : la tete est libre)
     @editable LimiterTete : logic = true
+    # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
+    @editable CorrectionVue : float = 90.0
     @editable TeteMaxDroite : float = 60.0
     @editable TeteMaxGauche : float = 60.0
     # Reglages
@@ -901,8 +903,9 @@ hands_manager := class(creative_device):
             if (TestSolo?):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
-                if (set Orientations[J] = Lacet, set EchecsTete[J] = 0) {}
-                spawn{ FaceMachine(J, Lacet) }
+                Vue := Lacet + CorrectionVue
+                if (set Orientations[J] = Vue, set EchecsTete[J] = 0) {}
+                spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
             else if (Ch := Chaises[I]):
                 # teleportation refusee partout : pas fige au point d'apparition, il est assis sur la vraie chaise
