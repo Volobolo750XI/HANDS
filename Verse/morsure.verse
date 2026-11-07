@@ -603,6 +603,10 @@ hands_manager := class(creative_device):
     @editable SonCarte : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
+    # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
+    # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
+    @editable ImageArretAppui : float = 210.0
+    @editable ImagesParSecondeAppui : float = 30.0
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
     # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
     # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
@@ -1200,6 +1204,8 @@ hands_manager := class(creative_device):
                     else:
                         Feinte()
                         set Requis -= 1
+                    # le geste reprend la ou il etait fige, jusqu'a la fin (il retire sa main)
+                    ReprendreAppui(J)
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
@@ -1476,9 +1482,12 @@ hands_manager := class(creative_device):
 
     # le personnage se penche (animation), puis le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
+        # le geste jusqu'a l'image d'arret, puis il reste fige dessus (le doigt sur le bouton)
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
             Controle.Play(Anim)
-            Sleep(0.6)
+            Sleep(Arret)
+            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0)
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
@@ -1488,6 +1497,10 @@ hands_manager := class(creative_device):
         Sleep(0.1)
         SonClic.Play()
         Sleep(0.4)
+
+    ReprendreAppui(J : player) : void =
+        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            Controle.Play(Anim, ?StartPositionSeconds := ImageArretAppui / Max(1.0, ImagesParSecondeAppui), ?BlendInTime := 0.0)
 
     # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
     # et la grille repart a zero
