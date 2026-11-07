@@ -723,7 +723,9 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
-        # avec le CLAVIER CACHE : une seule camera, la premiere de la liste, pour tout le monde
+        # les cameras sont rangees DANS LE MEME ORDRE que les Places : la camera de SA place
+        if (TouchesClavier.Length > 0, CamJ := CamerasClavier[NumeroDe(J) - 1]):
+            return option{CamJ}
         if (TouchesClavier.Length > 0, Cam0 := CamerasClavier[0]):
             return option{Cam0}
         if (Pl := Places[NumeroDe(J) - 1]):
@@ -847,6 +849,11 @@ hands_manager := class(creative_device):
             UI.AddWidget(C)
             set Image = option{C}
         var Main : ?creative_prop = false
+        # quoi qu'il arrive (fin du temps, joueur parti, fin de manche), la main est DETRUITE a la fin
+        defer:
+            if (M := Main?):
+                M.Dispose()
+            if (set SigneEnCours[J] = false) {}
         if (Asset := MainsSignes[I], Perso := J.GetFortCharacter[]):
             Pose := PoseMain(Perso)
             Resultat := SpawnProp(Asset, Pose(0), Pose(1))
@@ -859,11 +866,8 @@ hands_manager := class(creative_device):
                 Pose := PoseMain(Perso)
                 spawn{ BougerMain(M, Pose(0), Pose(1)) }
             Sleep(0.1)
-        if (M := Main?):
-            M.Dispose()
         if (C := Image?, UI := GetPlayerUI[J]):
             UI.RemoveWidget(C)
-        if (set SigneEnCours[J] = false) {}
 
     BougerMain(M : creative_prop, Ou : vector3, Rot : rotation)<suspends> : void =
         M.MoveTo(Ou, Rot, 0.1)
