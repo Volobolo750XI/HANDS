@@ -445,6 +445,9 @@ hands_manager := class(creative_device):
     # ne fait pas face au bon joueur (ex. 90, 180, -90).
     @editable FaceDepart : float = 0.0
     @editable DureeRotation : float = 1.75       # secondes pour pivoter vers le joueur suivant
+    # LA ROULETTE du debut de manche : nombre de tours complets, et sa duree totale (secondes). Plus long = plus lent.
+    @editable ToursRoulette : int = 3
+    @editable DureeRoulette : float = 12.0
     # Sons (Audio Player : lecture automatique NON)
     @editable SonClic : audio_player_device = audio_player_device{}
     @editable SonBoom : audio_player_device = audio_player_device{}
@@ -604,7 +607,7 @@ hands_manager := class(creative_device):
         # LA ROULETTE : la machine fait plusieurs tours et s'arrete sur le premier joueur (1 chance sur N)
         var Index : int = GetRandomInt(0, Max(0, Vivants.Length - 1))
         if (Premier := Vivants[Index]):
-            TournerVersAvec(Premier, 3)
+            TournerVersAvec(Premier, Max(0, ToursRoulette))
         loop:
             set Vivants = for (J : Vivants, EstLa(J)?) do J
             # a plusieurs : le dernier en jeu gagne. En TEST SOLO : on joue jusqu'a tomber sur un piege.
@@ -728,7 +731,7 @@ hands_manager := class(creative_device):
     TournerVers(J : player)<suspends> : void =
         TournerVersAvec(J, 0)
 
-    # Tours > 0 : la ROULETTE du debut de manche (plusieurs tours complets, puis elle ralentit et s'arrete sur J)
+    # Tours > 0 : la ROULETTE du debut de manche (plusieurs tours complets, puis elle s'arrete d'un coup sur J)
     TournerVersAvec(J : player, Tours : int)<suspends> : void =
         I := NumeroDe(J) - 1
         if (Pl := Places[I]):
@@ -751,8 +754,8 @@ hands_manager := class(creative_device):
                 set Ecart += 360.0 * (Tours * 1.0)
             set DernierTourne = I
             if (Abs(Ecart) > 2.0):
-                Duree := if (Tours > 0) then DureeRotation * (1.5 + Tours * 1.0) else Max(0.2, DureeRotation * (if (Abs(Ecart) > 300.0) then 1.6 else 1.0))
-                # pas de 15 degres (8 pour la roulette, qui part vite) : moins d'ordres de deplacement qu'avant (8 degres)
+                Duree := if (Tours > 0) then DureeRoulette else Max(0.2, DureeRotation * (if (Abs(Ecart) > 300.0) then 1.6 else 1.0))
+                # pas de 15 degres (8 pour la roulette) : moins d'ordres de deplacement qu'avant (8 degres)
                 # = les boutons restent mieux colles a la machine, sans qu'elle se deforme entre deux pas
                 Pas := if (N := Ceil[Abs(Ecart) / (if (Tours > 0) then 8.0 else 15.0)]) then Max(1, N) else 1
                 Dt := Duree / (Pas * 1.0)
@@ -760,9 +763,8 @@ hands_manager := class(creative_device):
                 SonRotation.Play()
                 for (K := 1..Pas):
                     Frac := (K * 1.0) / (Pas * 1.0)
-                    # roulette : elle ralentit a la fin (le pas d'angle diminue)
-                    Avance := if (Tours > 0) then 1.0 - (1.0 - Frac) * (1.0 - Frac) else Frac
-                    L := Depart + Ecart * Avance
+                    # vitesse constante, et elle s'arrete d'un coup (roulette comprise)
+                    L := Depart + Ecart * Frac
                     spawn{ Bouger(Centre, Tournee(BaseCentre, L), Dt) }
                     spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
                     spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
