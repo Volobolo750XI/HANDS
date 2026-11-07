@@ -43,9 +43,40 @@ DescriptionRelique(Id : int, Ligne : int) : string =
     if (Id = 0) then (if (Ligne = 0) then "SAVES YOU FROM" else "ONE TRAP")
     else if (Id = 1) then (if (Ligne = 0) then "SHOWS YOU ONE" else "SAFE BUTTON")
     else if (Id = 2) then (if (Ligne = 0) then "NO PRESS FOR YOU" else "THIS TURN")
-    else if (Id = 3) then (if (Ligne = 0) then "TURN ORDER" else "GOES BACKWARD")
+    else if (Id = 3) then (if (Ligne = 0) then "THE MACHINE TURNS" else "THE OTHER WAY")
     else if (Id = 4) then (if (Ligne = 0) then "NEXT PLAYER" else "PRESSES +1")
     else (if (Ligne = 0) then "TAKE A CARD" else "FROM A PLAYER")
+
+# RARETE (sur 100) : DEFUSE et PASS sont rares, JAM et REVERSE courantes
+PoidsRelique(Id : int)<transacts> : int =
+    if (Id = 0) then 8 else if (Id = 1) then 16 else if (Id = 2) then 8 else if (Id = 3) then 22 else if (Id = 4) then 30 else 16
+
+TirerReliquePonderee()<transacts> : int =
+    var Tirage : int = GetRandomInt(1, 100)
+    var Choisie : int = 5
+    var Trouve : logic = false
+    for (Id := 0..5, not Trouve?):
+        set Tirage -= PoidsRelique(Id)
+        if (Tirage <= 0):
+            set Choisie = Id
+            set Trouve = true
+    Choisie
+
+# les 6 cartes proposees au debut de la manche : au hasard (raretes), jamais plus de 2 fois la meme
+TirerOffre()<transacts> : []int =
+    var Offre : []int = array{}
+    var Essais : int = 0
+    loop:
+        if (Offre.Length >= 6 or Essais > 200):
+            break
+        set Essais += 1
+        Id := TirerReliquePonderee()
+        var Deja : int = 0
+        for (X : Offre, X = Id):
+            set Deja += 1
+        if (Deja < 2):
+            set Offre += array{Id}
+    Offre
 
 Dedans(L : []int, X : int)<transacts> : logic =
     var Trouve : logic = false
@@ -361,7 +392,8 @@ choix_depart := class:
     Cartes : []carte_main
     Compteur : texture_block
     Ev : event(int)
-    var Pris : []int = array{}
+    Offre : []int                              # la carte de chaque place (6 places)
+    var Pris : []int = array{}                 # les PLACES prises
     var Confirme : logic = false
 
     Suivre(Fin : event())<suspends> : void =
@@ -392,15 +424,19 @@ choix_depart := class:
         if (G := GlypheChiffre(Pris.Length)?):
             Compteur.SetImage(G)
 
+    # ses 3 cartes (les cartes des places prises)
+    Main() : []int =
+        for (P : Pris, Id := Offre[P]) do Id
+
     # temps ecoule : on complete au hasard
     Completer() : void =
         var Essais : int = 0
         loop:
             if (Pris.Length >= 3 or Essais > 100):
                 break
-            Id := GetRandomInt(0, 5)
-            if (not Dedans(Pris, Id)?):
-                set Pris += array{Id}
+            Place := GetRandomInt(0, Offre.Length - 1)
+            if (not Dedans(Pris, Place)?):
+                set Pris += array{Place}
             set Essais += 1
 
 hands_manager := class(creative_device):
@@ -1400,10 +1436,16 @@ hands_manager := class(creative_device):
             set S += array{PlaceLibre(Chiffre, 0.5, 0.0, -20.0 + I * 40.0, 165.0)}
         set S += TexteEcrit("DANGER {Risque}%", 0.5, 0.0, 0.0, 215.0, 42.0)
         set S += TexteGauche("YOU ARE P{NumeroDe(J)}", 0.0, 0.0, 110.0, 50.0, 48.0)
-        var Ligne : float = 95.0
+        # les autres joueurs : leur numero et leurs cartes en DOS DE CARTE (on voit tout de suite qui en a combien)
+        var Ligne : float = 125.0
         for (I -> X : Assis, X <> J, Contient(Vivants, X)?):
-            set S += TexteGauche("P{I + 1} : {NombreDe(X)} CARD(S)", 0.0, 0.0, 110.0, Ligne, 30.0)
-            set Ligne += 36.0
+            set S += TexteGauche("P{I + 1}", 0.0, 0.0, 110.0, Ligne, 40.0)
+            N := NombreDe(X)
+            if (N = 0):
+                set S += TexteGauche("NO CARD", 0.0, 0.0, 175.0, Ligne, 28.0)
+            for (K := 0..N - 1):
+                set S += DosCarte(0.0, 0.0, 195.0 + K * 42.0, Ligne, 46.0)
+            set Ligne += 56.0
         S
 
     # comme Entete, mais le chrono et le DANGER sont sur le cote gauche (pendant qu'il clique sur la machine)
@@ -1490,18 +1532,19 @@ hands_manager := class(creative_device):
             set S += array{PlaceLibre(Compteur, 0.5, 0.0, -30.0, 375.0)}
             set S += TexteEcrit("/3", 0.5, 0.0, 25.0, 375.0, 56.0)
             var Cartes : []carte_main = array{}
-            for (Id := 0..5):
-                X := (Id * 1.0 - 2.5) * 290.0
+            Offre := TirerOffre()
+            for (Place -> Id : Offre):
+                X := (Place * 1.0 - 2.5) * 290.0
                 Img := ImgH(ImageRelique(Id), 240.0, 240.0)
                 Zone := TEST1{}
-                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 500 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
+                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 500 + Place, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
                 spawn{ CM.Suivre() }
                 set Cartes += array{CM}
                 set S += array{PlaceLibre(Img, 0.5, 0.5, X, 0.0), PlaceH(Zone, 0.5, 0.5, X, 0.0, 200.0, 240.0)}
                 set S += TexteEcrit(NomRelique(Id), 0.5, 0.5, X, 160.0, 40.0)
                 set S += TexteEcrit(DescriptionRelique(Id, 0), 0.5, 0.5, X, 205.0, 24.0)
                 set S += TexteEcrit(DescriptionRelique(Id, 1), 0.5, 0.5, X, 235.0, 24.0)
-            CD := choix_depart{Manager := Self, J := J, Cartes := Cartes, Compteur := Compteur, Ev := EvJ}
+            CD := choix_depart{Manager := Self, J := J, Cartes := Cartes, Compteur := Compteur, Ev := EvJ, Offre := Offre}
             set S += BoutonTexteSur(EvJ, "CONFIRM", 0.5, 1.0, 0.0, -110.0, 80.0, 599)
             Montrer(J, S, Chrono, true)
             spawn{ CD.Suivre(FinEcran) }
@@ -1518,7 +1561,7 @@ hands_manager := class(creative_device):
             Sleep(0.25)
         for (CD : Liste):
             CD.Completer()
-            if (set Paquets[CD.J] = CD.Pris) {}
+            if (set Paquets[CD.J] = CD.Main()) {}
         FermerEcrans()
 
     # LES REGLES, au debut de la manche, pour tout le monde
