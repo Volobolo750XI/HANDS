@@ -746,10 +746,22 @@ hands_manager := class(creative_device):
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
-        Sleep(0.8)
-        if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?):
+        var Noir : ?canvas = false
+        if (UI := GetPlayerUI[J]):
+            C := canvas{Slots := array{canvas_slot{Widget := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 1.0},
+                Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}}}}
+            UI.AddWidget(C)
+            set Noir = option{C}
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
             Asseoir(J, PlaceIndex(J), ?Annonce := false)
+        if (Camera := CameraDe(J)?):
+            Camera.RemoveFrom(J)
+        if (Vue := Orientations[J]):
+            spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
+        Sleep(0.45)
+        if (C := Noir?, UI := GetPlayerUI[J]):
+            UI.RemoveWidget(C)
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -1276,13 +1288,13 @@ hands_manager := class(creative_device):
                         set Requis -= 1
                     # le geste reprend la ou il etait fige, jusqu'a la fin (il retire sa main)
                     ReprendreAppui(J)
-            if (Camera := CameraDe(J)?):
+            if (not Elimine?):
+                # retour a sa place SANS temps mort : ecran noir tres court, on le re-pose (comme au debut de la
+                # manche) PENDANT qu'il voit encore la camera du clavier, on enleve la camera, on corrige tout de suite
+                RetourPlace(J)
+            else if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
-            # retour a sa place : on le RE-POSE exactement comme au debut de la manche (le debut marche
-            # parfaitement), une fois la transition de la camera terminee
-            if (not Elimine?):
-                spawn{ RetourPlace(J) }
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
@@ -1619,6 +1631,12 @@ hands_manager := class(creative_device):
     # LE JUMPSCARE, pour la victime seulement : ecran noir le temps de charger les premieres images (0,35 s),
     # puis les images calees sur l'horloge, avec le son (pour elle seule)
     JouerCauchemar(J : player)<suspends> : void =
+        # plus AUCUN texte a l'ecran pendant le screamer (ecrans, chrono, message du haut, vue de la table)
+        FermerEcrans()
+        MessagePour(J, "")
+        if (V := Vues[J], UIv := GetPlayerUI[J]):
+            UIv.RemoveWidget(V)
+            OterVue(J)
         if (UI := GetPlayerUI[J], Premiere := ImagesCauchemar[0]):
             Plein := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}
             Couches := for (Im : ImagesCauchemar) do texture_block{DefaultImage := Im, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
