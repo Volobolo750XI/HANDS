@@ -28,4 +28,15 @@ E. L'ÉCLAIRAGE : chaque lumière (type, couleur, intensité, position) + le bro
 F. Les SONS d'ambiance à placer (vent, bois qui grince, animaux au loin...).
 G. Les contraintes techniques UEFN : reste dans un budget raisonnable de mémoire et de performances (le jeu doit tourner sur console et mobile), évite les objets inutiles.
 
+H. LE LIVRABLE FINAL, OBLIGATOIRE : LE MODÈLE 3D DU LOBBY.
+   À la fin, tu dois m'envoyer le lobby construit en 3D, prêt à importer dans UEFN :
+   - au format FBX (ou glTF/GLB), en STATIC MESH (aucun squelette, aucune animation), à l'échelle réelle (1 unité = 1 cm dans UEFN), avec l'axe vertical correct ;
+   - la grange complète (murs, sol, toit, poutres, portes, pièces) et tous les objets de décor que tu as placés, déjà à leur place ;
+   - découpé en plusieurs fichiers logiques (ex. Grange_Structure, Decor_Zone1, Decor_Table2...) pour que je puisse les déplacer séparément, avec des pivots propres (pivot au sol pour les objets posés, en haut pour les objets suspendus) ;
+   - avec les textures PBR (couleur, normal, rugosité) intégrées, réalistes ;
+   - des collisions simples sur les murs et le sol ; AUCUNE lumière dans les fichiers (je gère l'éclairage dans UEFN avec ta liste) ;
+   - les emplacements du spawn, des 3 zones, des 3 tables et du retour au lobby marqués par des objets repères simples (ex. un cube nommé "REPERE_Zone1") que je supprimerai après ;
+   - un aperçu en image (vue de dessus + 2 ou 3 vues à hauteur de joueur) pour que je voie le résultat avant d'importer.
+   Utilise tous les outils à ta disposition (Blender en script, bibliothèques 3D, modèles gratuits CC0/CC-BY que tu assembles...). Si une partie ne peut vraiment pas être générée, dis-le clairement et donne la solution la plus proche.
+
 Réfléchis vraiment comme un architecte d'intérieur : circulation des joueurs, points de vue, ce qu'on voit en entrant, mise en scène, lumière qui guide vers les zones. Pose-moi des questions si quelque chose manque, puis donne-moi le dossier complet.
