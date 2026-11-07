@@ -1698,7 +1698,7 @@ hands_manager := class(creative_device):
     SauterALaPose(J : player) : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
+            Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
 
     RetirerVueAnimation(J : player)<suspends> : void =
         Sleep(3.0)
@@ -1709,8 +1709,19 @@ hands_manager := class(creative_device):
     var NumAppui : [player]int = map{}
     FigerAppui(J : player, Arret : float, Num : int)<suspends> : void =
         Sleep(Arret)
-        if (NumAppui[J] = Num, Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0)
+        TenirPose(J, Arret, Num)
+
+    # Fortnite refuse la vitesse 0 : on rejoue l'animation sur l'image d'arret au RALENTI EXTREME (1 %), remise pile
+    # sur l'image chaque seconde -> a l'oeil, elle est figee. S'arrete des que l'animation reprend (Num change).
+    TenirPose(J : player, Arret : float, Num : int)<suspends> : void =
+        loop:
+            if (not NumAppui[J] = Num):
+                break
+            if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+                Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0, ?BlendOutTime := 0.0)
+            else:
+                break
+            Sleep(1.0)
 
     ReprendreAppui(J : player) : void =
         if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1) {}
