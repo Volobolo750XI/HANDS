@@ -22,3 +22,6 @@
 Un dossier du Tiroir a contenu devient un module Verse du meme nom. Un reglage (@editable) ou une fonction
 qui porte le meme nom qu'un dossier -> erreur 3532 / 3588 "ambiguous". Les animations vont dans le dossier
 "Animations" ; un nouveau reglage ne doit jamais s'appeler comme un dossier existant ou probable.
+
+## Pas de += sur un vector3
+`set V += ...` ne marche que pour int, float et tableaux. Pour un vector3 : `set V = V + ...`.

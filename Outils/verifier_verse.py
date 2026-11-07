@@ -55,6 +55,12 @@ for f in glob.glob('Verse/*.verse'):
                'IdentityRotation', 'Distance', 'Lerp', 'TEST1'}
     for fn in sorted(appels - definies - variables - connues):
         print(f, '3506 fonction appelee mais introuvable :', fn)
+    # += / -= sur un vector3 (ou une autre structure) : interdit en Verse (seulement int, float, tableaux)
+    vecs = set(re.findall(r'var (\w+) : (?:vector3|vector2|rotation|transform)\b', '\n'.join(L)))
+    for i, l in enumerate(L):
+        m = re.search(r'set (\w+) [-+]=', l)
+        if m and m.group(1) in vecs:
+            print(f, i + 1, '3509 vector3 += interdit (ecrire X = X + ...) :', l.strip()[:80])
     # BOUCLE SANS VRAIE PAUSE : une boucle qui n'attend que par MoveTo / PlayAndAwait / Fondu peut tourner a
     # l'infini si l'appel se termine tout de suite (accessoire cache...) -> ComputationLimitExceeded, tout le code s'arrete
     for i, l in enumerate(L):
