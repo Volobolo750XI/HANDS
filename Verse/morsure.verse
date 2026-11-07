@@ -606,6 +606,9 @@ hands_manager := class(creative_device):
     # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
     # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
     @editable ImageArretAppui : float = 210.0
+    # TEST DE L'ANIMATION : pas de camera fixe, on reste dans sa vue ; un clic gauche = l'animation d'appui puis un
+    # bouton au hasard. Decoche une fois l'animation reglee.
+    @editable TestAnimation : logic = false
     @editable ImagesParSecondeAppui : float = 30.0
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
     # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
@@ -698,6 +701,8 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
+        if (TestAnimation?):
+            return Meilleure
         # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
         # les cameras de la table sont ignorees)
         if (T0 := TouchesClavier[0]):
@@ -1302,6 +1307,17 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
+        # TEST DE L'ANIMATION : un clic gauche (ou la fin du temps) -> un bouton libre au hasard
+        if (TestAnimation?):
+            MessagePour(J, "TEST: CLICK TO PRESS A BUTTON")
+            race:
+                Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
+                loop:
+                    A := ClicJoueur.Await()
+                    if (player[A] = J):
+                        break
+            MessagePour(J, "")
+            return BoutonLibre()
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
