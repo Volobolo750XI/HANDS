@@ -583,6 +583,8 @@ hands_manager := class(creative_device):
     @editable PlacesLobby : []creative_prop = array{}
     @editable CameraLobby : []gameplay_camera_fixed_point_device = array{}
     @editable AnimLobby : ?animation_sequence = false
+    # hauteur (cm) ajoutee au-dessus du prop de place du lobby : monte-la pour faire pendre les joueurs
+    @editable HauteurLobby : float = 0.0
     # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
     # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
     @editable ToucheVue : input_trigger_device = input_trigger_device{}
@@ -742,7 +744,11 @@ hands_manager := class(creative_device):
         if (Perso := J.GetFortCharacter[]):
             if (Pl := PlacesLobby[I]):
                 T := Pl.GetTransform()
-                if (Perso.TeleportTo[T.Translation, T.Rotation]) {}
+                Base := T.Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurLobby}
+                var Pose : logic = false
+                for (H : array{0.0, 10.0, 25.0, 50.0, 100.0, 150.0}, not Pose?):
+                    if (Perso.TeleportTo[Base + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
+                        set Pose = true
             Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             for (Cam : CameraLobby):
                 Cam.AddTo(J)
