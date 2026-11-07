@@ -817,10 +817,19 @@ hands_manager := class(creative_device):
             UI.RemoveWidget(V)
             OterVue(J)
 
+    # le centre de la table = la moyenne de toutes les Places (elles sont disposees autour de la machine)
+    CentreTable()<transacts> : vector3 =
+        var Somme : vector3 = vector3{}
+        var N : float = 0.0
+        for (Pl : Places):
+            set Somme += Pl.GetTransform().Translation
+            set N += 1.0
+        if (N > 0.0) then Somme / N else BaseCentre.Translation
+
     # la table vue du dessus, TOI en bas : la machine au milieu, chaque joueur a sa vraie place autour
     DessinerVue(J : player) : canvas =
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.82}, 0.5, 0.5, 0.0, 0.0, 820.0, 820.0)}
-        C := BaseCentre.Translation
+        C := CentreTable()
         if (PlMoi := Places[PlaceIndex(J)]):
             Moi := PlMoi.GetTransform().Translation
             L0 := Max(1.0, Sqrt((C.X - Moi.X) * (C.X - Moi.X) + (C.Y - Moi.Y) * (C.Y - Moi.Y)))
@@ -925,7 +934,8 @@ hands_manager := class(creative_device):
     Asseoir(J : player, I : int, ?Annonce : logic = true) : void =
         if (Pl := Places[I], Perso := J.GetFortCharacter[]):
             Ici := Pl.GetTransform().Translation
-            C := Centre.GetTransform().Translation
+            # le VRAI centre de la table (moyenne des Places) : le pivot de la machine importee n'est pas au milieu
+            C := CentreTable()
             LacetRad := ArcTan(C.Y - Ici.Y, C.X - Ici.X)
             Lacet := LacetRad * 180.0 / PiFloat
             Avant := vector3{X := Cos(LacetRad), Y := Sin(LacetRad), Z := 0.0}
@@ -1096,7 +1106,7 @@ hands_manager := class(creative_device):
     SensRotation()<transacts> : float =
         var Naturel : float = 1.0
         if (P0 := Places[0], P1 := Places[1]):
-            C := BaseCentre.Translation
+            C := CentreTable()
             A0 := ArcTan(P0.GetTransform().Translation.Y - C.Y, P0.GetTransform().Translation.X - C.X) * 180.0 / PiFloat
             A1 := ArcTan(P1.GetTransform().Translation.Y - C.Y, P1.GetTransform().Translation.X - C.X) * 180.0 / PiFloat
             if (AngleCourt(A1 - A0) < 0.0):
@@ -1276,8 +1286,9 @@ hands_manager := class(creative_device):
                 # l'animation part tout de suite et reste figee a l'image d'arret jusqu'au clic
                 Pret := LancerAppui(J)
                 K := ViserEtCliquer(J, Requis, Vu, Fin)
-                # clic avant que la pose soit atteinte : on attend qu'elle le soit
-                Sleep(Max(0.0, Pret - GetSimulationElapsedTime()))
+                # clic avant que la pose soit atteinte : l'animation SAUTE a la pose, le clic est pris tout de suite
+                if (GetSimulationElapsedTime() < Pret):
+                    SauterALaPose(J)
                 if (K >= 0):
                     if (K = Vu):
                         set Vu = -1
@@ -1646,16 +1657,26 @@ hands_manager := class(creative_device):
                 Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
             Controle.Play(Anim)
-            spawn{ FigerAppui(J, Arret) }
+            Num := (if (N0 := NumAppui[J]) then N0 else 0) + 1
+            if (set NumAppui[J] = Num) {}
+            spawn{ FigerAppui(J, Arret, Num) }
             set Pret = GetSimulationElapsedTime() + Arret
         Pret
 
-    FigerAppui(J : player, Arret : float)<suspends> : void =
-        Sleep(Arret)
+    SauterALaPose(J : player) : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
+            Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
+
+    # (Num : on ne fige que si l'animation n'a pas deja repris entre-temps)
+    var NumAppui : [player]int = map{}
+    FigerAppui(J : player, Arret : float, Num : int)<suspends> : void =
+        Sleep(Arret)
+        if (NumAppui[J] = Num, Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0)
 
     ReprendreAppui(J : player) : void =
+        if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1) {}
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Controle.Play(Anim, ?StartPositionSeconds := ImageArretAppui / Max(1.0, ImagesParSecondeAppui), ?BlendInTime := 0.0)
 
