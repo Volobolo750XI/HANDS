@@ -760,13 +760,18 @@ hands_manager := class(creative_device):
                     if (Perso := J.GetFortCharacter[], Pl := PlacesLobby[I]):
                         T := Pl.GetTransform()
                         Perso.ReleaseFromStasis()
-                        if (Perso.TeleportTo[T.Translation, T.Rotation]) {}
-                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+                        # pile sur le prop refuse (le corps serait dans le sol) : on essaie un peu plus haut,
+                        # le joueur retombe ensuite sur le plancher (AllowFalling)
+                        var Pose : logic = false
+                        for (H : array{0.0, 40.0, 80.0, 130.0}, not Pose?):
+                            if (Perso.TeleportTo[T.Translation + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
+                                set Pose = true
+                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
                         Ecart := Perso.GetTransform().Translation - T.Translation
                         if (Ecart.X * Ecart.X + Ecart.Y * Ecart.Y < 2500.0):
                             break
                     else if (Perso := J.GetFortCharacter[]):
-                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
                         break
                     Sleep(0.25)
 
