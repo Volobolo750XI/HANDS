@@ -591,6 +591,10 @@ hands_manager := class(creative_device):
     @editable ToucheSignes : input_trigger_device = input_trigger_device{}
     @editable MainsSignes : []creative_prop_asset = array{}
     @editable DureeSigne : float = 5.0
+    # ou est la main 3D par rapport a ses yeux (cm) : devant, a droite, en dessous
+    @editable DistanceMain : float = 40.0
+    @editable DecalageMainDroite : float = 16.0
+    @editable DecalageMainBas : float = 20.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -822,7 +826,7 @@ hands_manager := class(creative_device):
             return
         if (set SigneEnCours[J] = true) {}
         var Image : ?canvas = false
-        if (UI := GetPlayerUI[J]):
+        if (not MainsSignes[I], UI := GetPlayerUI[J]):
             C := canvas{Slots := array{PlaceLibre(ImgH(ImageSigneClair(I), 230.0, 230.0), 1.0, 1.0, -195.0, -490.0)}}
             UI.AddWidget(C)
             set Image = option{C}
@@ -848,14 +852,15 @@ hands_manager := class(creative_device):
     BougerMain(M : creative_prop, Ou : vector3, Rot : rotation)<suspends> : void =
         M.MoveTo(Ou, Rot, 0.1)
 
-    # a cote de sa tete (a droite, a hauteur des yeux), la paume tournee vers ceux qu'il regarde
+    # devant lui, en bas a droite de sa vue ; la paume tournee vers ceux qu'il regarde
     PoseMain(Perso : fort_character) : tuple(vector3, rotation) =
         Oeil := Perso.GetViewLocation()
         F := Perso.GetViewRotation().GetLocalForward()
         Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
         Avant := vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}
         Droite := vector3{X := -Avant.Y, Y := Avant.X, Z := 0.0}
-        Ou := Oeil + Droite * 26.0 + Avant * 8.0 - vector3{X := 0.0, Y := 0.0, Z := 18.0}
+        # DEVANT lui, en bas a droite de sa vue (comme sa propre main) : il la voit, et les autres aussi
+        Ou := Oeil + F * DistanceMain + Droite * DecalageMainDroite - vector3{X := 0.0, Y := 0.0, Z := DecalageMainBas}
         (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + 90.0, 0.0, 0.0))
 
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
