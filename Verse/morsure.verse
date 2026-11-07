@@ -744,11 +744,15 @@ hands_manager := class(creative_device):
                     if (set EchecsTete[J] = 0) {}
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
+    # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
         for (Attente : array{0.25, 0.6}):
             Sleep(Attente)
             if (Perso := J.GetFortCharacter[]):
-                if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                Ici := Perso.GetTransform().Translation
+                Perso.ReleaseFromStasis()
+                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := false, AllowEmotes := false})
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -896,7 +900,7 @@ hands_manager := class(creative_device):
             Lacet := LacetRad * 180.0 / PiFloat
             Avant := vector3{X := Cos(LacetRad), Y := Sin(LacetRad), Z := 0.0}
             Pose := Ici + Avant * AvanceAssis + vector3{X := 0.0, Y := 0.0, Z := HauteurAssis}
-            Rot := MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)
+            Rot := MakeRotationFromYawPitchRollDegrees(Lacet + CorrectionVue, 0.0, 0.0)
             # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit : on essaie plus haut, puis devant
             Resultat := PoserPres(Perso, Pose, Avant, Rot)
             Exact := if (Resultat = 0) then true else false
