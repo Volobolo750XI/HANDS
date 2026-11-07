@@ -619,7 +619,7 @@ hands_manager := class(creative_device):
     @editable LimiterTete : logic = true
     # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
     @editable CorrectionVue : float = 0.0
-    @editable TeteMaxDroite : float = 60.0
+    @editable TeteMaxDroite : float = 90.0
     @editable TeteMaxGauche : float = 60.0
     # Reglages
     @editable JoueursMinimum : int = 2
@@ -730,7 +730,8 @@ hands_manager := class(creative_device):
     LimiterTetes()<suspends> : void =
         loop:
             Sleep(0.1)
-            for (J -> Cible : Orientations, LimiterTete?, Perso := J.GetFortCharacter[], Perso.IsActive[]):
+            # (pas pendant qu'il clique sur la machine : sa vue est alors celle de la camera du clavier)
+            for (J -> Cible : Orientations, LimiterTete?, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[]):
                 F := Perso.GetViewRotation().GetLocalForward()
                 Yaw := ArcTan(F.Y, F.X) * 180.0 / PiFloat
                 Ecart := AngleCourt(Yaw - Cible)
@@ -1267,6 +1268,9 @@ hands_manager := class(creative_device):
             if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
+            # retour a sa place : de nouveau face a la machine
+            if (Vue := Orientations[J]):
+                spawn{ FaceMachine(J, Vue) }
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
