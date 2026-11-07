@@ -401,6 +401,12 @@ fenetre_images := class:
             Scene.RemoveWidget(W)
         set Bas = Max(Bas, Debut)
 
+# LES SIGNES DE LA MAIN (dossier Gestes) : 0 = main ouverte, 1 = pouce leve, 2 = doigt pointe, 3 = OK
+ImageSigne(I : int) : texture =
+    if (I = 0) then Gestes.Signe_Ouverte else if (I = 1) then Gestes.Signe_Pouce else if (I = 2) then Gestes.Signe_Pointe else Gestes.Signe_OK
+ImageSigneClair(I : int) : texture =
+    if (I = 0) then Gestes.Signe_Ouverte_Clair else if (I = 1) then Gestes.Signe_Pouce_Clair else if (I = 2) then Gestes.Signe_Pointe_Clair else Gestes.Signe_OK_Clair
+
 # un TEXTE-BOUTON : au survol, il devient blanc pur et grossit un peu ; clic -> Ev.Signal(Code)
 bouton_texte := class:
     Ev : event(int)
@@ -579,6 +585,12 @@ hands_manager := class(creative_device):
     # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
     # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
     @editable ToucheVue : input_trigger_device = input_trigger_device{}
+    # LES SIGNES : un Declencheur d'entree (une touche au choix) ouvre les 4 mains en bas a droite ; on clique
+    # sur une main -> le signe pendant DureeSigne s : la main 3D flotte a cote de sa tete et suit son regard.
+    # MainsSignes : les 4 accessoires des mains 3D, DANS L'ORDRE : ouverte, pouce leve, doigt pointe, OK.
+    @editable ToucheSignes : input_trigger_device = input_trigger_device{}
+    @editable MainsSignes : []creative_prop_asset = array{}
+    @editable DureeSigne : float = 5.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -678,6 +690,7 @@ hands_manager := class(creative_device):
         set Piegee = for (T : Touches) do false
         ToucheClic.PressedEvent.Subscribe(QuandClic)
         ToucheVue.PressedEvent.Subscribe(QuandVue)
+        ToucheSignes.PressedEvent.Subscribe(QuandSignes)
         spawn{ LimiterTetes() }
         EnleverCameras()
         loop:
@@ -732,6 +745,94 @@ hands_manager := class(creative_device):
 
     QuandClic(Agent : agent) : void =
         ClicJoueur.Signal(Agent)
+
+    # LES SIGNES : la touche ouvre / ferme le petit menu des 4 mains en bas a droite
+    var MenusSignes : [player]canvas = map{}
+    var FinsMenuSigne : [player]event() = map{}
+    var SigneEnCours : [player]logic = map{}
+
+    QuandSignes(Agent : agent) : void =
+        if (J := player[Agent], UI := GetPlayerUI[J]):
+            if (Ancien := MenusSignes[J]):
+                FermerMenuSignes(J)
+            else if (Contient(Assis, J)?):
+                Fin := event(){}
+                EvJ := event(int){}
+                var S : []canvas_slot = array{}
+                # 4 mains en arc, en bas a droite, avec leur numero (comme dans Hands Over)
+                Positions : []vector2 = array{vector2{X := -330.0, Y := -150.0}, vector2{X := -230.0, Y := -290.0}, vector2{X := -100.0, Y := -320.0}, vector2{X := -120.0, Y := -150.0}}
+                for (I -> Pos : Positions):
+                    Img := ImgH(ImageSigne(I), 130.0, 130.0)
+                    Zone := TEST1{}
+                    CM := carte_main{Ev := EvJ, Fin := Fin, Code := 800 + I, Image := Img, Normale := ImageSigne(I), Lueur := ImageSigneClair(I), Taille := 130.0, Zone := Zone}
+                    spawn{ CM.Suivre() }
+                    set S += array{PlaceLibre(Img, 1.0, 1.0, Pos.X, Pos.Y), PlaceH(Zone, 1.0, 1.0, Pos.X, Pos.Y, 110.0, 120.0)}
+                    set S += TexteEcrit("{I + 1}", 1.0, 1.0, Pos.X - 60.0, Pos.Y - 60.0, 34.0)
+                C := canvas{Slots := S}
+                UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+                if (set MenusSignes[J] = C, set FinsMenuSigne[J] = Fin) {}
+                spawn{ AttendreSigne(J, EvJ, Fin) }
+
+    AttendreSigne(J : player, EvJ : event(int), Fin : event())<suspends> : void =
+        race:
+            Fin.Await()
+            block:
+                Code := EvJ.Await()
+                FermerMenuSignes(J)
+                FaireSigne(J, Code - 800)
+
+    FermerMenuSignes(J : player) : void =
+        if (C := MenusSignes[J], UI := GetPlayerUI[J]):
+            UI.RemoveWidget(C)
+        if (F := FinsMenuSigne[J]):
+            F.Signal()
+        var Reste : [player]canvas = map{}
+        for (X -> W : MenusSignes, X <> J):
+            if (set Reste[X] = W) {}
+        set MenusSignes = Reste
+
+    # le signe : l'image en bas a droite de SON ecran, et la main 3D a cote de sa tete (vue par les autres),
+    # tournee comme son regard, pendant DureeSigne secondes
+    FaireSigne(J : player, I : int)<suspends> : void =
+        if (SigneEnCours[J]?):
+            return
+        if (set SigneEnCours[J] = true) {}
+        var Image : ?canvas = false
+        if (UI := GetPlayerUI[J]):
+            C := canvas{Slots := array{PlaceLibre(ImgH(ImageSigne(I), 300.0, 300.0), 1.0, 1.0, -200.0, -190.0)}}
+            UI.AddWidget(C)
+            set Image = option{C}
+        var Main : ?creative_prop = false
+        if (Asset := MainsSignes[I], Perso := J.GetFortCharacter[]):
+            Pose := PoseMain(Perso)
+            Resultat := SpawnProp(Asset, Pose(0), Pose(1))
+            set Main = Resultat(0)
+        Fin := GetSimulationElapsedTime() + DureeSigne
+        loop:
+            if (GetSimulationElapsedTime() >= Fin):
+                break
+            if (M := Main?, Perso := J.GetFortCharacter[]):
+                Pose := PoseMain(Perso)
+                spawn{ BougerMain(M, Pose(0), Pose(1)) }
+            Sleep(0.1)
+        if (M := Main?):
+            M.Dispose()
+        if (C := Image?, UI := GetPlayerUI[J]):
+            UI.RemoveWidget(C)
+        if (set SigneEnCours[J] = false) {}
+
+    BougerMain(M : creative_prop, Ou : vector3, Rot : rotation)<suspends> : void =
+        M.MoveTo(Ou, Rot, 0.1)
+
+    # a cote de sa tete (a droite, a hauteur des yeux), la paume tournee vers ceux qu'il regarde
+    PoseMain(Perso : fort_character) : tuple(vector3, rotation) =
+        Oeil := Perso.GetViewLocation()
+        F := Perso.GetViewRotation().GetLocalForward()
+        Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+        Avant := vector3{X := Cos(Lacet * PiFloat / 180.0), Y := Sin(Lacet * PiFloat / 180.0), Z := 0.0}
+        Droite := vector3{X := -Avant.Y, Y := Avant.X, Z := 0.0}
+        Ou := Oeil + Droite * 26.0 + Avant * 8.0 - vector3{X := 0.0, Y := 0.0, Z := 18.0}
+        (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + 90.0, 0.0, 0.0))
 
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
     var Vues : [player]canvas = map{}

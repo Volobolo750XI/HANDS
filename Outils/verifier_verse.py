@@ -49,7 +49,7 @@ for f in glob.glob('Verse/*.verse'):
     definies = set(re.findall(r'^\s*([A-Z]\w*)(?:<[^>]*>)*\([^\n]*?\)(?:<[^>]*>)*\s*:\s*[^=\n]+=', sans_textes, re.M))
     variables = set(re.findall(r'\b([A-Z]\w*)\s*:=', sans_textes))
     appels = set(re.findall(r'(?<![\.\w])([A-Z]\w*)\(', sans_textes))
-    connues = {'Sleep', 'Max', 'Min', 'Abs', 'Floor', 'Ceil', 'Mod', 'ArcTan', 'Tan', 'Sin', 'Cos', 'Sqrt', 'DotProduct',
+    connues = {'Sleep', 'SpawnProp', 'Max', 'Min', 'Abs', 'Floor', 'Ceil', 'Mod', 'ArcTan', 'Tan', 'Sin', 'Cos', 'Sqrt', 'DotProduct',
                'DegreesToRadians', 'MakeRotation', 'MakeRotationFromYawPitchRollDegrees', 'GetRandomInt', 'GetRandomFloat',
                'GetSimulationElapsedTime', 'GetSecondsSinceEpoch', 'GetPlayspace', 'GetPlayerUI', 'ToString', 'ConcatenateMaps',
                'IdentityRotation', 'Distance', 'Lerp', 'TEST1'}
