@@ -606,6 +606,11 @@ hands_manager := class(creative_device):
     # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
     # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
     @editable ImageArretAppui : float = 210.0
+    # VOIR SON ANIMATION (test) : pendant son tour, pas de camera fixe ; la Camera orbitale ci-dessous (3e personne,
+    # priorite plus haute que la 1re personne, "Ajouter aux joueurs au debut" : Non) le montre de dos, et un bouton
+    # PRESS A BUTTON a l'ecran sert a cliquer. Decoche apres le test.
+    @editable VoirAnimation : logic = false
+    @editable CameraVueAnimation : []gameplay_camera_orbit_device = array{}
     # direction du CORPS pendant l'animation, par rapport a la machine (degres) : -90 = un quart de tour a gauche
     @editable CorrectionCorps : float = -90.0
     @editable ImagesParSecondeAppui : float = 30.0
@@ -700,6 +705,8 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
+        if (VoirAnimation?):
+            return Meilleure
         # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
         # les cameras de la table sont ignorees)
         if (T0 := TouchesClavier[0]):
@@ -1323,6 +1330,31 @@ hands_manager := class(creative_device):
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
+        # VOIR SON ANIMATION : vue de dos (camera orbitale) + un bouton a l'ecran ; la fin du temps = bouton au hasard
+        if (VoirAnimation?):
+            for (Cam : CameraVueAnimation):
+                Cam.AddTo(J)
+            FermerEcrans()
+            Chrono := NouveauChrono()
+            var S : []canvas_slot = Entete(J, Chrono)
+            set S += BoutonTexte("PRESS A BUTTON", 0.5, 1.0, 0.0, -160.0, 70.0, 950)
+            Montrer(J, S, Chrono, true)
+            loop:
+                Reste := Fin - GetSimulationElapsedTime()
+                MajChronos(Reste)
+                if (Reste <= 0.0):
+                    break
+                var Recu : int = -1
+                race:
+                    Sleep(Min(0.5, Reste))
+                    block:
+                        set Recu = Choix.Await()
+                if (Recu = 950):
+                    break
+            FermerEcrans()
+            # on garde la vue de dos encore 3 s pour voir la fin du geste
+            spawn{ RetirerVueAnimation(J) }
+            return BoutonLibre()
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
@@ -1667,6 +1699,11 @@ hands_manager := class(creative_device):
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
             Controle.Play(Anim, ?PlayRate := 0.0, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
+
+    RetirerVueAnimation(J : player)<suspends> : void =
+        Sleep(3.0)
+        for (Cam : CameraVueAnimation):
+            Cam.RemoveFrom(J)
 
     # (Num : on ne fige que si l'animation n'a pas deja repris entre-temps)
     var NumAppui : [player]int = map{}
