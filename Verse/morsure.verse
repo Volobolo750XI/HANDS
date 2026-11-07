@@ -567,6 +567,12 @@ hands_manager := class(creative_device):
     @editable Gueule : creative_prop = creative_prop{}
     @editable Touches : []creative_prop = array{}
     @editable Plaque : creative_prop = creative_prop{}
+    # LE CLAVIER CACHE : une 2e machine (copie) posee LOIN, qui ne tourne jamais, avec la camera fixe devant.
+    # C'est sur elle qu'on clique : son personnage ne peut pas gener, et la camera ne bouge jamais.
+    # Ses 24 boutons DANS L'ORDRE Bouton_01..Bouton_24, et (facultatif) sa machoire pour voir la feinte de pres.
+    # Vide = on clique sur la machine de la table, comme avant.
+    @editable TouchesClavier : []creative_prop = array{}
+    @editable GueuleClavier : []creative_prop = array{}
     # COULEURS DES BOUTONS : 3 materiaux dans un dossier Teintes du Tiroir a contenu :
     #   T_Base (l'aspect normal d'un bouton), T_Clair (le bouton vise, blanc), T_Sur (le bouton sur du PEEK, vert)
     # Numero de l'emplacement de materiau du bouton (0 en general)
@@ -640,6 +646,8 @@ hands_manager := class(creative_device):
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
     var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise
     var BaseTouches : []transform = array{}
+    var BaseTouchesClavier : []transform = array{}
+    var BasesGueuleClavier : []transform = array{}
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
     var BasePlaque : transform = transform{}
@@ -666,6 +674,8 @@ hands_manager := class(creative_device):
 
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
+        set BaseTouchesClavier = for (T : TouchesClavier) do T.GetTransform()
+        set BasesGueuleClavier = for (G : GueuleClavier) do G.GetTransform()
         set BaseGueule = Gueule.GetTransform()
         set BaseCentre = Centre.GetTransform()
         set BasePlaque = Plaque.GetTransform()
@@ -878,6 +888,8 @@ hands_manager := class(creative_device):
         for (K -> T : Touches, B := BaseTouches[K]):
             spawn{ Bouger(T, Tournee(B, LacetMachine), 0.25) }
             Peindre(K)
+        for (K -> T : TouchesClavier, B := BaseTouchesClavier[K]):
+            spawn{ Bouger(T, B, 0.25) }
 
     # une piece de la machine, tournee de Lacet degres autour du centre de la machine
     Tournee(B : transform, Lacet : float) : transform =
@@ -1023,12 +1035,17 @@ hands_manager := class(creative_device):
     # le bouton K prend son materiau : blanc s'il est vise, vert si c'est le bouton sur du PEEK, normal sinon
     Peindre(K : int) : void =
         if (T := Touches[K]):
-            if (K = BoutonBlanc):
-                T.SetMaterial(Teintes.T_Clair{}, ?Index := IndexMateriau)
-            else if (K = BoutonVert):
-                T.SetMaterial(Teintes.T_Sur{}, ?Index := IndexMateriau)
-            else:
-                T.SetMaterial(Teintes.T_Base{}, ?Index := IndexMateriau)
+            PeindreProp(T, K)
+        if (T := TouchesClavier[K]):
+            PeindreProp(T, K)
+
+    PeindreProp(T : creative_prop, K : int) : void =
+        if (K = BoutonBlanc):
+            T.SetMaterial(Teintes.T_Clair{}, ?Index := IndexMateriau)
+        else if (K = BoutonVert):
+            T.SetMaterial(Teintes.T_Sur{}, ?Index := IndexMateriau)
+        else:
+            T.SetMaterial(Teintes.T_Base{}, ?Index := IndexMateriau)
 
     # le bouton vise devient blanc (-1 = aucun) ; l'ancien reprend sa couleur
     Surligner(K : int) : void =
@@ -1486,7 +1503,10 @@ hands_manager := class(creative_device):
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
-            Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1)
+            spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
+        if (T := TouchesClavier[K], B := BaseTouchesClavier[K]):
+            spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
+        Sleep(0.1)
         SonClic.Play()
         Sleep(0.4)
 
@@ -1499,6 +1519,7 @@ hands_manager := class(creative_device):
         sync:
             JouerCauchemar(J)
             block:
+                spawn{ MachoireClavier(AngleFermeture, 0.12, 0.8, 1.6) }
                 Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFermeture), 0.12)
                 for (X : GetPlayspace().GetPlayers(), X <> J):
                     MessagePour(X, "P{NumeroDe(J)} GOT BITTEN!")
@@ -1517,8 +1538,17 @@ hands_manager := class(creative_device):
     # LA FEINTE : bouton sur -> la machoire claque un peu, d'un coup, puis se rouvre (on a eu peur pour rien)
     Feinte()<suspends> : void =
         PoseG := Tournee(BaseGueule, LacetMachine)
+        spawn{ MachoireClavier(AngleFeinte, 0.07, 0.25, 0.0) }
         Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFeinte), 0.07)
         Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.25)
+
+    # la machoire du clavier cache (il ne tourne jamais) : se ferme de Angle, reste Pause s, se rouvre
+    MachoireClavier(Angle : float, Fermer : float, Ouvrir : float, Pause : float)<suspends> : void =
+        if (G := GueuleClavier[0], B := BasesGueuleClavier[0]):
+            Axe := if (AxeFermeture = 0) then vector3{X := 1.0, Y := 0.0, Z := 0.0} else if (AxeFermeture = 2) then vector3{X := 0.0, Y := 0.0, Z := 1.0} else vector3{X := 0.0, Y := 1.0, Z := 0.0}
+            G.MoveTo(B.Translation, B.Rotation.RotateBy(MakeRotation(Axe, DegreesToRadians(Angle))), Fermer)
+            Sleep(Pause)
+            G.MoveTo(B.Translation, B.Rotation, Ouvrir)
 
     # LE JUMPSCARE, pour la victime seulement : ecran noir le temps de charger les premieres images (0,35 s),
     # puis les images calees sur l'horloge, avec le son (pour elle seule)
