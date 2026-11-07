@@ -774,7 +774,6 @@ hands_manager := class(creative_device):
                 canvas_slot{Widget := color_block{DefaultColor := color{R := 0.03, G := 0.03, B := 0.035}, DefaultOpacity := 0.72},
                     Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 0.0, Y := 1.0}},
                     Offsets := margin{Left := 60.0, Top := 60.0, Right := 560.0, Bottom := 60.0}}}
-            set S += TexteEcrit("MORSURE", 0.0, 0.0, 340.0, 140.0, 96.0)
             set S += TexteEcrit("{NbPrets}/{Presents.Length} READY", 0.0, 0.0, 340.0, 250.0, 64.0)
             set S += TexteEcrit("PRESS THE BUTTONS OF THE MACHINE.", 0.0, 0.0, 340.0, 340.0, 28.0)
             set S += TexteEcrit("ONE OF THEM BITES.", 0.0, 0.0, 340.0, 378.0, 28.0)
