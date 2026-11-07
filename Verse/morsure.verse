@@ -760,14 +760,15 @@ hands_manager := class(creative_device):
                 EvJ := event(int){}
                 var S : []canvas_slot = array{}
                 # 4 mains en arc, en bas a droite, avec leur numero (comme dans Hands Over)
-                Positions : []vector2 = array{vector2{X := -330.0, Y := -150.0}, vector2{X := -230.0, Y := -290.0}, vector2{X := -100.0, Y := -320.0}, vector2{X := -120.0, Y := -150.0}}
+                # en losange, comme dans Hands Over : 1 a gauche, 2 en haut, 3 a droite, 4 en bas
+                Positions : []vector2 = array{vector2{X := -330.0, Y := -210.0}, vector2{X := -215.0, Y := -315.0}, vector2{X := -100.0, Y := -230.0}, vector2{X := -215.0, Y := -110.0}}
                 for (I -> Pos : Positions):
                     Img := ImgH(ImageSigne(I), 130.0, 130.0)
                     Zone := TEST1{}
                     CM := carte_main{Ev := EvJ, Fin := Fin, Code := 800 + I, Image := Img, Normale := ImageSigne(I), Lueur := ImageSigneClair(I), Taille := 130.0, Zone := Zone}
                     spawn{ CM.Suivre() }
                     set S += array{PlaceLibre(Img, 1.0, 1.0, Pos.X, Pos.Y), PlaceH(Zone, 1.0, 1.0, Pos.X, Pos.Y, 110.0, 120.0)}
-                    set S += TexteEcrit("{I + 1}", 1.0, 1.0, Pos.X - 60.0, Pos.Y - 60.0, 34.0)
+                    set S += TexteEcrit("{I + 1}", 1.0, 1.0, Pos.X - 62.0, Pos.Y - 40.0, 34.0)
                 C := canvas{Slots := S}
                 UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
                 if (set MenusSignes[J] = C, set FinsMenuSigne[J] = Fin) {}
