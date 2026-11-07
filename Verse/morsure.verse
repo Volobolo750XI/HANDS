@@ -740,14 +740,35 @@ hands_manager := class(creative_device):
 
     InstallerLobby(J : player, I : int) : void =
         if (Perso := J.GetFortCharacter[]):
-            if (Pl := PlacesLobby[I]):
-                T := Pl.GetTransform()
-                if (Perso.TeleportTo[T.Translation, T.Rotation]) {}
-            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             for (Cam : CameraLobby):
                 Cam.AddTo(J)
+            spawn{ PoserLobby(J, I) }
             if (AnimLobby?):
                 spawn{ AnimEnBoucle(J) }
+
+    # au debut de la partie, Fortnite ignore la teleportation tant que le personnage apparait :
+    # on reessaie (5 s maximum) jusqu'a ce que le joueur soit vraiment sur sa place, puis on le fige
+    PoserLobby(J : player, I : int)<suspends> : void =
+        race:
+            FinLobby.Await()
+            block:
+                var Essais : int = 0
+                loop:
+                    set Essais += 1
+                    if (Essais > 20):
+                        break
+                    if (Perso := J.GetFortCharacter[], Pl := PlacesLobby[I]):
+                        T := Pl.GetTransform()
+                        Perso.ReleaseFromStasis()
+                        if (Perso.TeleportTo[T.Translation, T.Rotation]) {}
+                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+                        Ecart := Perso.GetTransform().Translation - T.Translation
+                        if (Ecart.X * Ecart.X + Ecart.Y * Ecart.Y < 2500.0):
+                            break
+                    else if (Perso := J.GetFortCharacter[]):
+                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
+                        break
+                    Sleep(0.25)
 
     # l'animation du lobby (suspendu) en boucle, jusqu'au depart
     AnimEnBoucle(J : player)<suspends> : void =
