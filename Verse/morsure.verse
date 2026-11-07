@@ -749,7 +749,7 @@ hands_manager := class(creative_device):
         Sleep(0.8)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?):
             Perso.ReleaseFromStasis()
-            Asseoir(J, PlaceIndex(J))
+            Asseoir(J, PlaceIndex(J), ?Annonce := false)
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -904,7 +904,7 @@ hands_manager := class(creative_device):
             Perso.ReleaseFromStasis()
 
     # le joueur va a sa place (debout, ou assis avec l'animation), tourne vers la machine, fige, a la premiere personne
-    Asseoir(J : player, I : int) : void =
+    Asseoir(J : player, I : int, ?Annonce : logic = true) : void =
         if (Pl := Places[I], Perso := J.GetFortCharacter[]):
             Ici := Pl.GetTransform().Translation
             C := Centre.GetTransform().Translation
@@ -916,7 +916,7 @@ hands_manager := class(creative_device):
             # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit : on essaie plus haut, puis devant
             Resultat := PoserPres(Perso, Pose, Avant, Rot)
             Exact := if (Resultat = 0) then true else false
-            if (TestSolo?):
+            if (TestSolo?, Annonce?):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
                 Vue := Lacet + CorrectionVue
