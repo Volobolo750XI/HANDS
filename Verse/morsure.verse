@@ -576,13 +576,14 @@ hands_manager := class(creative_device):
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
-    # LE LOBBY (ou on apparait) : les joueurs sont suspendus cote a cote, une camera fixe les filme, un panneau a
-    # gauche avec READY. Quand tout le monde est pret (au moins JoueursMinimum), tout le monde va a la table.
-    # PlacesLobby : un accessoire invisible par joueur (1, 2, 3, 4), aligne ; CameraLobby : la camera fixe qui les
-    # regarde (Ajouter aux joueurs au debut : Non) ; AnimLobby : l'animation "suspendu" jouee en boucle.
-    @editable PlacesLobby : []creative_prop = array{}
-    @editable CameraLobby : []gameplay_camera_fixed_point_device = array{}
-    @editable AnimLobby : ?animation_sequence = false
+    # LE LOBBY : une Zone de mutation (Mutator Zone) devant CETTE table. Les joueurs entrent dans la zone ; des
+    # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
+    # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
+    @editable ZoneLobby : mutator_zone_device = mutator_zone_device{}
+    # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones)
+    @editable RetourLobby : []creative_prop = array{}
+    # Secondes a passer dans la zone avant le depart
+    @editable AttenteLobby : float = 10.0
     # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
     # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
     @editable ToucheVue : input_trigger_device = input_trigger_device{}
@@ -694,151 +695,81 @@ hands_manager := class(creative_device):
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         spawn{ LimiterTetes() }
         EnleverCameras()
+        ZoneLobby.AgentEntersEvent.Subscribe(EntreZone)
+        ZoneLobby.AgentExitsEvent.Subscribe(SortZone)
         loop:
-            Lobby()
-            Manche()
-            Sleep(4.0)
+            Table0 := Lobby()
+            Manche(Table0)
+            Sleep(1.0)
 
     # =========================================================================
     #  LE LOBBY : suspendus cote a cote, panneau a gauche (READY / CANCEL), on part quand tout le monde est pret
     # =========================================================================
-    var Prets : [player]logic = map{}
-    FinLobby : event() = event(){}
+    # les joueurs dans la zone du lobby (dans l'ordre d'arrivee) et ceux de la partie en cours a CETTE table
+    var DansZone : []player = array{}
+    var Table : []player = array{}
 
-    Lobby()<suspends> : void =
-        set Prets = map{}
-        var Installes : []player = array{}
-        var Dernier : string = ""
+    EntreZone(Agent : agent) : void =
+        if (J := player[Agent], not Contient(DansZone, J)?):
+            set DansZone += array{J}
+
+    SortZone(Agent : agent) : void =
+        if (J := player[Agent]):
+            set DansZone = for (X : DansZone, X <> J) do X
+            AfficherLobby(J, "")
+
+    # attend que 2 a 4 joueurs restent AttenteLobby secondes dans la zone ; rend la liste des joueurs qui partent
+    Lobby()<suspends> : []player =
+        set Table = array{}
+        Max4 := Min(4, Max(1, Places.Length))
+        Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
+        var Reste : float = AttenteLobby
+        var Partants : []player = array{}
         loop:
-            Presents := for (J : GetPlayspace().GetPlayers(), J.GetFortCharacter[]) do J
-            # les nouveaux arrivants : suspendus a leur place du lobby
-            for (I -> J : Presents, not Contient(Installes, J)?):
-                InstallerLobby(J, I)
-                set Installes += array{J}
-            set Installes = for (J : Installes, Contient(Presents, J)?) do J
-            Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
-            NbPrets := (for (J : Presents, Prets[J]?) do J).Length
-            # on redessine seulement quand quelque chose a change
-            Etat := "{Presents.Length}/{NbPrets}/" + (if (Presents.Length >= Requis) then "ok" else "attente")
-            if (Etat <> Dernier):
-                set Dernier = Etat
-                DessinerLobbyTous(Presents, Requis)
-            if (Presents.Length >= Requis, NbPrets = Presents.Length):
-                break
-            Sleep(0.3)
-        # tout le monde est pret : depart
-        FermerEcrans()
-        Bandeau("GET READY...")
-        Sleep(1.2)
-        Bandeau("")
-        FinLobby.Signal()
-        for (J : GetPlayspace().GetPlayers()):
-            for (Cam : CameraLobby):
-                Cam.RemoveFrom(J)
-            if (Perso := J.GetFortCharacter[]):
-                Perso.ReleaseFromStasis()
+            set DansZone = for (J : DansZone, EstLa(J)?, J.GetFortCharacter[]) do J
+            for (J -> T : Affiches, not Contient(DansZone, J)?):
+                if (set Affiches[J] = "") {}
+            Groupe := for (K -> J : DansZone, K < Max4) do J
+            if (Groupe.Length >= Requis):
+                if (Reste <= 0.0):
+                    set Partants = Groupe
+                    break
+                Secondes := if (C := Ceil[Reste]) then C else 0
+                for (J : Groupe):
+                    AfficherLobby(J, "STARTING IN {Secondes}")
+                for (K -> J : DansZone, K >= Max4):
+                    AfficherLobby(J, "THIS TABLE IS FULL")
+                set Reste -= 0.25
+            else:
+                set Reste = AttenteLobby
+                for (J : DansZone):
+                    AfficherLobby(J, "WAITING FOR PLAYERS")
+            Sleep(0.25)
+        for (J : DansZone):
+            AfficherLobby(J, "")
+        set DansZone = for (J : DansZone, not Contient(Partants, J)?) do J
+        set Table = Partants
+        Partants
 
-    InstallerLobby(J : player, I : int) : void =
-        if (Perso := J.GetFortCharacter[]):
-            for (Cam : CameraLobby):
-                Cam.AddTo(J)
-            spawn{ PoserLobby(J, I) }
-            if (AnimLobby?):
-                spawn{ AnimEnBoucle(J) }
+    # le texte du lobby n'est redessine que s'il change (pas de clignotement)
+    var Affiches : [player]string = map{}
+    AfficherLobby(J : player, S : string) : void =
+        Avant := if (A := Affiches[J]) then A else ""
+        if (Avant <> S):
+            if (set Affiches[J] = S) {}
+            MessagePour(J, S)
 
-    # au debut de la partie, Fortnite ignore la teleportation tant que le personnage apparait :
-    # on reessaie (5 s maximum) jusqu'a ce que le joueur soit vraiment sur sa place, puis on le fige
-    PoserLobby(J : player, I : int)<suspends> : void =
-        race:
-            FinLobby.Await()
-            block:
-                var Essais : int = 0
-                loop:
-                    set Essais += 1
-                    if (Essais > 20):
-                        break
-                    if (Perso := J.GetFortCharacter[], Pl := PlacesLobby[I]):
-                        T := Pl.GetTransform()
-                        Perso.ReleaseFromStasis()
-                        # le joueur est pose sur le prop puis retombe sur ce qu'il y a sous lui (une plateforme
-                        # invisible AVEC collision) : en l'air, Fortnite jouerait l'effet de chute (traînee)
-                        var Pose : logic = false
-                        for (H : array{0.0, 40.0, 80.0, 130.0}, not Pose?):
-                            if (Perso.TeleportTo[T.Translation + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
-                                set Pose = true
-                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
-                        Ecart := Perso.GetTransform().Translation - T.Translation
-                        if (Ecart.X * Ecart.X + Ecart.Y * Ecart.Y < 2500.0):
-                            break
-                    else if (Perso := J.GetFortCharacter[]):
-                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
-                        break
-                    Sleep(0.25)
-                # tourne le joueur face a la camera du lobby (fige, il ignore la rotation : on le libere un instant)
-                for (Attente : array{0.4, 0.3}):
-                    Sleep(Attente)
-                    if (Perso := J.GetFortCharacter[], Cam := CameraLobby[0]):
-                        Ici := Perso.GetTransform().Translation
-                        C := Cam.GetTransform().Translation
-                        Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
-                        Perso.ReleaseFromStasis()
-                        if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
-
-    # l'animation du lobby (suspendu) en boucle, jusqu'au depart
-    AnimEnBoucle(J : player)<suspends> : void =
-        race:
-            FinLobby.Await()
-            loop:
-                if (Anim := AnimLobby?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-                    Instance := Controle.Play(Anim)
-                    # au depart du lobby (course interrompue) l'animation est ARRETEE
-                    defer:
-                        Instance.Stop()
-                    Instance.Await()
-                else:
-                    Sleep(0.5)
-                Sleep(0.0)
-
-    # le panneau de gauche (comme Hands Over) pour chaque joueur
-    DessinerLobbyTous(Presents : []player, Requis : int) : void =
-        FermerEcrans()
-        NbPrets := (for (J : Presents, Prets[J]?) do J).Length
-        for (J : Presents):
-            EvJ := event(int){}
-            var S : []canvas_slot = array{
-                canvas_slot{Widget := color_block{DefaultColor := color{R := 0.03, G := 0.03, B := 0.035}, DefaultOpacity := 0.72},
-                    Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 0.0, Y := 1.0}},
-                    Offsets := margin{Left := 60.0, Top := 60.0, Right := 560.0, Bottom := 60.0}}}
-            set S += TexteEcrit("{NbPrets}/{Presents.Length} READY", 0.0, 0.0, 340.0, 250.0, 64.0)
-            set S += TexteEcrit("PRESS THE BUTTONS OF THE MACHINE.", 0.0, 0.0, 340.0, 340.0, 28.0)
-            set S += TexteEcrit("ONE OF THEM BITES.", 0.0, 0.0, 340.0, 378.0, 28.0)
-            set S += TexteEcrit("THE LAST ONE STANDING WINS.", 0.0, 0.0, 340.0, 416.0, 28.0)
-            if (Presents.Length < Requis):
-                set S += TexteEcrit("WAITING FOR PLAYERS ({Presents.Length}/{Requis})", 0.0, 0.0, 340.0, 480.0, 28.0)
-            # la liste des joueurs
-            var Y : float = 560.0
-            for (I -> X : Presents):
-                Nom := if (X = J) then "YOU" else "PLAYER {I + 1}"
-                set S += TexteGauche("{I + 1}. {Nom}", 0.0, 0.0, 130.0, Y, 34.0)
-                if (Prets[X]?):
-                    set S += TexteGauche("READY", 0.0, 0.0, 430.0, Y, 34.0)
-                set Y += 46.0
-            # le bouton
-            Texte := if (Prets[J]?) then "CANCEL" else "READY"
-            set S += BoutonTexteSur(EvJ, Texte, 0.0, 1.0, 340.0, -150.0, 90.0, 960)
-            Montrer(J, S, NouveauChrono(), true)
-            spawn{ ClicLobby(J, EvJ) }
-
-    ClicLobby(J : player, EvJ : event(int))<suspends> : void =
-        race:
-            FinEcran.Await()
-            block:
-                EvJ.Await()
-                Etait := if (Prets[J]?) then true else false
-                if (set Prets[J] = (if (Etait?) then false else true)) {}
-                Presents := for (X : GetPlayspace().GetPlayers(), X.GetFortCharacter[]) do X
-                DessinerLobbyTous(Presents, if (TestSolo?) then 1 else Max(2, JoueursMinimum))
+    # fin de partie : les joueurs de la table sont renvoyes au lobby
+    RenvoyerAuLobby(Liste : []player) : void =
+        for (K -> J : Liste, Perso := J.GetFortCharacter[]):
+            Perso.ReleaseFromStasis()
+            if (Ix := Mod[K, Max(1, RetourLobby.Length)], Pl := RetourLobby[Ix]):
+                T := Pl.GetTransform()
+                var Pose : logic = false
+                for (H : array{0.0, 40.0, 80.0, 130.0}, not Pose?):
+                    if (Perso.TeleportTo[T.Translation + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
+                        set Pose = true
+        set Table = array{}
 
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
@@ -868,7 +799,7 @@ hands_manager := class(creative_device):
 
     # aucune camera fixe sur personne (au demarrage et a chaque manche) : on ne la voit que pendant son tour
     EnleverCameras() : void =
-        for (Cam : CamerasClavier, J : GetPlayspace().GetPlayers()):
+        for (Cam : CamerasClavier, J : Table):
             Cam.RemoveFrom(J)
 
     # LA TETE : si un joueur a sa place tourne trop a droite / a gauche, il est remis a la limite
@@ -1004,9 +935,9 @@ hands_manager := class(creative_device):
     # =========================================================================
     #  UNE MANCHE
     # =========================================================================
-    Manche()<suspends> : void =
+    Manche(Joueurs : []player)<suspends> : void =
         var Liste0 : []player = array{}
-        for (J : GetPlayspace().GetPlayers()):
+        for (J : Joueurs):
             if (Liste0.Length < Places.Length):
                 set Liste0 += array{J}
         # PLACES AU HASARD : on tire au hasard QUELLES places sont prises et QUI va ou ; l'ordre du jeu suit le tour
@@ -1072,6 +1003,8 @@ hands_manager := class(creative_device):
         set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
+        EnleverCameras()
+        RenvoyerAuLobby(Assis)
 
     # le joueur va a sa place (debout, ou assis avec l'animation), tourne vers la machine, fige, a la premiere personne
     Asseoir(J : player, I : int, ?Annonce : logic = true) : void =
@@ -1690,7 +1623,7 @@ hands_manager := class(creative_device):
     # LA NOTIFICATION en haut a gauche pour tout le monde : "P2 PLAYED REVERSE" + la petite carte, qui glisse et
     # dont le fond sombre transparent apparait / disparait en fondu
     NotifierCarte(J : player, Id : int) : void =
-        for (X : GetPlayspace().GetPlayers()):
+        for (X : Table):
             spawn{ Notification(X, "P{NumeroDe(J)} PLAYED", NomRelique(Id), ImageRelique(Id)) }
 
     Notification(X : player, Ligne1 : string, Ligne2 : string, Image : texture)<suspends> : void =
@@ -1845,7 +1778,7 @@ hands_manager := class(creative_device):
             block:
                 spawn{ MachoireClavier(AngleFermeture, 0.12, 0.8, 1.6) }
                 Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFermeture), 0.12)
-                for (X : GetPlayspace().GetPlayers(), X <> J):
+                for (X : Table, X <> J):
                     MessagePour(X, "P{NumeroDe(J)} GOT BITTEN!")
                 Sleep(1.6)
                 Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.8)
@@ -2171,7 +2104,7 @@ hands_manager := class(creative_device):
 
     # message en haut de l'ecran pour tout le monde ("" = efface)
     Bandeau(S : string) : void =
-        for (J : GetPlayspace().GetPlayers()):
+        for (J : Table):
             MessagePour(J, S)
 
     Avertir(J : player, S : string) : void =
