@@ -609,6 +609,8 @@ hands_manager := class(creative_device):
     # sens de la main (degres autour de la verticale) : 0 normalement ; si tu vois la PAUME au lieu du dos de
     # la main mets 180 ; si elle est de profil mets 90 ou -90
     @editable AngleMain : float = 0.0
+    # inclinaison de la main : -90 normalement (doigts vers le haut) ; si les doigts pointent vers le bas : 90
+    @editable InclinaisonMain : float = -90.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
@@ -891,7 +893,9 @@ hands_manager := class(creative_device):
         Droite := vector3{X := -Avant.Y, Y := Avant.X, Z := 0.0}
         # DEVANT lui, en bas a droite de sa vue (comme sa propre main) : il la voit, et les autres aussi
         Ou := Oeil + F * DistanceMain + Droite * DecalageMainDroite - vector3{X := 0.0, Y := 0.0, Z := DecalageMainBas}
-        (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + AngleMain, 0.0, 0.0))
+        # mains importees (glb) : dans UEFN les doigts pointent vers -X et la paume vers le bas.
+        # tangage -90 -> doigts vers le haut, paume vers -X ; lacet regard + 180 -> paume vers son regard
+        (Ou, MakeRotationFromYawPitchRollDegrees(Lacet + 180.0 + AngleMain, InclinaisonMain, 0.0))
 
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
     var Vues : [player]canvas = map{}
