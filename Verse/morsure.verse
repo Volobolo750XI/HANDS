@@ -1597,6 +1597,12 @@ hands_manager := class(creative_device):
     Appuyer(J : player, K : int)<suspends> : void =
         # le geste jusqu'a l'image d'arret, puis il reste fige dessus (le doigt sur le bouton)
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
+            # le CORPS face a la machine et bloque (il ne tourne plus avec la souris) : il appuie droit devant lui
+            if (Vue := Orientations[J]):
+                Ici := Perso.GetTransform().Translation
+                Perso.ReleaseFromStasis()
+                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Vue, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
             Controle.Play(Anim)
             Sleep(Arret)
