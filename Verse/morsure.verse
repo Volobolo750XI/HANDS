@@ -774,6 +774,16 @@ hands_manager := class(creative_device):
                         Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
                         break
                     Sleep(0.25)
+                # tourne le joueur face a la camera du lobby (fige, il ignore la rotation : on le libere un instant)
+                for (Attente : array{0.4, 0.3}):
+                    Sleep(Attente)
+                    if (Perso := J.GetFortCharacter[], Cam := CameraLobby[0]):
+                        Ici := Perso.GetTransform().Translation
+                        C := Cam.GetTransform().Translation
+                        Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
+                        Perso.ReleaseFromStasis()
+                        if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                        Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
 
     # l'animation du lobby (suspendu) en boucle, jusqu'au depart
     AnimEnBoucle(J : player)<suspends> : void =
