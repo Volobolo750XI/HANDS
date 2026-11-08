@@ -2,9 +2,9 @@
 #  (animation a l'arret), tournent parfois la tete / le corps, puis repartent (animation de marche).
 #
 #  A INSTALLER DANS UEFN :
-#   - pour CHAQUE cochon, 2 appareils "Maillage anime" (Animated Mesh) avec ton modele de cochon :
-#       un regle sur l'animation de MARCHE, un regle sur l'animation A L'ARRET (les deux en boucle).
-#     Pose les deux au meme endroit. Le code cache celui qui ne sert pas (il le passe sous le sol).
+#   - pour CHAQUE cochon, 2 accessoires (Blueprint de type "Creative Prop" / accessoire creatif) avec ton
+#     cochon : un dont l'animation est la MARCHE, un dont l'animation est l'ARRET (les deux en boucle).
+#     Pose les deux au meme endroit. Le code cache celui qui ne sert pas.
 #   - des points de passage : des accessoires (petit cube) INVISIBLES et SANS collision, poses au sol, la ou
 #     les cochons peuvent aller. Entre deux points proches, le chemin doit etre libre (pas de mur).
 #   - un appareil "cochons_manager" (ce fichier) : remplis les listes ci-dessous.
@@ -15,9 +15,9 @@ using { /Verse.org/Random }
 using { /UnrealEngine.com/Temporary/SpatialMath }
 
 cochons_manager := class(creative_device):
-    # MEME ORDRE dans les deux listes : CochonsMarche[1] et CochonsRepos[1] = le meme cochon
-    @editable CochonsMarche : []animated_mesh_device = array{}
-    @editable CochonsRepos : []animated_mesh_device = array{}
+    # Tes accessoires cochon. MEME ORDRE dans les deux listes : CochonsMarche[1] et CochonsRepos[1] = le meme cochon
+    @editable CochonsMarche : []creative_prop = array{}
+    @editable CochonsRepos : []creative_prop = array{}
     # Les points de passage (accessoires invisibles, sans collision, au sol)
     @editable PointsCochons : []creative_prop = array{}
     # Vitesse de marche (cm par seconde)
@@ -42,9 +42,6 @@ cochons_manager := class(creative_device):
     Rot(Lacet : float)<transacts> : rotation =
         MakeRotationFromYawPitchRollDegrees(Lacet + CorrectionCochon, 0.0, 0.0)
 
-    SousLeSol(P : vector3)<transacts> : vector3 =
-        P + vector3{X := 0.0, Y := 0.0, Z := -10000.0}
-
     Contient(L : []int, X : int)<transacts> : logic =
         var Trouve : logic = false
         for (Y : L, Y = X):
@@ -52,18 +49,16 @@ cochons_manager := class(creative_device):
         Trouve
 
     # montre le cochon qui marche OU celui a l'arret, a la position Ici
-    Afficher(Marche : animated_mesh_device, Repos : animated_mesh_device, Ici : vector3, Lacet : float, EnMarche : logic) : void =
+    Afficher(Marche : creative_prop, Repos : creative_prop, Ici : vector3, Lacet : float, EnMarche : logic) : void =
         R := Rot(Lacet)
         if (EnMarche?):
             if (Marche.TeleportTo[Ici, R]) {}
-            if (Repos.TeleportTo[SousLeSol(Ici), R]) {}
-            Repos.Pause()
-            Marche.Play()
+            Marche.Show()
+            Repos.Hide()
         else:
             if (Repos.TeleportTo[Ici, R]) {}
-            if (Marche.TeleportTo[SousLeSol(Ici), R]) {}
-            Marche.Pause()
-            Repos.Play()
+            Repos.Show()
+            Marche.Hide()
 
     # une destination au hasard parmi les points proches et libres (-1 = aucune)
     ChoisirPoint(Actuel : int, Ici : vector3) : int =
@@ -77,7 +72,7 @@ cochons_manager := class(creative_device):
     Liberer(K : int) : void =
         set Reserves = for (X : Reserves, X <> K) do X
 
-    VieCochon(Marche : animated_mesh_device, Repos : animated_mesh_device)<suspends> : void =
+    VieCochon(Marche : creative_prop, Repos : creative_prop)<suspends> : void =
         Depart := Repos.GetTransform()
         F := Depart.Rotation.GetLocalForward()
         var Ici : vector3 = Depart.Translation
