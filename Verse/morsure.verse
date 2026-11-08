@@ -699,7 +699,9 @@ hands_manager := class(creative_device):
         ZoneLobby.AgentExitsEvent.Subscribe(SortZone)
         loop:
             Table0 := Lobby()
-            Manche(Table0)
+            race:
+                Manche(Table0)
+                ZonePendantPartie()
             Sleep(1.0)
 
     # =========================================================================
@@ -736,20 +738,28 @@ hands_manager := class(creative_device):
                     break
                 Secondes := if (C := Ceil[Reste]) then C else 0
                 for (J : Groupe):
-                    AfficherLobby(J, "STARTING IN {Secondes}")
+                    AfficherLobby(J, "{Groupe.Length}/{Max4} PLAYERS  -  START IN {Secondes}")
                 for (K -> J : DansZone, K >= Max4):
-                    AfficherLobby(J, "THIS TABLE IS FULL")
+                    AfficherLobby(J, "FULL ({Max4}/{Max4})  -  TRY ANOTHER ZONE")
                 set Reste -= 0.25
             else:
                 set Reste = AttenteLobby
                 for (J : DansZone):
-                    AfficherLobby(J, "WAITING FOR PLAYERS")
+                    AfficherLobby(J, "{DansZone.Length}/{Max4} PLAYERS  -  WAITING FOR A FRIEND")
             Sleep(0.25)
         for (J : DansZone):
             AfficherLobby(J, "")
         set DansZone = for (J : DansZone, not Contient(Partants, J)?) do J
         set Table = Partants
         Partants
+
+    # pendant la partie de CETTE table, ceux qui entrent dans sa zone sont prevenus
+    ZonePendantPartie()<suspends> : void =
+        loop:
+            set DansZone = for (J : DansZone, EstLa(J)?, J.GetFortCharacter[]) do J
+            for (J : DansZone):
+                AfficherLobby(J, "GAME IN PROGRESS  -  TRY ANOTHER ZONE")
+            Sleep(0.5)
 
     # le texte du lobby n'est redessine que s'il change (pas de clignotement)
     var Affiches : [player]string = map{}
