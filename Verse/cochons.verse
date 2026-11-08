@@ -36,6 +36,11 @@ cochons_manager := class(creative_device):
     @editable ChanceTourSurPlace : float = 0.35
     # Si les cochons flottent ou s'enfoncent : monte (+) ou descends (-) en cm (ex. -40)
     @editable DecalageSol : float = 0.0
+    # FACULTATIF : un Lecteur audio par cochon (MEME ORDRE), lecture automatique NON, en boucle NON.
+    # Il suit son cochon et joue de temps en temps quand le cochon est a l'arret.
+    @editable SonsCochons : []audio_player_device = array{}
+    # Chance (0 a 1) qu'il grogne pendant une pause
+    @editable ChanceGrogne : float = 0.5
 
     # les points deja choisis comme destination (deux cochons ne visent pas le meme point)
     var Reserves : []int = array{}
@@ -43,7 +48,7 @@ cochons_manager := class(creative_device):
 
     OnBegin<override>()<suspends> : void =
         for (I -> M : CochonsMarche, R := CochonsRepos[I]):
-            spawn{ VieCochon(M, R) }
+            spawn{ VieCochon(I, M, R) }
 
     Rot(Lacet : float)<transacts> : rotation =
         MakeRotationFromYawPitchRollDegrees(Lacet + CorrectionCochon, 0.0, 0.0)
@@ -78,7 +83,7 @@ cochons_manager := class(creative_device):
     Liberer(K : int) : void =
         set Reserves = for (X : Reserves, X <> K) do X
 
-    VieCochon(Marche : creative_prop, Repos : creative_prop)<suspends> : void =
+    VieCochon(I : int, Marche : creative_prop, Repos : creative_prop)<suspends> : void =
         Depart := Repos.GetTransform()
         F := Depart.Rotation.GetLocalForward()
         # la HAUTEUR du cochon ne change jamais : c'est celle ou tu l'as pose (au sol) + DecalageSol ;
@@ -99,7 +104,16 @@ cochons_manager := class(creative_device):
         Sleep(GetRandomFloat(0.5, 4.0))
         loop:
             # PAUSE : a l'arret, il bouge la tete (animation), et parfois se tourne un peu
-            Sleep(GetRandomFloat(PauseMin, Max(PauseMin, PauseMax)))
+            Pause := GetRandomFloat(PauseMin, Max(PauseMin, PauseMax))
+            # parfois il grogne, a un moment au hasard de sa pause (son a l'endroit du cochon)
+            if (Son := SonsCochons[I], GetRandomFloat(0.0, 1.0) < ChanceGrogne):
+                Avant := GetRandomFloat(0.0, Pause)
+                Sleep(Avant)
+                if (Son.TeleportTo[Ici, Rot(Lacet)]) {}
+                Son.Play()
+                Sleep(Pause - Avant)
+            else:
+                Sleep(Pause)
             if (GetRandomFloat(0.0, 1.0) < ChanceTourSurPlace):
                 set Lacet = Lacet + GetRandomFloat(-70.0, 70.0)
                 Repos.MoveTo(Ici, Rot(Lacet), 0.8)
