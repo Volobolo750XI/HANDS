@@ -40,7 +40,7 @@ cochons_manager := class(creative_device):
     # Il suit son cochon et joue de temps en temps quand le cochon est a l'arret.
     @editable SonsCochons : []audio_player_device = array{}
     # Chance (0 a 1) qu'il grogne pendant une pause
-    @editable ChanceGrogne : float = 0.5
+    @editable ChanceGrogne : float = 0.25
 
     # les points deja choisis comme destination (deux cochons ne visent pas le meme point)
     var Reserves : []int = array{}
