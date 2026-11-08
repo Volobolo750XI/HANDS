@@ -20,6 +20,9 @@ cochons_manager := class(creative_device):
     @editable CochonsRepos : []creative_prop = array{}
     # Les points de passage (accessoires invisibles, sans collision, au sol)
     @editable PointsCochons : []creative_prop = array{}
+    # FACULTATIF : les points d'apparition (accessoires invisibles, au sol). Au debut, chaque cochon apparait sur
+    # l'un d'eux, tire au hasard (deux cochons jamais au meme). Vide = il apparait la ou tu l'as pose.
+    @editable SpawnsCochons : []creative_prop = array{}
     # Vitesse de marche (cm par seconde)
     @editable VitesseCochon : float = 90.0
     # Temps d'arret entre deux promenades (secondes, tire au hasard entre les deux)
@@ -34,6 +37,7 @@ cochons_manager := class(creative_device):
 
     # les points deja choisis comme destination (deux cochons ne visent pas le meme point)
     var Reserves : []int = array{}
+    var SpawnsPris : []int = array{}
 
     OnBegin<override>()<suspends> : void =
         for (I -> M : CochonsMarche, R := CochonsRepos[I]):
@@ -78,6 +82,13 @@ cochons_manager := class(creative_device):
         var Ici : vector3 = Depart.Translation
         var Lacet : float = ArcTan(F.Y, F.X) * 180.0 / PiFloat - CorrectionCochon
         var Actuel : int = -1
+        # point d'apparition au hasard parmi ceux encore libres
+        Libres := for (K -> S : SpawnsCochons, not Contient(SpawnsPris, K)?) do K
+        if (Libres.Length > 0, K := Libres[GetRandomInt(0, Libres.Length - 1)], S := SpawnsCochons[K]):
+            set SpawnsPris += array{K}
+            set Ici = S.GetTransform().Translation
+            set Lacet = GetRandomFloat(-180.0, 180.0)
+        # le cochon qui marche est cale sur celui a l'arret (meme position), puis cache
         Afficher(Marche, Repos, Ici, Lacet, false)
         # chaque cochon commence a un moment different
         Sleep(GetRandomFloat(0.5, 4.0))
