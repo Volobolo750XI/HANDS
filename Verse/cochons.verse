@@ -34,6 +34,8 @@ cochons_manager := class(creative_device):
     @editable CorrectionCochon : float = 0.0
     # Chance (0 a 1) qu'il tourne un peu sur place pendant une pause
     @editable ChanceTourSurPlace : float = 0.35
+    # Si les cochons flottent ou s'enfoncent : monte (+) ou descends (-) en cm (ex. -40)
+    @editable DecalageSol : float = 0.0
 
     # les points deja choisis comme destination (deux cochons ne visent pas le meme point)
     var Reserves : []int = array{}
@@ -66,7 +68,7 @@ cochons_manager := class(creative_device):
 
     # une destination au hasard parmi les points proches et libres (-1 = aucune)
     ChoisirPoint(Actuel : int, Ici : vector3) : int =
-        Candidats := for (K -> P : PointsCochons, K <> Actuel, not Contient(Reserves, K)?, Ecart := P.GetTransform().Translation - Ici, Ecart.Length() <= DistanceMaxCochon) do K
+        Candidats := for (K -> P : PointsCochons, K <> Actuel, not Contient(Reserves, K)?, Ecart := P.GetTransform().Translation - Ici, Ecart.X * Ecart.X + Ecart.Y * Ecart.Y <= DistanceMaxCochon * DistanceMaxCochon) do K
         var Choisi : int = -1
         if (Candidats.Length > 0, C := Candidats[GetRandomInt(0, Candidats.Length - 1)]):
             set Choisi = C
@@ -79,14 +81,17 @@ cochons_manager := class(creative_device):
     VieCochon(Marche : creative_prop, Repos : creative_prop)<suspends> : void =
         Depart := Repos.GetTransform()
         F := Depart.Rotation.GetLocalForward()
-        var Ici : vector3 = Depart.Translation
+        # la HAUTEUR du cochon ne change jamais : c'est celle ou tu l'as pose (au sol) + DecalageSol ;
+        # les points de passage et d'apparition ne donnent que la position au sol (X, Y)
+        var Ici : vector3 = Depart.Translation + vector3{X := 0.0, Y := 0.0, Z := DecalageSol}
         var Lacet : float = ArcTan(F.Y, F.X) * 180.0 / PiFloat - CorrectionCochon
         var Actuel : int = -1
         # point d'apparition au hasard parmi ceux encore libres
         Libres := for (K -> S : SpawnsCochons, not Contient(SpawnsPris, K)?) do K
         if (Libres.Length > 0, K := Libres[GetRandomInt(0, Libres.Length - 1)], S := SpawnsCochons[K]):
             set SpawnsPris += array{K}
-            set Ici = S.GetTransform().Translation
+            P0 := S.GetTransform().Translation
+            set Ici = vector3{X := P0.X, Y := P0.Y, Z := Ici.Z}
             set Lacet = GetRandomFloat(-180.0, 180.0)
         # le cochon qui marche est cale sur celui a l'arret (meme position), puis cache
         Afficher(Marche, Repos, Ici, Lacet, false)
@@ -102,7 +107,8 @@ cochons_manager := class(creative_device):
             # PROMENADE vers un point proche et libre
             Cible := ChoisirPoint(Actuel, Ici)
             if (Pt := PointsCochons[Cible]):
-                Dest := Pt.GetTransform().Translation
+                P1 := Pt.GetTransform().Translation
+                Dest := vector3{X := P1.X, Y := P1.Y, Z := Ici.Z}
                 V := Dest - Ici
                 Dist := V.Length()
                 if (Dist > 20.0):
