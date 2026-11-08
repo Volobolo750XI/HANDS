@@ -576,10 +576,10 @@ hands_manager := class(creative_device):
     # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
     # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
     @editable ToucheClic : input_trigger_device = input_trigger_device{}
-    # LE LOBBY : une Zone de mutation (Mutator Zone) devant CETTE table. Les joueurs entrent dans la zone ; des
+    # LE LOBBY : un Compteur de joueurs (Player Counter, "Utiliser la zone" coche) = l'enclos de CETTE table. Les joueurs entrent dans la zone ; des
     # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
     # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
-    @editable ZoneLobby : mutator_zone_device = mutator_zone_device{}
+    @editable ZoneLobby : player_counter_device = player_counter_device{}
     # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones).
     # VIDE = chacun revient la ou il est apparu.
     @editable RetourLobby : []creative_prop = array{}
@@ -697,8 +697,8 @@ hands_manager := class(creative_device):
         spawn{ LimiterTetes() }
         EnleverCameras()
         spawn{ MemoriserSpawns() }
-        ZoneLobby.AgentEntersEvent.Subscribe(EntreZone)
-        ZoneLobby.AgentExitsEvent.Subscribe(SortZone)
+        ZoneLobby.CountedEvent.Subscribe(EntreZone)
+        ZoneLobby.RemovedEvent.Subscribe(SortZone)
         loop:
             Table0 := Lobby()
             race:
