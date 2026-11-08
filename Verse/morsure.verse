@@ -705,7 +705,7 @@ hands_manager := class(creative_device):
             Sleep(1.0)
 
     # =========================================================================
-    #  LE LOBBY : suspendus cote a cote, panneau a gauche (READY / CANCEL), on part quand tout le monde est pret
+    #  LE LOBBY : 3 zones (une par table), 2 a 4 joueurs, depart apres 10 s ; on bouge librement
     # =========================================================================
     # les joueurs dans la zone du lobby (dans l'ordre d'arrivee) et ceux de la partie en cours a CETTE table
     var DansZone : []player = array{}
