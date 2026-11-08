@@ -1294,7 +1294,8 @@ hands_manager := class(creative_device):
         else if (K = BoutonVert):
             T.SetMaterial(Teintes.T_Sur{}, ?Index := IndexMateriau)
         else:
-            T.SetMaterial(Teintes.T_Base{}, ?Index := IndexMateriau)
+            # le materiau D'ORIGINE des boutons de la nouvelle machine (Salle_Porcherie/Materials/M_Touches)
+            T.SetMaterial(Salle_Porcherie.Materials.M_Touches{}, ?Index := IndexMateriau)
 
     # le bouton vise devient blanc (-1 = aucun) ; l'ancien reprend sa couleur
     Surligner(K : int) : void =
