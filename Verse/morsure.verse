@@ -580,7 +580,8 @@ hands_manager := class(creative_device):
     # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
     # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
     @editable ZoneLobby : mutator_zone_device = mutator_zone_device{}
-    # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones)
+    # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones).
+    # VIDE = chacun revient la ou il est apparu.
     @editable RetourLobby : []creative_prop = array{}
     # Secondes a passer dans la zone avant le depart
     @editable AttenteLobby : float = 10.0
@@ -695,6 +696,7 @@ hands_manager := class(creative_device):
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         spawn{ LimiterTetes() }
         EnleverCameras()
+        spawn{ MemoriserSpawns() }
         ZoneLobby.AgentEntersEvent.Subscribe(EntreZone)
         ZoneLobby.AgentExitsEvent.Subscribe(SortZone)
         loop:
@@ -769,11 +771,25 @@ hands_manager := class(creative_device):
             if (set Affiches[J] = S) {}
             MessagePour(J, S)
 
-    # fin de partie : les joueurs de la table sont renvoyes au lobby
+    # l'endroit ou chaque joueur est apparu (retenu la premiere fois qu'on le voit)
+    var PointSpawn : [player]vector3 = map{}
+    MemoriserSpawns()<suspends> : void =
+        loop:
+            for (J : GetPlayspace().GetPlayers(), not PointSpawn[J], Perso := J.GetFortCharacter[]):
+                if (set PointSpawn[J] = Perso.GetTransform().Translation) {}
+            Sleep(0.5)
+
+    # fin de partie : les joueurs de la table sont renvoyes au lobby (sur RetourLobby, ou a leur point
+    # d'apparition si RetourLobby est vide)
     RenvoyerAuLobby(Liste : []player) : void =
         for (K -> J : Liste, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
-            if (Ix := Mod[K, Max(1, RetourLobby.Length)], Pl := RetourLobby[Ix]):
+            if (RetourLobby.Length = 0, P := PointSpawn[J]):
+                var PoseS : logic = false
+                for (H : array{0.0, 40.0, 80.0, 130.0}, not PoseS?):
+                    if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := H}, Perso.GetTransform().Rotation]):
+                        set PoseS = true
+            else if (Ix := Mod[K, Max(1, RetourLobby.Length)], Pl := RetourLobby[Ix]):
                 T := Pl.GetTransform()
                 var Pose : logic = false
                 for (H : array{0.0, 40.0, 80.0, 130.0}, not Pose?):
