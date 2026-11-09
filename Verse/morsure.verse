@@ -644,6 +644,9 @@ hands_manager := class(creative_device):
     # BACK TO LOBBY : un appareil Bouton (Button) dans la piece (Temps d'interaction : 2 s). Un joueur mordu
     # (plus dans le jeu) qui l'utilise rentre au lobby tout de suite. Les joueurs encore en jeu ne peuvent pas.
     @editable BoutonRetourLobby : button_device = button_device{}
+    # Ou va un joueur mordu : des accessoires INVISIBLES et SANS collision, au sol, dans un coin de la piece
+    # (3 pour une table de 4). Vide = il reste a sa place. Ensuite il peut se deplacer librement.
+    @editable PointsElimines : []creative_prop = array{}
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -1365,6 +1368,12 @@ hands_manager := class(creative_device):
         Sleep(0.5)
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
+            # il est envoye a un point de la piece (le K-ieme mordu va au K-ieme point), tourne vers la table
+            if (Ix := Mod[K, Max(1, PointsElimines.Length)], Pl := PointsElimines[Ix]):
+                Ici := Pl.GetTransform().Translation
+                C := CentreTable()
+                Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
+                Resultat := PoserPres(Perso, Ici, vector3{X := 0.0, Y := 0.0, Z := 0.0}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
