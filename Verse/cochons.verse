@@ -47,6 +47,14 @@ cochons_manager := class(creative_device):
     var SpawnsPris : []int = array{}
 
     OnBegin<override>()<suspends> : void =
+        # SECURITE : les points de passage / d'apparition sont invisibles et sans collision, les grognements ne
+        # jouent pas tout seuls au lancement
+        for (P : PointsCochons):
+            P.Hide()
+        for (P : SpawnsCochons):
+            P.Hide()
+        for (Son : SonsCochons):
+            Son.Stop()
         for (I -> M : CochonsMarche, R := CochonsRepos[I]):
             spawn{ VieCochon(I, M, R) }
 

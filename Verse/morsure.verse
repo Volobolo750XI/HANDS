@@ -718,6 +718,17 @@ hands_manager := class(creative_device):
         set Piegee = for (T : Touches) do false
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         EnleverCameras()
+        # SECURITE (reglages des appareils) : rien ne doit gener, meme si une case est mal reglee dans l'editeur
+        #  - aucun son du jeu ne joue tout seul au lancement (si "lecture automatique" est cochee par erreur)
+        for (Son : array{SonRotation, SonArret, SonClic, SonBoom, SonCauchemar, SonCarte, SonBouton}):
+            Son.Stop()
+        #  - les reperes (places, points des mordus, points de retour) sont invisibles et sans collision
+        for (Pl : Places):
+            Pl.Hide()
+        for (Pl : PointsElimines):
+            Pl.Hide()
+        for (Pl : RetourLobby):
+            Pl.Hide()
         spawn{ MemoriserSpawns() }
         if (TestVictoire?):
             spawn{ TesterVictoire() }
