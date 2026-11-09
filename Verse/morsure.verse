@@ -658,6 +658,9 @@ hands_manager := class(creative_device):
     @editable DureeVictoire : float = 4.0              # secondes du dezoom
     # TEST : coche pour gagner tout de suite (5 s apres l'arrivee : pose a ta place, puis la scene de victoire)
     @editable TestVictoire : logic = false
+    # TEST : coche pour etre envoye dans la porcherie comme un joueur MORDU (5 s apres l'arrivee) : tu peux
+    # marcher et essayer le bouton BACK TO LOBBY
+    @editable TestRetourLobby : logic = false
     # Les panneaux (BACK TO LOBBY...) qui FLOTTENT doucement de haut en bas, comme dans Football Pillars
     @editable PanneauxFlottants : []creative_prop = array{}
     @editable Flottement : float = 15.0           # cm de haut en bas
@@ -718,6 +721,8 @@ hands_manager := class(creative_device):
         spawn{ MemoriserSpawns() }
         if (TestVictoire?):
             spawn{ TesterVictoire() }
+        if (TestRetourLobby?):
+            spawn{ TesterRetourLobby() }
         for (Pan : PanneauxFlottants):
             spawn{ FaireFlotter(Pan) }
         BoutonRetourLobby.InteractedWithEvent.Subscribe(QuandRetourLobby)
@@ -870,6 +875,19 @@ hands_manager := class(creative_device):
                 Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 345.0, Right := 600.0, Bottom := 60.0}, ZOrder := 1}}
         set S += TexteEcrit("WINNER", 0.5, 0.0, 0.0, 265.0, 110.0)
         canvas{Slots := S}
+
+    # TEST : 5 s apres le debut, le premier joueur est mis a la table comme s'il venait d'etre mordu
+    TesterRetourLobby()<suspends> : void =
+        Sleep(5.0)
+        if (J := GetPlayspace().GetPlayers()[0], J.GetFortCharacter[]):
+            set Table = array{J}
+            set Assis = array{J}
+            set Vivants = array{}
+            set DejaRentres = array{}
+            set PlaceDe = map{J => 0}
+            Asseoir(J, 0, ?Annonce := false)
+            Sleep(1.0)
+            DevenirSpectateur(J, 0)
 
     # TEST : 5 s apres le debut, le premier joueur est pose a la place 1 et gagne (scene de victoire), puis lobby
     TesterVictoire()<suspends> : void =
