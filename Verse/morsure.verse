@@ -642,6 +642,9 @@ hands_manager := class(creative_device):
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
+    # SPECTATEURS : des appareils Siege (Chair), invisibles, poses LOIN (3 pour une table de 4). Le joueur mordu meurt,
+    # reapparait (Parametres de l'ile : reapparition ACTIVEE) et est assis sur l'un d'eux jusqu'a la fin de la partie.
+    @editable SiegesSpectateurs : []chair_device = array{}
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -1022,9 +1025,9 @@ hands_manager := class(creative_device):
                 Elimine := TourDe(J)
                 if (Elimine?):
                     set Vivants = for (X : Vivants, X <> J) do X
-                    # il devient SPECTATEUR : invisible a sa place, il regarde les tours des autres
-                    if (Perso := J.GetFortCharacter[]):
-                        Perso.Hide()
+                    # il MEURT, reapparait, et est assis sur un siege invisible au loin : de la, il regarde les
+                    # tours des autres par leur camera
+                    spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
                     if (Sens < 0):
                         set Index -= 1
                 else:
@@ -1037,6 +1040,9 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
+        # les spectateurs se levent de leur siege
+        for (Ch : SiegesSpectateurs, X : Assis):
+            Ch.Eject(X)
         set Orientations = map{}
         set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
@@ -1442,6 +1448,24 @@ hands_manager := class(creative_device):
         Verdir(-1)
         FermerEcrans()
         Elimine
+
+    # mordu : le personnage meurt ; quand il reapparait, il est assis sur le siege numero K (au loin)
+    DevenirSpectateur(J : player, K : int)<suspends> : void =
+        if (Perso := J.GetFortCharacter[]):
+            Perso.ReleaseFromStasis()
+            Perso.Damage(100000.0)
+        Sleep(1.0)
+        var Essais : int = 0
+        loop:
+            set Essais += 1
+            if (Essais > 60):
+                break
+            if (P2 := J.GetFortCharacter[], P2.IsActive[]):
+                if (Ch := SiegesSpectateurs[K]):
+                    Ch.Enable()
+                    Ch.Seat(J)
+                break
+            Sleep(0.25)
 
     # les joueurs de la table deja elimines (ils regardent la partie)
     Spectateurs(J : player)<transacts> : []player =
