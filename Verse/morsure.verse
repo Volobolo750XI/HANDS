@@ -589,6 +589,9 @@ hands_manager := class(creative_device):
     # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
     # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
     @editable ZoneLobby : player_counter_device = player_counter_device{}
+    # FACULTATIF : un appareil Barriere (Barrier) qui ferme l'entree de l'enclos PENDANT la partie de cette table
+    # (personne ne peut y entrer) ; elle disparait quand la partie est finie.
+    @editable BarriereZone : barrier_device = barrier_device{}
     # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones).
     # VIDE = chacun revient la ou il est apparu.
     @editable RetourLobby : []creative_prop = array{}
@@ -729,6 +732,7 @@ hands_manager := class(creative_device):
             Pl.Hide()
         for (Pl : RetourLobby):
             Pl.Hide()
+        BarriereZone.Disable()
         spawn{ MemoriserSpawns() }
         if (TestVictoire?):
             spawn{ TesterVictoire() }
@@ -741,9 +745,12 @@ hands_manager := class(creative_device):
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
         loop:
             Table0 := Lobby()
+            # la partie commence : l'enclos est FERME (personne ne peut y entrer)
+            BarriereZone.Enable()
             race:
                 Manche(Table0)
                 ZonePendantPartie()
+            BarriereZone.Disable()
             Sleep(1.0)
 
     # =========================================================================
