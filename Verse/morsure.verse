@@ -806,6 +806,11 @@ hands_manager := class(creative_device):
         loop:
             for (J : GetPlayspace().GetPlayers(), not PointSpawn[J], Perso := J.GetFortCharacter[]):
                 if (set PointSpawn[J] = Perso.GetTransform().Translation) {}
+                # securite : a son arrivee, AUCUNE camera fixe du jeu (clavier, victoire) ne doit etre sur lui,
+                # meme si "Ajouter aux joueurs au debut" est reste coche sur une camera
+                CameraVictoire.RemoveFrom(J)
+                for (Cam : CamerasClavier):
+                    Cam.RemoveFrom(J)
             Sleep(0.5)
 
     # un panneau monte et descend doucement, en boucle (8 petits pas par aller-retour)
