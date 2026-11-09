@@ -642,11 +642,10 @@ hands_manager := class(creative_device):
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
-    # SPECTATEURS : des accessoires INVISIBLES et SANS collision, poses un peu LOIN de la table (3 pour une table de 4),
-    # au sol, la ou le joueur se tient. Le joueur mordu meurt, reapparait (Parametres de l'ile : reapparition ACTIVEE),
-    # est pose sur l'un d'eux, tourne vers la table, et regarde la partie de la (premiere personne, il peut tourner
-    # la tete) jusqu'a la fin.
-    @editable SiegesSpectateurs : []creative_prop = array{}
+    # SPECTATEURS : des appareils Siege (Chair) de Fortnite, poses un peu LOIN de la table, tournes vers elle
+    # (3 pour une table de 4). Le joueur mordu meurt, reapparait (Parametres de l'ile : reapparition ACTIVEE) et est
+    # assis sur l'un d'eux : de la, il regarde la partie jusqu'a la fin.
+    @editable SiegesSpectateurs : []chair_device = array{}
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -1041,6 +1040,9 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
+        # les spectateurs se levent de leur siege
+        for (Ch : SiegesSpectateurs, X : Assis):
+            Ch.Eject(X)
         set Orientations = map{}
         set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
@@ -1454,15 +1456,9 @@ hands_manager := class(creative_device):
             if (Essais > 60):
                 break
             if (P2 := J.GetFortCharacter[], P2.IsActive[]):
-                if (Pl := SiegesSpectateurs[K]):
-                    # pose sur sa place au loin, tourne vers la table, fige (premiere personne)
-                    Ici := Pl.GetTransform().Translation
-                    C := CentreTable()
-                    Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
-                    Avant := vector3{X := 0.0, Y := 0.0, Z := 0.0}
-                    Resultat := PoserPres(P2, Ici, Avant, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
-                    if (Resultat >= 0):
-                        P2.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
+                if (Ch := SiegesSpectateurs[K]):
+                    Ch.Enable()
+                    Ch.Seat(J)
                 break
             Sleep(0.25)
 
