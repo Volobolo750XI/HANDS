@@ -815,6 +815,15 @@ hands_manager := class(creative_device):
         if (C := Noir?, UI := GetPlayerUI[J]):
             UI.RemoveWidget(C)
 
+    # juste apres la teleportation depuis le lobby, Fortnite refuse parfois de le poser pile sur sa place (il est
+    # mis un peu devant) : on le repose 2 fois, un peu plus tard, comme apres un tour
+    ReposerApresArrivee(J : player)<suspends> : void =
+        for (Attente : array{0.6, 0.8}):
+            Sleep(Attente)
+            if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?, not EnMachine[J]?):
+                Perso.ReleaseFromStasis()
+                Asseoir(J, PlaceIndex(J), ?Annonce := false)
+
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
         FaceMachineApres(J, Lacet, array{0.25, 0.35})
@@ -935,6 +944,7 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
+            spawn{ ReposerApresArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
@@ -1400,6 +1410,11 @@ hands_manager := class(creative_device):
                     # taille de la zone a l'ecran (unites 1920 x 1080) selon la distance du bouton
                     L := TailleBoutonClavier / (Z * TanX) * 0.5 * 1920.0
                     H := L * 0.8
+                    # TEST SOLO : la zone de clic est montree (carre vert transparent, SOUS la zone) pour verifier qu'elle est sur le bouton
+                    if (TestSolo?):
+                        C.AddWidget(canvas_slot{Widget := color_block{DefaultColor := color{R := 0.0, G := 1.0, B := 0.3}, DefaultOpacity := 0.35},
+                            Anchors := anchors{Minimum := vector2{X := X, Y := Y}, Maximum := vector2{X := X, Y := Y}},
+                            Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := L, Bottom := H}, SizeToContent := false})
                     Zone := TEST1{}
                     ZB := zone_bouton{Manager := Self, K := K, Zone := Zone}
                     spawn{ ZB.Suivre() }
