@@ -1351,9 +1351,17 @@ hands_manager := class(creative_device):
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
-        EcranVisee(J, Requis, Vu, false)
-        # sans camera fixe (TEST) : au bout de 3 s, un bouton au hasard est appuye (pour regarder l'animation)
-        Sleep(Max(0.0, Min(3.0, Fin - GetSimulationElapsedTime())))
+        # sans camera fixe (TEST) : un gros bouton PRESS a l'ecran ; tu cliques QUAND tu veux (l'animation reste
+        # figee a l'image d'arret en attendant), puis un bouton au hasard de la machine est appuye
+        EcranVisee(J, Requis, Vu, true)
+        EvTest := event(int){}
+        SlotsTest := BoutonTexteSur(EvTest, "PRESS", 0.5, 1.0, 0.0, -160.0, 90.0, 777)
+        if (C := Ecrans[J]):
+            for (Slot : SlotsTest):
+                C.AddWidget(Slot)
+        race:
+            EvTest.Await()
+            Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
         BoutonLibre()
 
     # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
