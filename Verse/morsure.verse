@@ -644,6 +644,10 @@ hands_manager := class(creative_device):
     # BACK TO LOBBY : un appareil Bouton (Button) dans la piece (Temps d'interaction : 2 s). Un joueur mordu
     # (plus dans le jeu) qui l'utilise rentre au lobby tout de suite. Les joueurs encore en jeu ne peuvent pas.
     @editable BoutonRetourLobby : button_device = button_device{}
+    # Les panneaux (BACK TO LOBBY...) qui FLOTTENT doucement de haut en bas, comme dans Football Pillars
+    @editable PanneauxFlottants : []creative_prop = array{}
+    @editable Flottement : float = 15.0           # cm de haut en bas
+    @editable VitesseFlottement : float = 0.4     # allers-retours par seconde
     # Ou va un joueur mordu : des accessoires INVISIBLES et SANS collision, au sol, dans un coin de la piece
     # (3 pour une table de 4). Vide = il reste a sa place. Ensuite il peut se deplacer librement.
     @editable PointsElimines : []creative_prop = array{}
@@ -698,6 +702,8 @@ hands_manager := class(creative_device):
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         EnleverCameras()
         spawn{ MemoriserSpawns() }
+        for (Pan : PanneauxFlottants):
+            spawn{ FaireFlotter(Pan) }
         BoutonRetourLobby.InteractedWithEvent.Subscribe(QuandRetourLobby)
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
@@ -780,6 +786,22 @@ hands_manager := class(creative_device):
             for (J : GetPlayspace().GetPlayers(), not PointSpawn[J], Perso := J.GetFortCharacter[]):
                 if (set PointSpawn[J] = Perso.GetTransform().Translation) {}
             Sleep(0.5)
+
+    # un panneau monte et descend doucement, en boucle (8 petits pas par aller-retour)
+    FaireFlotter(Pan : creative_prop)<suspends> : void =
+        Depart := Pan.GetTransform()
+        Pas := 8
+        Duree := 1.0 / Max(0.05, VitesseFlottement) / (Pas * 1.0)
+        loop:
+            for (K := 1..Pas):
+                Onde := Sin((K * 1.0) / (Pas * 1.0) * 2.0 * PiFloat)
+                Hauteur := (Onde + 1.0) * 0.5 * Flottement
+                # le Sleep garantit l'attente (un panneau cache rend MoveTo instantane : sans lui, boucle infinie)
+                spawn{ BougerPanneau(Pan, Depart.Translation + vector3{X := 0.0, Y := 0.0, Z := Hauteur}, Depart.Rotation, Duree) }
+                Sleep(Duree)
+
+    BougerPanneau(Pan : creative_prop, Ou : vector3, Rot : rotation, Duree : float)<suspends> : void =
+        Pan.MoveTo(Ou, Rot, Duree)
 
     # les joueurs mordus deja rentres au lobby par le bouton (on ne les y renvoie pas une 2e fois)
     var DejaRentres : []player = array{}
