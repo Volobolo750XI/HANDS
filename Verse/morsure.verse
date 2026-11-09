@@ -820,15 +820,6 @@ hands_manager := class(creative_device):
         if (C := Noir?, UI := GetPlayerUI[J]):
             UI.RemoveWidget(C)
 
-    # juste apres la teleportation depuis le lobby, Fortnite refuse parfois de le poser pile sur sa place (il est
-    # mis un peu devant) : on le repose 2 fois, un peu plus tard, comme apres un tour
-    ReposerApresArrivee(J : player)<suspends> : void =
-        for (Attente : array{0.6, 0.8}):
-            Sleep(Attente)
-            if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?, not EnMachine[J]?):
-                Perso.ReleaseFromStasis()
-                Asseoir(J, PlaceIndex(J), ?Annonce := false)
-
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
         FaceMachineApres(J, Lacet, array{0.25, 0.35})
@@ -949,7 +940,6 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
-            spawn{ ReposerApresArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
