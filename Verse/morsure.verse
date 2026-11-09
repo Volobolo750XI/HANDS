@@ -551,9 +551,9 @@ hands_manager := class(creative_device):
     # de l'ecran (0 = gauche / haut, 1 = droite / bas). 7 valeurs = les 7 lignes qui separent les 6 rangees de
     # boutons, de haut en bas : hauteur de la ligne, bord gauche et bord droit du clavier a cette hauteur.
     # (valeurs mesurees sur ta capture d'ecran ; a retoucher seulement si la camera bouge)
-    @editable LignesY : []float = array{0.1084, 0.2018, 0.3129, 0.4356, 0.5707, 0.7262, 0.8889}
-    @editable BordGauche : []float = array{0.4, 0.396, 0.39, 0.384, 0.376, 0.3675, 0.358}
-    @editable BordDroit : []float = array{0.634, 0.638, 0.644, 0.65, 0.657, 0.665, 0.674}
+    @editable LignesY : []float = array{0.274, 0.329, 0.399, 0.486, 0.600, 0.751, 0.946}
+    @editable BordGauche : []float = array{0.409, 0.398, 0.383, 0.364, 0.340, 0.310, 0.298}
+    @editable BordDroit : []float = array{0.593, 0.600, 0.603, 0.613, 0.625, 0.645, 0.668}
     # quel bouton (Bouton_01...) est ou a l'ecran : si le bouton qui devient blanc n'est pas celui sous la
     # souris, coche / decoche ces cases
     @editable InverserColonnes : logic = false
