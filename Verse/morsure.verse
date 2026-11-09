@@ -680,7 +680,6 @@ hands_manager := class(creative_device):
             Table0 := Lobby()
             race:
                 Manche(Table0)
-                GarderEnPlace()
                 ZonePendantPartie()
             Sleep(1.0)
 
@@ -825,19 +824,9 @@ hands_manager := class(creative_device):
             Sleep(Attente)
             if (Perso := J.GetFortCharacter[]):
                 Ici := Perso.GetTransform().Translation
-                if (not EnMachine[J]?):
-                    Perso.ReleaseFromStasis()
-                    if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-
-    # les joueurs a la table ne sont PAS figes (vue libre) : s'ils s'eloignent de leur place, ils y sont remis
-    var PoseDe : [player]vector3 = map{}
-    GarderEnPlace()<suspends> : void =
-        loop:
-            Sleep(0.5)
-            for (J : Vivants, not EnMachine[J]?, P := PoseDe[J], Perso := J.GetFortCharacter[], Perso.IsActive[]):
-                E := Perso.GetTransform().Translation - P
-                if (E.X * E.X + E.Y * E.Y > 6400.0):
-                    if (Perso.TeleportTo[P, Perso.GetTransform().Rotation]) {}
+                Perso.ReleaseFromStasis()
+                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -987,7 +976,6 @@ hands_manager := class(creative_device):
         for (Ch : SiegesSpectateurs, X : Assis):
             Ch.Eject(X)
         set Orientations = map{}
-        set PoseDe = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
@@ -1006,15 +994,14 @@ hands_manager := class(creative_device):
             Rot := MakeRotationFromYawPitchRollDegrees(Lacet + CorrectionVue, 0.0, 0.0)
             # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit : on essaie plus haut, puis devant
             Resultat := PoserPres(Perso, Pose, Avant, Rot)
+            Exact := if (Resultat = 0) then true else false
             if (TestSolo?, Annonce?):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
                 Vue := Lacet + CorrectionVue
                 if (set Orientations[J] = Vue) {}
-                # PAS fige : il regarde ou il veut. S'il s'eloigne, GarderEnPlace le remet sur sa place.
-                Perso.ReleaseFromStasis()
-                if (set PoseDe[J] = Perso.GetTransform().Translation) {}
                 spawn{ FaceMachine(J, Vue) }
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
