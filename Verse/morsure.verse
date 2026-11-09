@@ -653,6 +653,8 @@ hands_manager := class(creative_device):
     @editable HauteurVictoire : float = 165.0          # hauteur de la camera (cm au-dessus de ses pieds)
     @editable InclinaisonVictoire : float = -8.0       # degres : negatif = la camera regarde un peu vers le bas
     @editable DureeVictoire : float = 4.0              # secondes du dezoom
+    # TEST : coche pour gagner tout de suite (5 s apres l'arrivee : pose a ta place, puis la scene de victoire)
+    @editable TestVictoire : logic = false
     # Les panneaux (BACK TO LOBBY...) qui FLOTTENT doucement de haut en bas, comme dans Football Pillars
     @editable PanneauxFlottants : []creative_prop = array{}
     @editable Flottement : float = 15.0           # cm de haut en bas
@@ -711,6 +713,8 @@ hands_manager := class(creative_device):
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         EnleverCameras()
         spawn{ MemoriserSpawns() }
+        if (TestVictoire?):
+            spawn{ TesterVictoire() }
         for (Pan : PanneauxFlottants):
             spawn{ FaireFlotter(Pan) }
         BoutonRetourLobby.InteractedWithEvent.Subscribe(QuandRetourLobby)
@@ -842,6 +846,24 @@ hands_manager := class(creative_device):
                 CameraVictoire.RemoveFrom(X)
         else:
             Sleep(4.0)
+
+    # TEST : 5 s apres le debut, le premier joueur est pose a la place 1 et gagne (scene de victoire), puis lobby
+    TesterVictoire()<suspends> : void =
+        Sleep(5.0)
+        if (J := GetPlayspace().GetPlayers()[0], J.GetFortCharacter[]):
+            set Table = array{J}
+            set Assis = array{J}
+            set Vivants = array{J}
+            set PlaceDe = map{J => 0}
+            Asseoir(J, 0, ?Annonce := false)
+            Sleep(1.0)
+            Bandeau("P1 WINS THE ROUND!")
+            CinematiqueVictoire(J)
+            Bandeau("")
+            RenvoyerAuLobby(array{J})
+            set Table = array{}
+            set Assis = array{}
+            set Vivants = array{}
 
     # les joueurs mordus deja rentres au lobby par le bouton (on ne les y renvoie pas une 2e fois)
     var DejaRentres : []player = array{}
