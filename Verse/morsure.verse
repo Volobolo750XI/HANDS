@@ -1002,6 +1002,19 @@ hands_manager := class(creative_device):
         if (C := Noir?, IU := GetPlayerUI[J]):
             IU.RemoveWidget(C)
 
+    # apres une teleportation LOINTAINE, Fortnite charge la zone (ecran noir "deplacement") et annule le gel :
+    # on le refige plusieurs fois ; s'il n'est plus sur sa place, on l'y repose
+    RefigerApresArrivee(J : player)<suspends> : void =
+        for (Attente : array{1.0, 1.0, 2.0}):
+            Sleep(Attente)
+            if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?, not EnMachine[J]?, Pl := Places[PlaceIndex(J)]):
+                E := Perso.GetTransform().Translation - Pl.GetTransform().Translation
+                if (E.X * E.X + E.Y * E.Y > 10000.0):
+                    Perso.ReleaseFromStasis()
+                    Asseoir(J, PlaceIndex(J), ?Annonce := false)
+                else:
+                    Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
+
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
         FaceMachineApres(J, Lacet, array{0.25, 0.35})
@@ -1122,6 +1135,7 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
+            spawn{ RefigerApresArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
