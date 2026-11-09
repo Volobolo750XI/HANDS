@@ -818,10 +818,14 @@ hands_manager := class(creative_device):
         if (Perso := G.GetFortCharacter[]):
             EnleverCameras()
             P := Perso.GetTransform().Translation
-            # direction ou il regarde (a plat)
-            F0 := Perso.GetTransform().Rotation.GetLocalForward()
-            Lg := Sqrt(F0.X * F0.X + F0.Y * F0.Y)
-            F := if (Lg > 0.01) then vector3{X := F0.X / Lg, Y := F0.Y / Lg, Z := 0.0} else vector3{X := 1.0, Y := 0.0, Z := 0.0}
+            # il est tourne FACE A LA CAMERA (vers la machine, la ou la camera va se placer) et fige pendant la scene :
+            # il ne peut plus tourner la tete, il regarde la camera
+            C := CentreTable()
+            LacetG := ArcTan(C.Y - P.Y, C.X - P.X)
+            F := vector3{X := Cos(LacetG), Y := Sin(LacetG), Z := 0.0}
+            Perso.ReleaseFromStasis()
+            if (Perso.TeleportTo[P, MakeRotationFromYawPitchRollDegrees(LacetG * 180.0 / PiFloat, 0.0, 0.0)]) {}
+            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             Haut := vector3{X := 0.0, Y := 0.0, Z := HauteurVictoire}
             # la camera regarde le gagnant : direction opposee a la sienne
             Lacet := ArcTan(-F.Y, -F.X) * 180.0 / PiFloat
