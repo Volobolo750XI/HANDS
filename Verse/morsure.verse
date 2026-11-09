@@ -1142,7 +1142,7 @@ hands_manager := class(creative_device):
                 Sleep(4.0)
         Bandeau("")
         set Orientations = map{}
-        for (J : Assis, Perso := J.GetFortCharacter[]):
+        for (J : Assis, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
         RenvoyerAuLobby(Assis)
@@ -1186,6 +1186,10 @@ hands_manager := class(creative_device):
         Resultat
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 4)
+
+    # encore la et encore a CETTE table (pas rentre au lobby par le bouton)
+    ALaTable(J : player)<transacts> : logic =
+        if (EstLa(J)?, not Contient(DejaRentres, J)?) then true else false
 
     EstLa(J : player)<transacts> : logic =
         var Trouve : logic = false
@@ -1573,7 +1577,7 @@ hands_manager := class(creative_device):
         if (M := Paquets[J], M.Length < PaquetMax, set Paquets[J] = M + array{TirerRelique()}):
             SonCarte.Play()
             Avertir(J, "+1 CARD")
-        for (X : Assis, X <> J):
+        for (X : Assis, X <> J, ALaTable(X)?):
             Avertir(X, "P{NumeroDe(J)} DRAWS A CARD")
 
     # SON CHOIX : PLAY A CARD (0) ou NO CARD (1). 0 carte : pas d'ecran, il va direct a la machine (-1).
@@ -1610,7 +1614,7 @@ hands_manager := class(creative_device):
     AnimerPlus(Gros : string, Ligne1 : string, Ligne2 : string, Qui : player)<suspends> : void =
         var Calques : [player]canvas = map{}
         for (Taille : array{90.0, 190.0, 300.0, 250.0, 270.0}):
-            for (X : Assis, EstLa(X)?, IU := GetPlayerUI[X]):
+            for (X : Assis, ALaTable(X)?, IU := GetPlayerUI[X]):
                 if (Ancien := Calques[X]):
                     IU.RemoveWidget(Ancien)
                 var S : []canvas_slot = TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille)
@@ -1708,7 +1712,7 @@ hands_manager := class(creative_device):
         NotifierCarte(J, Id)
         FermerEcrans()
         SonCarte.Play()
-        for (X : Assis, EstLa(X)?):
+        for (X : Assis, ALaTable(X)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(X, Chrono)
             set S += array{PlaceH(ImgH(ImageRelique(Id), 400.0, 400.0), 0.5, 0.5, 0.0, -20.0, 400.0, 400.0)}
@@ -2011,7 +2015,7 @@ hands_manager := class(creative_device):
     ChoixDepart()<suspends> : void =
         FermerEcrans()
         var Liste : []choix_depart = array{}
-        for (J : Assis, EstLa(J)?):
+        for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             Compteur := ImgH(Ecriture.E_0, 56.0, 56.0)
             EvJ := event(int){}
@@ -2055,7 +2059,7 @@ hands_manager := class(creative_device):
     # LES REGLES, au debut de la manche, pour tout le monde
     EcranRegles() : void =
         FermerEcrans()
-        for (J : Assis, EstLa(J)?):
+        for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.75}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
             set S += TexteEcrit("HOW TO PLAY", 0.5, 0.5, 0.0, -260.0, 100.0)
@@ -2068,7 +2072,7 @@ hands_manager := class(creative_device):
     # SON CHOIX : deux gros mots, PLAY A CARD / NO CARD (et les boutons qui l'attendent, s'il y en a)
     EcranAction(Actif : player, Attente : int, PeutJouer : logic, PeutPiocher : logic) : void =
         FermerEcrans()
-        for (J : Assis, EstLa(J)?):
+        for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
             if (J = Actif):
@@ -2089,7 +2093,7 @@ hands_manager := class(creative_device):
     # JOUER : ses cartes en grand en bas. Une carte choisie -> TRUTH / LIE au-dessus. LIE -> les autres cartes.
     EcranJouer(Actif : player, Choisie : int, Mensonge : logic) : void =
         FermerEcrans()
-        for (J : Assis, EstLa(J)?):
+        for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
             if (J = Actif):
@@ -2127,7 +2131,7 @@ hands_manager := class(creative_device):
     # A LA MACHINE : pas de curseur, il vise avec la camera. PEEK : le bouton sur, sur SON ecran seulement.
     EcranVisee(Actif : player, Requis : int, Vu : int, Souris : logic) : void =
         FermerEcrans()
-        for (J : Assis, EstLa(J)?):
+        for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
             if (J = Actif, Souris?):
