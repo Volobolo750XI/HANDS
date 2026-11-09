@@ -755,7 +755,7 @@ hands_manager := class(creative_device):
     Lobby()<suspends> : []player =
         set Table = array{}
         Max4 := Min(4, Max(1, Places.Length))
-        Requis := if (TestSolo?) then 1 else Max(2, JoueursMinimum)
+        Requis := if (TestSolo?) then 1 else Min(Max4, Max(2, JoueursMinimum))
         var Reste : float = AttenteLobby
         var Partants : []player = array{}
         loop:
@@ -1505,6 +1505,9 @@ hands_manager := class(creative_device):
         Sleep(0.5)
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
+            # INVISIBLE pour les autres : en se promenant, il ne peut pas cacher la machine aux joueurs encore en jeu
+            # (il redevient visible en rentrant au lobby)
+            Perso.Hide()
             # il est envoye a un point de la piece (le K-ieme mordu va au K-ieme point), tourne vers la table
             if (Ix := Mod[K, Max(1, PointsElimines.Length)], Pl := PointsElimines[Ix]):
                 Ici := Pl.GetTransform().Translation
