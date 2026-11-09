@@ -642,9 +642,11 @@ hands_manager := class(creative_device):
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
-    # SPECTATEURS : des appareils Siege (Chair), invisibles, poses LOIN (3 pour une table de 4). Le joueur mordu meurt,
-    # reapparait (Parametres de l'ile : reapparition ACTIVEE) et est assis sur l'un d'eux jusqu'a la fin de la partie.
-    @editable SiegesSpectateurs : []chair_device = array{}
+    # SPECTATEURS : des accessoires INVISIBLES et SANS collision, poses un peu LOIN de la table (3 pour une table de 4),
+    # au sol, la ou le joueur se tient. Le joueur mordu meurt, reapparait (Parametres de l'ile : reapparition ACTIVEE),
+    # est pose sur l'un d'eux, tourne vers la table, et regarde la partie de la (premiere personne, il peut tourner
+    # la tete) jusqu'a la fin.
+    @editable SiegesSpectateurs : []creative_prop = array{}
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -1025,8 +1027,7 @@ hands_manager := class(creative_device):
                 Elimine := TourDe(J)
                 if (Elimine?):
                     set Vivants = for (X : Vivants, X <> J) do X
-                    # il MEURT, reapparait, et est assis sur un siege invisible au loin : de la, il regarde les
-                    # tours des autres par leur camera
+                    # il MEURT, reapparait, et est pose un peu au loin : de la, il regarde la partie
                     spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
                     if (Sens < 0):
                         set Index -= 1
@@ -1040,9 +1041,6 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
-        # les spectateurs se levent de leur siege
-        for (Ch : SiegesSpectateurs, X : Assis):
-            Ch.Eject(X)
         set Orientations = map{}
         set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
@@ -1401,9 +1399,7 @@ hands_manager := class(creative_device):
             if (Camera := CameraDe(J)?):
                 Camera.AddTo(J)
                 if (set EnMachine[J] = true) {}
-                # les ELIMINES de la table regardent son tour, par sa camera
-                for (X : Spectateurs(J)):
-                    Camera.AddTo(X)
+
             Fin := GetSimulationElapsedTime() + DureeTour
             loop:
                 if (Requis <= 0 or Elimine? or LibresRestants() = 0):
@@ -1441,9 +1437,6 @@ hands_manager := class(creative_device):
             else if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
-            if (Camera := CameraDe(J)?):
-                for (X : Spectateurs(J)):
-                    Camera.RemoveFrom(X)
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
@@ -1461,15 +1454,17 @@ hands_manager := class(creative_device):
             if (Essais > 60):
                 break
             if (P2 := J.GetFortCharacter[], P2.IsActive[]):
-                if (Ch := SiegesSpectateurs[K]):
-                    Ch.Enable()
-                    Ch.Seat(J)
+                if (Pl := SiegesSpectateurs[K]):
+                    # pose sur sa place au loin, tourne vers la table, fige (premiere personne)
+                    Ici := Pl.GetTransform().Translation
+                    C := CentreTable()
+                    Lacet := ArcTan(C.Y - Ici.Y, C.X - Ici.X) * 180.0 / PiFloat
+                    Avant := vector3{X := 0.0, Y := 0.0, Z := 0.0}
+                    Resultat := PoserPres(P2, Ici, Avant, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0))
+                    if (Resultat >= 0):
+                        P2.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
                 break
             Sleep(0.25)
-
-    # les joueurs de la table deja elimines (ils regardent la partie)
-    Spectateurs(J : player)<transacts> : []player =
-        for (X : Assis, not Contient(Vivants, X)?, X <> J, EstLa(X)?) do X
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
