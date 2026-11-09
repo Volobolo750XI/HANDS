@@ -964,7 +964,7 @@ hands_manager := class(creative_device):
         var Meilleure : ?gameplay_camera_fixed_point_device = false
         if (Pl := Places[PlaceIndex(J)]):
             Ici := Pl.GetTransform().Translation
-            var PlusPres : float = 100000000.0
+            var PlusPres : float = 2000.0 * 2000.0   # une camera a plus de 20 m de la place est ignoree (camera d'une autre table)
             for (Cam : CamerasClavier):
                 V := Cam.GetTransform().Translation - Ici
                 D := DotProduct(V, V)
@@ -1194,6 +1194,9 @@ hands_manager := class(creative_device):
                 if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+            else:
+                # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
@@ -1544,6 +1547,8 @@ hands_manager := class(creative_device):
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         # pas de camera fixe pour cette place (oubli dans l'editeur) : bouton au hasard a la fin du temps
+        if (TestSolo?):
+            Avertir(J, "NO KEYPAD CAMERA NEAR YOUR PLACE - CHECK CamerasClavier")
         EcranVisee(J, Requis, Vu, false)
         Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
         BoutonLibre()
