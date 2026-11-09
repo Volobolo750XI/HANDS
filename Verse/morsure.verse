@@ -858,6 +858,8 @@ hands_manager := class(creative_device):
             LacetG := ArcTan(C.Y - P.Y, C.X - P.X)
             F := vector3{X := Cos(LacetG), Y := Sin(LacetG), Z := 0.0}
             Perso.ReleaseFromStasis()
+            # toujours VISIBLE pendant sa scene (securite)
+            Perso.Show()
             if (Perso.TeleportTo[P, MakeRotationFromYawPitchRollDegrees(LacetG * 180.0 / PiFloat, 0.0, 0.0)]) {}
             Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             Haut := vector3{X := 0.0, Y := 0.0, Z := HauteurVictoire}
