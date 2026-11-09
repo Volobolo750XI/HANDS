@@ -641,10 +641,9 @@ hands_manager := class(creative_device):
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
-    # SPECTATEURS : des appareils Siege (Chair) de Fortnite, poses un peu LOIN de la table, tournes vers elle
-    # (3 pour une table de 4). Le joueur mordu meurt, reapparait (Parametres de l'ile : reapparition ACTIVEE) et est
-    # assis sur l'un d'eux : de la, il regarde la partie jusqu'a la fin.
-    @editable SiegesSpectateurs : []chair_device = array{}
+    # BACK TO LOBBY : un appareil Bouton (Button) dans la piece (Temps d'interaction : 2 s). Un joueur mordu
+    # (plus dans le jeu) qui l'utilise rentre au lobby tout de suite. Les joueurs encore en jeu ne peuvent pas.
+    @editable BoutonRetourLobby : button_device = button_device{}
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -696,6 +695,7 @@ hands_manager := class(creative_device):
         ToucheVue.PressedEvent.Subscribe(QuandVue)
         EnleverCameras()
         spawn{ MemoriserSpawns() }
+        BoutonRetourLobby.InteractedWithEvent.Subscribe(QuandRetourLobby)
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
         loop:
@@ -778,10 +778,17 @@ hands_manager := class(creative_device):
                 if (set PointSpawn[J] = Perso.GetTransform().Translation) {}
             Sleep(0.5)
 
+    # les joueurs mordus deja rentres au lobby par le bouton (on ne les y renvoie pas une 2e fois)
+    var DejaRentres : []player = array{}
+    QuandRetourLobby(Agent : agent) : void =
+        if (J := player[Agent], Contient(Assis, J)?, not Contient(Vivants, J)?, not Contient(DejaRentres, J)?):
+            RenvoyerAuLobby(array{J})
+            set DejaRentres += array{J}
+
     # fin de partie : les joueurs de la table sont renvoyes au lobby (sur RetourLobby, ou a leur point
     # d'apparition si RetourLobby est vide)
     RenvoyerAuLobby(Liste : []player) : void =
-        for (K -> J : Liste, Perso := J.GetFortCharacter[]):
+        for (K -> J : Liste, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             Perso.Show()
             if (RetourLobby.Length = 0, P := PointSpawn[J]):
@@ -795,7 +802,6 @@ hands_manager := class(creative_device):
                 for (H : array{0.0, 40.0, 80.0, 130.0}, not Pose?):
                     if (Perso.TeleportTo[T.Translation + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
                         set Pose = true
-        set Table = array{}
 
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
@@ -999,14 +1005,13 @@ hands_manager := class(creative_device):
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
         Sleep(4.0)
         Bandeau("")
-        # les spectateurs se levent de leur siege
-        for (Ch : SiegesSpectateurs, X : Assis):
-            Ch.Eject(X)
         set Orientations = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
         RenvoyerAuLobby(Assis)
+        set Table = array{}
+        set DejaRentres = array{}
 
     # le joueur va a sa place (debout, ou assis avec l'animation), tourne vers la machine, fige, a la premiere personne
     Asseoir(J : player, I : int, ?Annonce : logic = true) : void =
@@ -1354,22 +1359,12 @@ hands_manager := class(creative_device):
         Elimine
 
     # mordu : le personnage meurt ; quand il reapparait, il est assis sur le siege numero K (au loin)
+    # mordu : il n'est plus dans le jeu ; il est LIBRE de se deplacer dans la piece (il regarde les autres jouer)
+    # ou il rentre au lobby avec le bouton BACK TO LOBBY
     DevenirSpectateur(J : player, K : int)<suspends> : void =
+        Sleep(0.5)
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
-            Perso.Damage(100000.0)
-        Sleep(1.0)
-        var Essais : int = 0
-        loop:
-            set Essais += 1
-            if (Essais > 60):
-                break
-            if (P2 := J.GetFortCharacter[], P2.IsActive[]):
-                if (Ch := SiegesSpectateurs[K]):
-                    Ch.Enable()
-                    Ch.Seat(J)
-                break
-            Sleep(0.25)
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
