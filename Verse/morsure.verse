@@ -618,8 +618,6 @@ hands_manager := class(creative_device):
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
     # entre deux tours, la machine fait un tour complet et revient sur toi). Decoche avant de publier.
     @editable TestSolo : logic = false
-    # TEST : coche pour NE PAS mettre la camera fixe du clavier (tu gardes ta camera, pour voir l'animation)
-    @editable TestSansCamera : logic = false
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
@@ -782,9 +780,6 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
-        # TEST : aucune camera fixe (pour se voir avec sa propre camera et regarder l'animation)
-        if (TestSansCamera?):
-            return Meilleure
         if (Pl := Places[PlaceIndex(J)]):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 100000000.0
@@ -1135,15 +1130,18 @@ hands_manager := class(creative_device):
                     L := Depart + Ecart * Frac
                     if (not PiecesAttachees?):
                         spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
-                        spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
                     for (N2 -> T : Touches, B := BaseTouches[N2], not PiecesAttachees?):
                         Pose := Tournee(B, L)
                         Bas := if (Enfoncee[N2]?) then Enfoncement else 0.0
                         spawn{ Bouger(T, transform{Translation := Pose.Translation - vector3{X := 0.0, Y := 0.0, Z := Bas}, Rotation := Pose.Rotation, Scale := Pose.Scale}, Dt) }
-                    # le pas suivant part quand le CORPS a fini : toutes les pieces restent ensemble
+                    # le pas suivant part quand le CORPS ET LA GUEULE ont fini : la gueule n'est plus coupee en
+                    # plein mouvement par l'ordre suivant (c'est ce qui la faisait sauter)
                     race:
-                        Bouger(Centre, Tournee(BaseCentre, L), Dt)
-                        Sleep(Dt + 0.05)
+                        sync:
+                            Bouger(Centre, Tournee(BaseCentre, L), Dt)
+                            if (not PiecesAttachees?):
+                                Bouger(Gueule, Tournee(BaseGueule, L), Dt)
+                        Sleep(Dt + 0.15)
                 set LacetMachine = Depart + Ecart
                 SonRotation.Stop()
                 SonArret.Play()
@@ -1351,17 +1349,9 @@ hands_manager := class(creative_device):
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
-        # sans camera fixe (TEST) : un gros bouton PRESS a l'ecran ; tu cliques QUAND tu veux (l'animation reste
-        # figee a l'image d'arret en attendant), puis un bouton au hasard de la machine est appuye
-        EcranVisee(J, Requis, Vu, true)
-        EvTest := event(int){}
-        SlotsTest := BoutonTexteSur(EvTest, "PRESS", 0.5, 1.0, 0.0, -160.0, 90.0, 777)
-        if (C := Ecrans[J]):
-            for (Slot : SlotsTest):
-                C.AddWidget(Slot)
-        race:
-            EvTest.Await()
-            Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
+        # pas de camera fixe pour cette place (oubli dans l'editeur) : bouton au hasard a la fin du temps
+        EcranVisee(J, Requis, Vu, false)
+        Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
         BoutonLibre()
 
     # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
