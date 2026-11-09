@@ -272,6 +272,9 @@ PlaceZ(W : widget, AX : float, AY : float, X : float, Y : float, Z : type{_X:int
     canvas_slot{Widget := W, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
         Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := 0.0, Bottom := 0.0}, SizeToContent := true, ZOrder := Z}
 
+# le pseudo Fortnite d'un joueur (affiche dans un text_block)
+NomJoueur<localizes>(Agent : agent) : message = "{Agent}"
+
 # un TEXTE au pinceau (non cliquable), centre en (X, Y)
 TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : float) : []canvas_slot =
     var Slots : []canvas_slot = array{}
@@ -648,10 +651,10 @@ hands_manager := class(creative_device):
     # Quand quelqu'un gagne, le code la place devant le gagnant, tournee vers lui, puis la recule doucement
     # (leger dezoom). Toute la table la voit.
     @editable CameraVictoire : gameplay_camera_fixed_point_device = gameplay_camera_fixed_point_device{}
-    @editable DistanceDebutVictoire : float = 120.0    # cm devant le gagnant au debut
-    @editable DistanceFinVictoire : float = 260.0      # cm devant le gagnant a la fin (dezoom)
-    @editable HauteurVictoire : float = 165.0          # hauteur de la camera (cm au-dessus de ses pieds)
-    @editable InclinaisonVictoire : float = -8.0       # degres : negatif = la camera regarde un peu vers le bas
+    @editable DistanceDebutVictoire : float = 55.0     # cm devant le gagnant au debut (gros plan sur la tete)
+    @editable DistanceFinVictoire : float = 170.0      # cm devant le gagnant a la fin (dezoom)
+    @editable HauteurVictoire : float = 168.0          # hauteur de la camera (cm au-dessus de ses pieds) = sa tete
+    @editable InclinaisonVictoire : float = -4.0       # degres : negatif = la camera regarde un peu vers le bas
     @editable DureeVictoire : float = 4.0              # secondes du dezoom
     # TEST : coche pour gagner tout de suite (5 s apres l'arrivee : pose a ta place, puis la scene de victoire)
     @editable TestVictoire : logic = false
@@ -837,15 +840,36 @@ hands_manager := class(creative_device):
             if (CameraVictoire.TeleportTo[P + F * DistanceDebutVictoire + Haut, Rot]) {}
             for (X : Table, EstLa(X)?):
                 CameraVictoire.AddTo(X)
+            # L'ECRAN DU GAGNANT : la couronne, WINNER, et son pseudo (pour toute la table)
+            var EcransV : [player]canvas = map{}
+            for (X : Table, EstLa(X)?, IU := GetPlayerUI[X]):
+                CV := EcranGagnant(G)
+                IU.AddWidget(CV)
+                if (set EcransV[X] = CV) {}
             Sleep(0.2)
             Debut := GetSimulationElapsedTime()
             CameraVictoire.MoveTo(P + F * DistanceFinVictoire + Haut, Rot, Max(0.5, DureeVictoire))
             # securite : la scene dure toujours au moins DureeVictoire, meme si le deplacement finit trop tot
             Sleep(Max(0.0, DureeVictoire - (GetSimulationElapsedTime() - Debut)) + 0.6)
+            for (X -> CV : EcransV, IU := GetPlayerUI[X]):
+                IU.RemoveWidget(CV)
             for (X : Table, EstLa(X)?):
                 CameraVictoire.RemoveFrom(X)
         else:
             Sleep(4.0)
+
+    # en haut de l'ecran : la couronne, WINNER au pinceau, et le pseudo du gagnant sur un bandeau sombre
+    EcranGagnant(G : player) : canvas =
+        var S : []canvas_slot = array{
+            PlaceZ(ImgH(Panneaux.Couronne, 170.0, 170.0), 0.5, 0.0, 0.0, 115.0, 0),
+            canvas_slot{Widget := color_block{DefaultColor := color{R := 0.02, G := 0.02, B := 0.02}, DefaultOpacity := 0.65},
+                Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.0}, Maximum := vector2{X := 0.5, Y := 0.0}},
+                Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 345.0, Right := 620.0, Bottom := 70.0}, ZOrder := 0},
+            canvas_slot{Widget := text_block{DefaultText := NomJoueur(G), DefaultTextColor := color{R := 1.0, G := 0.86, B := 0.35}, DefaultJustification := text_justification.Center},
+                Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.0}, Maximum := vector2{X := 0.5, Y := 0.0}},
+                Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 345.0, Right := 600.0, Bottom := 60.0}, ZOrder := 1}}
+        set S += TexteEcrit("WINNER", 0.5, 0.0, 0.0, 265.0, 110.0)
+        canvas{Slots := S}
 
     # TEST : 5 s apres le debut, le premier joueur est pose a la place 1 et gagne (scene de victoire), puis lobby
     TesterVictoire()<suspends> : void =
@@ -857,7 +881,6 @@ hands_manager := class(creative_device):
             set PlaceDe = map{J => 0}
             Asseoir(J, 0, ?Annonce := false)
             Sleep(1.0)
-            Bandeau("P1 WINS THE ROUND!")
             CinematiqueVictoire(J)
             Bandeau("")
             RenvoyerAuLobby(array{J})
@@ -1087,7 +1110,6 @@ hands_manager := class(creative_device):
         # fin de manche
         FermerEcrans()
         if (G := Vivants[0], not TestSolo?):
-            Bandeau("P{NumeroDe(G)} WINS THE ROUND!")
             CinematiqueVictoire(G)
         else:
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
