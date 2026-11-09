@@ -637,6 +637,11 @@ hands_manager := class(creative_device):
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
     # entre deux tours, la machine fait un tour complet et revient sur toi). Decoche avant de publier.
     @editable TestSolo : logic = false
+    # TEST : coche pour NE PAS mettre la camera fixe du clavier (tu gardes ta camera, pour voir l'animation)
+    @editable TestSansCamera : logic = false
+    # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
+    # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
+    @editable PiecesAttachees : logic = false
     @editable PiegesParGrille : int = 2
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
@@ -784,6 +789,7 @@ hands_manager := class(creative_device):
     RenvoyerAuLobby(Liste : []player) : void =
         for (K -> J : Liste, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
+            Perso.Show()
             if (RetourLobby.Length = 0, P := PointSpawn[J]):
                 var PoseS : logic = false
                 for (H : array{0.0, 40.0, 80.0, 130.0}, not PoseS?):
@@ -800,6 +806,9 @@ hands_manager := class(creative_device):
     # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
         var Meilleure : ?gameplay_camera_fixed_point_device = false
+        # TEST : aucune camera fixe (pour se voir avec sa propre camera et regarder l'animation)
+        if (TestSansCamera?):
+            return Meilleure
         # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
         # les cameras de la table sont ignorees)
         if (T0 := TouchesClavier[0]):
@@ -1013,6 +1022,9 @@ hands_manager := class(creative_device):
                 Elimine := TourDe(J)
                 if (Elimine?):
                     set Vivants = for (X : Vivants, X <> J) do X
+                    # il devient SPECTATEUR : invisible a sa place, il regarde les tours des autres
+                    if (Perso := J.GetFortCharacter[]):
+                        Perso.Hide()
                     if (Sens < 0):
                         set Index -= 1
                 else:
@@ -1189,9 +1201,10 @@ hands_manager := class(creative_device):
                     Frac := (K * 1.0) / (Pas * 1.0)
                     # vitesse constante, et elle s'arrete d'un coup (roulette comprise)
                     L := Depart + Ecart * Frac
-                    spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
-                    spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
-                    for (N2 -> T : Touches, B := BaseTouches[N2]):
+                    if (not PiecesAttachees?):
+                        spawn{ Bouger(Plaque, Tournee(BasePlaque, L), Dt) }
+                        spawn{ Bouger(Gueule, Tournee(BaseGueule, L), Dt) }
+                    for (N2 -> T : Touches, B := BaseTouches[N2], not PiecesAttachees?):
                         Pose := Tournee(B, L)
                         Bas := if (Enfoncee[N2]?) then Enfoncement else 0.0
                         spawn{ Bouger(T, transform{Translation := Pose.Translation - vector3{X := 0.0, Y := 0.0, Z := Bas}, Rotation := Pose.Rotation, Scale := Pose.Scale}, Dt) }
@@ -1382,6 +1395,9 @@ hands_manager := class(creative_device):
             if (Camera := CameraDe(J)?):
                 Camera.AddTo(J)
                 if (set EnMachine[J] = true) {}
+                # les ELIMINES de la table regardent son tour, par sa camera
+                for (X : Spectateurs(J)):
+                    Camera.AddTo(X)
             Fin := GetSimulationElapsedTime() + DureeTour
             loop:
                 if (Requis <= 0 or Elimine? or LibresRestants() = 0):
@@ -1419,10 +1435,17 @@ hands_manager := class(creative_device):
             else if (Camera := CameraDe(J)?):
                 Camera.RemoveFrom(J)
             if (set EnMachine[J] = false) {}
+            if (Camera := CameraDe(J)?):
+                for (X : Spectateurs(J)):
+                    Camera.RemoveFrom(X)
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
         Elimine
+
+    # les joueurs de la table deja elimines (ils regardent la partie)
+    Spectateurs(J : player)<transacts> : []player =
+        for (X : Assis, not Contient(Vivants, X)?, X <> J, EstLa(X)?) do X
 
     # il vise avec la camera : le bouton vise devient blanc ; un clic l'enfonce. Temps ecoule : bouton au hasard.
     ViserEtCliquer(J : player, Requis : int, Vu : int, Fin : float)<suspends> : int =
