@@ -829,8 +829,13 @@ hands_manager := class(creative_device):
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
             Asseoir(J, PlaceIndex(J), ?Annonce := false)
-        if (Camera := CameraDe(J)?):
-            Camera.RemoveFrom(J)
+        # securite : AUCUNE camera fixe ne reste sur lui, et il est refige avec la TETE LIBRE (meme si la
+        # teleportation de retour a ete refusee)
+        for (Cam : CamerasClavier):
+            Cam.RemoveFrom(J)
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
+            Perso.ReleaseFromStasis()
+            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
         Sleep(0.45)
