@@ -29,10 +29,9 @@ TexteJeu<localizes>(S : string) : message = "{S}"
 #  2 PASS    : tu passes ton tour sans appuyer
 #  3 REVERSE : le sens du tour s'inverse
 #  4 JAM     : le joueur suivant devra appuyer sur 2 boutons
-#  5 STEAL   : tu regardes un joueur et tu cliques : tu lui voles une carte au hasard
-#  Images : dossier Reliques (Relique_Bouclier, _Serrure, _Sablier, _Chaine, _Etau, _Corbeau) + les versions _Lueur (plus claires)
+#  Images : dossier Reliques (Relique_Bouclier, _Serrure, _Sablier, _Chaine, _Etau) + les versions _Lueur (plus claires)
 NomRelique(Id : int) : string =
-    if (Id = 0) then "DEFUSE" else if (Id = 1) then "PEEK" else if (Id = 2) then "PASS" else if (Id = 3) then "REVERSE" else if (Id = 4) then "JAM" else "STEAL"
+    if (Id = 0) then "DEFUSE" else if (Id = 1) then "PEEK" else if (Id = 2) then "PASS" else if (Id = 3) then "REVERSE" else "JAM"
 
 # ce que fait la carte, en 2 lignes courtes (ecran du choix des cartes)
 DescriptionRelique(Id : int, Ligne : int) : string =
@@ -40,18 +39,17 @@ DescriptionRelique(Id : int, Ligne : int) : string =
     else if (Id = 1) then (if (Ligne = 0) then "SHOWS YOU ONE" else "SAFE BUTTON")
     else if (Id = 2) then (if (Ligne = 0) then "NO PRESS FOR YOU" else "THIS TURN")
     else if (Id = 3) then (if (Ligne = 0) then "THE MACHINE TURNS" else "THE OTHER WAY")
-    else if (Id = 4) then (if (Ligne = 0) then "NEXT PLAYER" else "PRESSES +1")
-    else (if (Ligne = 0) then "TAKE A CARD" else "FROM A PLAYER")
+    else (if (Ligne = 0) then "NEXT PLAYER" else "PRESSES +1")
 
-# RARETE (sur 100) : DEFUSE et PASS sont rares, JAM et REVERSE courantes
+# RARETE (sur 84) : DEFUSE et PASS sont rares, JAM et REVERSE courantes
 PoidsRelique(Id : int)<transacts> : int =
-    if (Id = 0) then 8 else if (Id = 1) then 16 else if (Id = 2) then 8 else if (Id = 3) then 22 else if (Id = 4) then 30 else 16
+    if (Id = 0) then 8 else if (Id = 1) then 16 else if (Id = 2) then 8 else if (Id = 3) then 22 else 30
 
 TirerReliquePonderee()<transacts> : int =
-    var Tirage : int = GetRandomInt(1, 100)
-    var Choisie : int = 5
+    var Tirage : int = GetRandomInt(1, 84)
+    var Choisie : int = 4
     var Trouve : logic = false
-    for (Id := 0..5, not Trouve?):
+    for (Id := 0..4, not Trouve?):
         set Tirage -= PoidsRelique(Id)
         if (Tirage <= 0):
             set Choisie = Id
@@ -82,11 +80,11 @@ Dedans(L : []int, X : int)<transacts> : logic =
 
 ImageRelique(Id : int) : texture =
     if (Id = 0) then Reliques.Relique_Bouclier else if (Id = 1) then Reliques.Relique_Serrure else if (Id = 2) then Reliques.Relique_Sablier
-    else if (Id = 3) then Reliques.Relique_Chaine else if (Id = 4) then Reliques.Relique_Etau else Reliques.Relique_Corbeau
+    else if (Id = 3) then Reliques.Relique_Chaine else Reliques.Relique_Etau
 
 ImageReliqueSurvol(Id : int) : texture =
     if (Id = 0) then Reliques.Relique_Bouclier_Lueur else if (Id = 1) then Reliques.Relique_Serrure_Lueur else if (Id = 2) then Reliques.Relique_Sablier_Lueur
-    else if (Id = 3) then Reliques.Relique_Chaine_Lueur else if (Id = 4) then Reliques.Relique_Etau_Lueur else Reliques.Relique_Corbeau_Lueur
+    else if (Id = 3) then Reliques.Relique_Chaine_Lueur else Reliques.Relique_Etau_Lueur
 
 ImgH(T : texture, L : float, H : float) : texture_block =
     texture_block{DefaultImage := T, DefaultDesiredSize := vector2{X := L, Y := H}}
@@ -1046,7 +1044,7 @@ hands_manager := class(creative_device):
                 set Resultat = 2
         Resultat
 
-    TirerRelique()<transacts> : int = GetRandomInt(0, 5)
+    TirerRelique()<transacts> : int = GetRandomInt(0, 4)
 
     EstLa(J : player)<transacts> : logic =
         var Trouve : logic = false
@@ -1303,8 +1301,6 @@ hands_manager := class(creative_device):
                     set Bloque = Attente + 1
                     set Attente = 0
                     AnimerPlus("+{Bloque}", "NEXT PLAYER MUST PRESS {Bloque} MORE!", "", J)
-                else if (Id = 5):
-                    Voler(J)
 
         # les JAM qu'il n'a pas passes : il les prend
         set Requis += Attente
@@ -1433,57 +1429,6 @@ hands_manager := class(creative_device):
                 spawn{ ZB.Suivre() }
                 C.AddWidget(canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := X, Y := Y}, Maximum := vector2{X := X, Y := Y}},
                     Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := L, Bottom := H}, SizeToContent := false})
-
-    # STEAL : il regarde un joueur (son nom s'affiche) et clique. Temps ecoule : un joueur au hasard.
-    Voler(J : player)<suspends> : void =
-        Victimes := for (X : Vivants, X <> J, NombreDe(X) > 0) do X
-        if (Victimes.Length = 0):
-            Avertir(J, "NOBODY HAS A CARD TO STEAL")
-            return
-        # un ecran : il CLIQUE sur le joueur a voler (10 s, sinon un joueur au hasard)
-        FermerEcrans()
-        for (X : Assis, EstLa(X)?):
-            Chrono := NouveauChrono()
-            var S : []canvas_slot = Entete(X, Chrono)
-            if (X = J):
-                set S += TexteEcrit("STEAL A CARD FROM...", 0.5, 0.0, 0.0, 300.0, 90.0)
-                for (N -> V : Victimes):
-                    Y := (N * 1.0 - (Victimes.Length - 1) * 0.5) * 120.0
-                    set S += BoutonTexte("P{NumeroDe(V)} ({NombreDe(V)} CARDS)", 0.5, 0.5, 0.0, Y, 70.0, 700 + N)
-                set S += PaquetEnBas(X)
-                Montrer(X, S, Chrono, true)
-            else:
-                set S += TexteEcrit("P{NumeroDe(J)} IS STEALING A CARD...", 0.5, 0.0, 0.0, 300.0, 54.0)
-                set S += PaquetEnBas(X)
-                Montrer(X, S, Chrono, false)
-        var Cible : ?player = false
-        Fin := GetSimulationElapsedTime() + 10.0
-        loop:
-            Reste := Fin - GetSimulationElapsedTime()
-            MajChronos(Reste)
-            if (Reste <= 0.0):
-                break
-            var Recu : int = -1
-            race:
-                Sleep(Min(0.5, Reste))
-                block:
-                    set Recu = Choix.Await()
-            if (V := Victimes[Recu - 700]):
-                set Cible = option{V}
-                break
-        if (not Cible?, X := Victimes[GetRandomInt(0, Victimes.Length - 1)]):
-            set Cible = option{X}
-        FermerEcrans()
-        if (C := Cible?, MC := Paquets[C], MC.Length > 0):
-            I := GetRandomInt(0, MC.Length - 1)
-            if (Volee := MC[I]):
-                RetirerRelique(C, I)
-                if (MJ := Paquets[J], MJ.Length < PaquetMax, set Paquets[J] = MJ + array{Volee}) {}
-                SonCarte.Play()
-                Avertir(J, "YOU STOLE {NomRelique(Volee)} FROM P{NumeroDe(C)}!")
-                Avertir(C, "P{NumeroDe(J)} STOLE YOUR {NomRelique(Volee)}!")
-                for (X : Assis, X <> J, X <> C):
-                    Avertir(X, "P{NumeroDe(J)} STOLE A CARD FROM P{NumeroDe(C)}")
 
     # les 6 cartes a l'ecran (survol plus clair) + NO CARD. Renvoie la carte annoncee, ou -1.
     # PIOCHER : une carte arrive dans sa main
