@@ -604,7 +604,7 @@ hands_manager := class(creative_device):
     @editable SonArret : audio_player_device = audio_player_device{}
     # Direction (degres, vue du dessus dans UEFN) vers laquelle la gueule regarde au depart. Ajuste si elle
     # ne fait pas face au bon joueur (ex. 90, 180, -90).
-    @editable FaceDepart : float = 0.0
+    @editable FaceDepart : float = -90.0
     @editable DureeRotation : float = 1.75       # secondes pour pivoter vers le joueur suivant
     # LA ROULETTE du debut de manche : nombre de tours complets, et sa duree totale (secondes). Plus long = plus lent.
     @editable ToursRoulette : int = 3
@@ -670,7 +670,7 @@ hands_manager := class(creative_device):
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
-    @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
+    @editable AxeFermeture : int = 0             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
     @editable Enfoncement : float = 3.0          # cm : un bouton appuye descend de ca
     Colonnes : int = 4
     PaquetMax : int = 3
