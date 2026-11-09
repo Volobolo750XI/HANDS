@@ -1092,7 +1092,8 @@ hands_manager := class(creative_device):
     TournerVersAvec(J : player, Tours : int)<suspends> : void =
         I := PlaceIndex(J)
         if (Pl := Places[I]):
-            Ici := Pl.GetTransform().Translation
+            # elle s'arrete FACE A LA CAMERA du joueur (pile dans l'axe de ce qu'il verra) ; sans camera, face a sa place
+            Ici := if (Cam := CameraDe(J)?) then Cam.GetTransform().Translation else Pl.GetTransform().Translation
             C := BaseCentre.Translation
             Cible := ArcTan(Ici.Y - C.Y, Ici.X - C.X) * 180.0 / PiFloat - FaceDepart
             var Ecart : float = Cible - LacetMachine
