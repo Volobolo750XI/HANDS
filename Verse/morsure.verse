@@ -540,46 +540,24 @@ choix_depart := class:
 
 hands_manager := class(creative_device):
     # --- A REMPLIR DANS UEFN ---------------------------------------------------
-    # Une place par joueur autour de la table (accessoires invisibles poses devant chaque chaise)
+    # Une place par joueur autour de la table (accessoires invisibles, sans collision, pivot au sol)
     @editable Places : []creative_prop = array{}
-    # Une CHAISE (appareil Chaise / Chair) par place, MEME ORDRE que Places. Vide = joueurs figes sur place.
-    @editable Chaises : []chair_device = array{}
-    # FACULTATIF : une camera fixe par place, MEME ORDRE, posee devant la bouche de la machine et qui regarde
-    # le clavier (la machine est tournee vers cette place pendant son tour). Vide = la camera du joueur.
+    # Une camera fixe par place, posee devant la bouche de la machine et qui regarde le clavier (l'ordre ne compte
+    # pas : chaque joueur a la camera la plus proche de sa place). On clique sur les boutons A LA SOURIS.
     @editable CamerasClavier : []gameplay_camera_fixed_point_device = array{}
-    # Avec une camera fixe : on clique A LA SOURIS. Ou est le clavier A L'ECRAN (vu par la camera), en fractions
-    # de l'ecran (0 = gauche / haut, 1 = droite / bas). 7 valeurs = les 7 lignes qui separent les 6 rangees de
-    # boutons, de haut en bas : hauteur de la ligne, bord gauche et bord droit du clavier a cette hauteur.
-    # (valeurs mesurees sur ta capture d'ecran ; a retoucher seulement si la camera bouge)
-    @editable LignesY : []float = array{0.274, 0.329, 0.399, 0.486, 0.600, 0.751, 0.946}
-    @editable BordGauche : []float = array{0.409, 0.398, 0.383, 0.364, 0.340, 0.310, 0.298}
-    @editable BordDroit : []float = array{0.593, 0.600, 0.603, 0.613, 0.625, 0.645, 0.668}
-    # quel bouton (Bouton_01...) est ou a l'ecran : si le bouton qui devient blanc n'est pas celui sous la
-    # souris, coche / decoche ces cases
-    @editable InverserColonnes : logic = false
-    @editable InverserLignes : logic = false
     # Angle de vue (Champ de vision) de la camera du clavier, en degres : MEME valeur que dans la camera
     @editable ChampVisionClavier : float = 80.0
     # Largeur d'un bouton (cm) : taille de la zone cliquable
     @editable TailleBoutonClavier : float = 9.0
-    # La machine : le centre (Corps), la machoire du haut (Gueule) et les 24 boutons DANS L'ORDRE Bouton_01..Bouton_24
+    # La machine : le socle (Centre), la machoire du haut (Gueule), la machoire du bas (Plaque) et les 24 boutons DANS L'ORDRE Bouton_01..Bouton_24
     @editable Centre : creative_prop = creative_prop{}
     @editable Gueule : creative_prop = creative_prop{}
     @editable Touches : []creative_prop = array{}
     @editable Plaque : creative_prop = creative_prop{}
-    # LE CLAVIER CACHE : une 2e machine (copie) posee LOIN, qui ne tourne jamais, avec la camera fixe devant.
-    # C'est sur elle qu'on clique : son personnage ne peut pas gener, et la camera ne bouge jamais.
-    # Ses 24 boutons DANS L'ORDRE Bouton_01..Bouton_24, et (facultatif) sa machoire pour voir la feinte de pres.
-    # Vide = on clique sur la machine de la table, comme avant.
-    @editable TouchesClavier : []creative_prop = array{}
-    @editable GueuleClavier : []creative_prop = array{}
-    # COULEURS DES BOUTONS : 3 materiaux dans un dossier Teintes du Tiroir a contenu :
-    #   T_Base (l'aspect normal d'un bouton), T_Clair (le bouton vise, blanc), T_Sur (le bouton sur du PEEK, vert)
+    # COULEURS DES BOUTONS : 2 materiaux dans un dossier Teintes du Tiroir a contenu :
+    #   T_Clair (le bouton vise, blanc), T_Sur (le bouton sur du PEEK, vert) ; sinon le bouton reprend M_Touches
     # Numero de l'emplacement de materiau du bouton (0 en general)
     @editable IndexMateriau : int = 0
-    # CLIC : un Declencheur d'entree (Input Trigger) regle sur l'action "Tir" (clic gauche / gachette).
-    # Sert a appuyer sur le bouton vise, a crier LIAR! et a choisir la victime d'un STEAL.
-    @editable ToucheClic : input_trigger_device = input_trigger_device{}
     # LE LOBBY : un Compteur de joueurs (Player Counter, "Utiliser la zone" coche) = l'enclos de CETTE table. Les joueurs entrent dans la zone ; des
     # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
     # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
@@ -593,7 +571,6 @@ hands_manager := class(creative_device):
     # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
     @editable ToucheVue : input_trigger_device = input_trigger_device{}
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
-    @editable PorteeVisee : float = 12.0
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
     @editable SonRotation : audio_player_device = audio_player_device{}
     # Son "CLAC" quand la machine s'arrete sur un joueur (Audio Player : lecture automatique NON)
@@ -623,19 +600,14 @@ hands_manager := class(creative_device):
     @editable CorrectionCorps : float = -90.0
     @editable ImagesParSecondeAppui : float = 30.0
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
-    # PERSONNE. La vraie chaise ne sert que si Fortnite refuse la teleportation (elle force la 3e personne).
+    # PERSONNE (si Fortnite refuse la teleportation, il est pose un peu plus haut ou un peu devant).
     # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
     @editable AvanceAssis : float = 0.0
     @editable HauteurAssis : float = 0.0
     # decoche pour essayer de garder le CORPS immobile (si la tete ne bouge plus du tout, recoche-la)
     @editable CorpsTourne : logic = true
-    # LA TETE : de combien de degres on peut tourner la tete a droite / a gauche depuis la machine
-    # coche pour limiter la tete (desactive : la tete est libre)
-    @editable LimiterTete : logic = false
     # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
     @editable CorrectionVue : float = 0.0
-    @editable TeteMaxDroite : float = 90.0
-    @editable TeteMaxGauche : float = 60.0
     # Reglages
     @editable JoueursMinimum : int = 2
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
@@ -663,15 +635,10 @@ hands_manager := class(creative_device):
     # codes des clics sur les cartes de l'ecran : 100 + Id = annoncer la carte Id, 199 = pas de carte
     Choix : event(int) = event(int){}
     # un clic (action Tir) d'un joueur
-    ClicJoueur : event(agent) = event(agent){}
     FinEcran : event() = event(){}
     var EnMachine : [player]logic = map{}          # il clique sur la machine (camera fixe) : ses textes sont a gauche
-    var EchecsTete : [player]int = map{}            # corrections de la tete qui n'ont pas pris (securite)
     var Orientations : [player]float = map{}       # direction (degres) de la machine vue de sa place : la tete est limitee autour
-    var SurVraieChaise : [player]logic = map{}     # teleportation refusee : assis sur la vraie chaise
     var BaseTouches : []transform = array{}
-    var BaseTouchesClavier : []transform = array{}
-    var BasesGueuleClavier : []transform = array{}
     var BaseGueule : transform = transform{}
     var BaseCentre : transform = transform{}
     var BasePlaque : transform = transform{}
@@ -698,16 +665,12 @@ hands_manager := class(creative_device):
 
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
-        set BaseTouchesClavier = for (T : TouchesClavier) do T.GetTransform()
-        set BasesGueuleClavier = for (G : GueuleClavier) do G.GetTransform()
         set BaseGueule = Gueule.GetTransform()
         set BaseCentre = Centre.GetTransform()
         set BasePlaque = Plaque.GetTransform()
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
-        ToucheClic.PressedEvent.Subscribe(QuandClic)
         ToucheVue.PressedEvent.Subscribe(QuandVue)
-        spawn{ LimiterTetes() }
         EnleverCameras()
         spawn{ MemoriserSpawns() }
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
@@ -817,18 +780,6 @@ hands_manager := class(creative_device):
         # TEST : aucune camera fixe (pour se voir avec sa propre camera et regarder l'animation)
         if (TestSansCamera?):
             return Meilleure
-        # avec le CLAVIER CACHE : la camera posee LE PLUS PRES de ce clavier (l'ordre de la liste ne compte pas,
-        # les cameras de la table sont ignorees)
-        if (T0 := TouchesClavier[0]):
-            Ici0 := T0.GetTransform().Translation
-            var Pres0 : float = 100000000.0
-            for (Cam : CamerasClavier):
-                V0 := Cam.GetTransform().Translation - Ici0
-                D0 := DotProduct(V0, V0)
-                if (D0 < Pres0):
-                    set Pres0 = D0
-                    set Meilleure = option{Cam}
-            return Meilleure
         if (Pl := Places[PlaceIndex(J)]):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 100000000.0
@@ -844,24 +795,6 @@ hands_manager := class(creative_device):
     EnleverCameras() : void =
         for (Cam : CamerasClavier, J : Table):
             Cam.RemoveFrom(J)
-
-    # LA TETE : si un joueur a sa place tourne trop a droite / a gauche, il est remis a la limite
-    LimiterTetes()<suspends> : void =
-        loop:
-            Sleep(0.1)
-            # (pas pendant qu'il clique sur la machine : sa vue est alors celle de la camera du clavier)
-            for (J -> Cible : Orientations, LimiterTete?, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[]):
-                F := Perso.GetViewRotation().GetLocalForward()
-                Yaw := ArcTan(F.Y, F.X) * 180.0 / PiFloat
-                Ecart := AngleCourt(Yaw - Cible)
-                Borne := if (Ecart > TeteMaxDroite) then TeteMaxDroite else if (Ecart < -TeteMaxGauche) then -TeteMaxGauche else Ecart
-                Echecs := if (E := EchecsTete[J]) then E else 0
-                if (Borne <> Ecart, Echecs < 15):
-                    if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Cible + Borne, 0.0, 0.0)]) {}
-                    # SECURITE : si la vue ne se laisse pas corriger (15 fois de suite), on arrete de la limiter pour lui
-                    if (set EchecsTete[J] = Echecs + 1) {}
-                else if (Borne = Ecart):
-                    if (set EchecsTete[J] = 0) {}
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
@@ -905,9 +838,6 @@ hands_manager := class(creative_device):
             else if (A < -180.0):
                 set A += 360.0
         A
-
-    QuandClic(Agent : agent) : void =
-        ClicJoueur.Signal(Agent)
 
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
     var Vues : [player]canvas = map{}
@@ -1048,7 +978,6 @@ hands_manager := class(creative_device):
         for (Ch : SiegesSpectateurs, X : Assis):
             Ch.Eject(X)
         set Orientations = map{}
-        set SurVraieChaise = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
@@ -1072,16 +1001,11 @@ hands_manager := class(creative_device):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
                 Vue := Lacet + CorrectionVue
-                if (set Orientations[J] = Vue, set EchecsTete[J] = 0) {}
+                if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
-            else if (Ch := Chaises[I]):
-                # teleportation refusee partout : pas fige au point d'apparition, il est assis sur la vraie chaise
-                if (set SurVraieChaise[J] = true) {}
-                Ch.Enable()
-                Ch.Seat(J)
 
-    # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : chaise, mur...), plus haut, puis devant.
+    # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
     PoserPres(Perso : fort_character, Pose : vector3, Avant : vector3, Rot : rotation) : int =
         var Resultat : int = -1
@@ -1094,11 +1018,6 @@ hands_manager := class(creative_device):
             if (Perso.TeleportTo[Pose + Avant * D + vector3{X := 0.0, Y := 0.0, Z := 40.0}, Rot]):
                 set Resultat = 2
         Resultat
-
-    # un joueur qui s'est leve de sa chaise y est remis (la chaise ne fait rien s'il est deja assis)
-    Rasseoir() : void =
-        for (J : Assis, SurVraieChaise[J]?, Contient(Vivants, J)?, Ch := Chaises[PlaceIndex(J)]):
-            Ch.Seat(J)
 
     TirerRelique()<transacts> : int = GetRandomInt(0, 5)
 
@@ -1157,8 +1076,6 @@ hands_manager := class(creative_device):
         for (K -> T : Touches, B := BaseTouches[K]):
             spawn{ Bouger(T, Tournee(B, LacetMachine), 0.25) }
             Peindre(K)
-        for (K -> T : TouchesClavier, B := BaseTouchesClavier[K]):
-            spawn{ Bouger(T, B, 0.25) }
 
     # une piece de la machine, tournee de Lacet degres autour du centre de la machine
     Tournee(B : transform, Lacet : float) : transform =
@@ -1266,49 +1183,9 @@ hands_manager := class(creative_device):
             set Libres += array{K}
         if (K := Libres[GetRandomInt(0, Libres.Length - 1)]) then K else -1
 
-    # =========================================================================
-    #  LA VISEE : le bouton (libre) le plus proche du regard du joueur, ou -1
-    # =========================================================================
-    BoutonVise(J : player) : int =
-        var Meilleur : int = -1
-        if (Perso := J.GetFortCharacter[]):
-            Oeil := Perso.GetViewLocation()
-            Regard := Perso.GetViewRotation().GetLocalForward()
-            var PlusPres : float = PorteeVisee
-            for (K -> T : Touches, not Enfoncee[K]?):
-                P := T.GetTransform().Translation
-                V := P - Oeil
-                Avance := DotProduct(V, Regard)
-                if (Avance > 0.0):
-                    # distance entre le centre du bouton et la ligne du regard
-                    Ecart := (V - Regard * Avance).Length()
-                    if (Ecart < PlusPres):
-                        set PlusPres = Ecart
-                        set Meilleur = K
-        Meilleur
-
-    # le joueur (encore en jeu, autre que J) que J regarde le plus, ou rien
-    JoueurVise(J : player) : ?player =
-        var Meilleur : ?player = false
-        if (Perso := J.GetFortCharacter[]):
-            Oeil := Perso.GetViewLocation()
-            Regard := Perso.GetViewRotation().GetLocalForward()
-            var MeilleurCos : float = 0.85
-            for (X : Vivants, X <> J, NombreDe(X) > 0, PX := X.GetFortCharacter[]):
-                V := PX.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := 120.0} - Oeil
-                Lg := V.Length()
-                if (Lg > 1.0):
-                    Cosinus := DotProduct(V, Regard) / Lg
-                    if (Cosinus > MeilleurCos):
-                        set MeilleurCos = Cosinus
-                        set Meilleur = option{X}
-        Meilleur
-
     # le bouton K prend son materiau : blanc s'il est vise, vert si c'est le bouton sur du PEEK, normal sinon
     Peindre(K : int) : void =
         if (T := Touches[K]):
-            PeindreProp(T, K)
-        if (T := TouchesClavier[K]):
             PeindreProp(T, K)
 
     PeindreProp(T : creative_prop, K : int) : void =
@@ -1340,7 +1217,6 @@ hands_manager := class(creative_device):
     #  renvoie true si le joueur est elimine
     # =========================================================================
     TourDe(J : player)<suspends> : logic =
-        Rasseoir()
         TournerVers(J)
         Penalite := if (P := Penalites[J]) then P else 0
         if (set Penalites[J] = 0) {}
@@ -1471,31 +1347,14 @@ hands_manager := class(creative_device):
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
-        var Choisi : int = -2
-        var Vise : int = -1
+        # sans camera fixe (TEST) : on attend la fin du temps, puis un bouton au hasard
         loop:
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
             if (Reste <= 0.0):
-                set Choisi = BoutonLibre()
                 break
-            K := BoutonVise(J)
-            if (K <> Vise):
-                set Vise = K
-                Surligner(K)
-            var Clic : logic = false
-            race:
-                Sleep(0.05)
-                loop:
-                    A := ClicJoueur.Await()
-                    if (player[A] = J):
-                        set Clic = true
-                        break
-            if (Clic?, Vise >= 0):
-                set Choisi = Vise
-                break
-        Surligner(-1)
-        Choisi
+            Sleep(Min(0.5, Reste))
+        BoutonLibre()
 
     # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
     # enfonce le bouton. Temps ecoule : bouton au hasard.
@@ -1519,15 +1378,6 @@ hands_manager := class(creative_device):
                 break
         Surligner(-1)
         Choisi
-
-    # le bouton numero K (Bouton_01 = 0) est dans quelle rangee / colonne de l'ecran (0 = en haut / a gauche)
-    RangeeDe(K : int)<transacts> : int =
-        R := if (Q := Floor[(K * 1.0) / (Colonnes * 1.0)]) then Q else 0
-        if (InverserLignes?) then 5 - R else R
-
-    ColonneDe(K : int)<transacts> : int =
-        C := if (M := Mod[K, Colonnes]) then M else 0
-        if (InverserColonnes?) then Colonnes - 1 - C else C
 
     # une zone de clic invisible (TEST1) sur chaque bouton libre, a sa place exacte A L'ECRAN.
     # La place est CALCULEE : position 3D du bouton vue par la camera fixe (angle de vue ChampVisionClavier).
@@ -1793,8 +1643,6 @@ hands_manager := class(creative_device):
         if (T := Touches[K], B0 := BaseTouches[K]):
             B := Tournee(B0, LacetMachine)
             spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
-        if (T := TouchesClavier[K], B := BaseTouchesClavier[K]):
-            spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
         Sleep(0.1)
         SonClic.Play()
         Sleep(0.4)
@@ -1854,7 +1702,6 @@ hands_manager := class(creative_device):
         sync:
             JouerCauchemar(J)
             block:
-                spawn{ MachoireClavier(AngleFermeture, 0.12, 0.8, 1.6) }
                 Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFermeture), 0.12)
                 for (X : Table, X <> J):
                     MessagePour(X, "P{NumeroDe(J)} GOT BITTEN!")
@@ -1873,17 +1720,8 @@ hands_manager := class(creative_device):
     # LA FEINTE : bouton sur -> la machoire claque un peu, d'un coup, puis se rouvre (on a eu peur pour rien)
     Feinte()<suspends> : void =
         PoseG := Tournee(BaseGueule, LacetMachine)
-        spawn{ MachoireClavier(AngleFeinte, 0.07, 0.25, 0.0) }
         Gueule.MoveTo(PoseG.Translation, RotationGueule(AngleFeinte), 0.07)
         Gueule.MoveTo(PoseG.Translation, PoseG.Rotation, 0.25)
-
-    # la machoire du clavier cache (il ne tourne jamais) : se ferme de Angle, reste Pause s, se rouvre
-    MachoireClavier(Angle : float, Fermer : float, Ouvrir : float, Pause : float)<suspends> : void =
-        if (G := GueuleClavier[0], B := BasesGueuleClavier[0]):
-            Axe := if (AxeFermeture = 0) then vector3{X := 1.0, Y := 0.0, Z := 0.0} else if (AxeFermeture = 2) then vector3{X := 0.0, Y := 0.0, Z := 1.0} else vector3{X := 0.0, Y := 1.0, Z := 0.0}
-            G.MoveTo(B.Translation, B.Rotation.RotateBy(MakeRotation(Axe, DegreesToRadians(Angle))), Fermer)
-            Sleep(Pause)
-            G.MoveTo(B.Translation, B.Rotation, Ouvrir)
 
     # LE JUMPSCARE, pour la victime seulement : ecran noir le temps de charger les premieres images (0,35 s),
     # puis les images calees sur l'horloge, avec le son (pour elle seule)
