@@ -828,10 +828,10 @@ hands_manager := class(creative_device):
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
         var Noir : ?canvas = false
-        if (UI := GetPlayerUI[J]):
+        if (IU := GetPlayerUI[J]):
             C := canvas{Slots := array{canvas_slot{Widget := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 1.0},
                 Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}}}}
-            UI.AddWidget(C)
+            IU.AddWidget(C)
             set Noir = option{C}
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
@@ -846,8 +846,8 @@ hands_manager := class(creative_device):
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
         Sleep(0.45)
-        if (C := Noir?, UI := GetPlayerUI[J]):
-            UI.RemoveWidget(C)
+        if (C := Noir?, IU := GetPlayerUI[J]):
+            IU.RemoveWidget(C)
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -876,13 +876,13 @@ hands_manager := class(creative_device):
     # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
     var Vues : [player]canvas = map{}
     QuandVue(Agent : agent) : void =
-        if (J := player[Agent], UI := GetPlayerUI[J]):
+        if (J := player[Agent], IU := GetPlayerUI[J]):
             if (Ancienne := Vues[J]):
-                UI.RemoveWidget(Ancienne)
+                IU.RemoveWidget(Ancienne)
                 OterVue(J)
             else if (Contient(Assis, J)?):
                 V := DessinerVue(J)
-                UI.AddWidget(V)
+                IU.AddWidget(V)
                 if (set Vues[J] = V) {}
                 spawn{ CacherVue(J, V) }
 
@@ -894,8 +894,8 @@ hands_manager := class(creative_device):
 
     CacherVue(J : player, V : canvas)<suspends> : void =
         Sleep(5.0)
-        if (Actuelle := Vues[J], Actuelle = V, UI := GetPlayerUI[J]):
-            UI.RemoveWidget(V)
+        if (Actuelle := Vues[J], Actuelle = V, IU := GetPlayerUI[J]):
+            IU.RemoveWidget(V)
             OterVue(J)
 
     # le centre de la table = la moyenne de toutes les Places (elles sont disposees autour de la machine)
@@ -1477,21 +1477,21 @@ hands_manager := class(creative_device):
     AnimerPlus(Gros : string, Ligne1 : string, Ligne2 : string, Qui : player)<suspends> : void =
         var Calques : [player]canvas = map{}
         for (Taille : array{90.0, 190.0, 300.0, 250.0, 270.0}):
-            for (X : Assis, EstLa(X)?, UI := GetPlayerUI[X]):
+            for (X : Assis, EstLa(X)?, IU := GetPlayerUI[X]):
                 if (Ancien := Calques[X]):
-                    UI.RemoveWidget(Ancien)
+                    IU.RemoveWidget(Ancien)
                 var S : []canvas_slot = TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille)
                 set S += TexteEcrit(Ligne1, 0.5, 0.5, 0.0, 120.0, 52.0)
                 if (X = Qui):
                     set S += TexteEcrit(Ligne2, 0.5, 0.5, 0.0, 190.0, 44.0)
                 C := canvas{Slots := S}
-                UI.AddWidget(C)
+                IU.AddWidget(C)
                 if (set Calques[X] = C) {}
             Sleep(0.06)
         SonBoom.Play()
         Sleep(1.6)
-        for (X -> C : Calques, UI := GetPlayerUI[X]):
-            UI.RemoveWidget(C)
+        for (X -> C : Calques, IU := GetPlayerUI[X]):
+            IU.RemoveWidget(C)
 
     # JOUER : il clique une carte de sa main -> TRUTH (il la joue pour ce qu'elle est) ou LIE (il dit que c'est
     # une autre : il choisit laquelle). SKIP = pas de carte.
@@ -1532,7 +1532,7 @@ hands_manager := class(creative_device):
             spawn{ Notification(X, "P{NumeroDe(J)} PLAYED", NomRelique(Id), ImageRelique(Id)) }
 
     Notification(X : player, Ligne1 : string, Ligne2 : string, Image : texture)<suspends> : void =
-        if (UI := GetPlayerUI[X]):
+        if (IU := GetPlayerUI[X]):
             Fond := color_block{DefaultColor := color{R := 0.05, G := 0.05, B := 0.06}, DefaultOpacity := 0.0}
             Opa : []type{_X:float where 0.0 <= _X, _X <= 1.0} = array{0.0, 0.12, 0.24, 0.36, 0.48, 0.55}
             var Actuel : ?canvas = false
@@ -1543,8 +1543,8 @@ hands_manager := class(creative_device):
                     Fond.SetOpacity(O)
                 C := DessinerNotif(Fond, Ligne1, Ligne2, Image, Dx)
                 if (A := Actuel?):
-                    UI.RemoveWidget(A)
-                UI.AddWidget(C)
+                    IU.RemoveWidget(A)
+                IU.AddWidget(C)
                 set Actuel = option{C}
                 Sleep(0.04)
             Sleep(3.0)
@@ -1554,12 +1554,12 @@ hands_manager := class(creative_device):
                     Fond.SetOpacity(O)
                     C := DessinerNotif(Fond, Ligne1, Ligne2, Image, Dx)
                     if (A := Actuel?):
-                        UI.RemoveWidget(A)
-                    UI.AddWidget(C)
+                        IU.RemoveWidget(A)
+                    IU.AddWidget(C)
                     set Actuel = option{C}
                 Sleep(0.04)
             if (A := Actuel?):
-                UI.RemoveWidget(A)
+                IU.RemoveWidget(A)
 
     DessinerNotif(Fond : color_block, Ligne1 : string, Ligne2 : string, Image : texture, Dx : float) : canvas =
         X0 := 30.0 + Dx
@@ -1709,13 +1709,13 @@ hands_manager := class(creative_device):
         if (V := Vues[J], UIv := GetPlayerUI[J]):
             UIv.RemoveWidget(V)
             OterVue(J)
-        if (UI := GetPlayerUI[J], Premiere := ImagesCauchemar[0]):
+        if (IU := GetPlayerUI[J], Premiere := ImagesCauchemar[0]):
             Plein := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}
             Couches := for (Im : ImagesCauchemar) do texture_block{DefaultImage := Im, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
             Ecran := texture_block{DefaultImage := Premiere, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
             Noir := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 1.0}
             Scene := canvas{Slots := array{canvas_slot{Widget := Noir, Anchors := Plein, Offsets := margin{}, ZOrder := 3}}}
-            UI.AddWidget(Scene)
+            IU.AddWidget(Scene)
             Fenetre := fenetre_images{Scene := Scene, Couches := Couches, Plein := Plein}
             Fenetre.Avancer(0, 30)
             Sleep(0.35)
@@ -1735,7 +1735,7 @@ hands_manager := class(creative_device):
                     Ecran.SetImage(Im)
                     set Affichee = I
                     Fenetre.Avancer(I, 30)
-            UI.RemoveWidget(Scene)
+            IU.RemoveWidget(Scene)
             SonCauchemar.Stop(J)
             SonCauchemar.Unregister(J)
 
@@ -1745,8 +1745,8 @@ hands_manager := class(creative_device):
     FermerEcrans() : void =
         FinEcran.Signal()
         set DernierChrono = -1
-        for (J -> C : Ecrans, UI := GetPlayerUI[J]):
-            UI.RemoveWidget(C)
+        for (J -> C : Ecrans, IU := GetPlayerUI[J]):
+            IU.RemoveWidget(C)
         set Ecrans = map{}
         set Chronos = map{}
 
@@ -1862,12 +1862,12 @@ hands_manager := class(creative_device):
             Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
-        if (UI := GetPlayerUI[J]):
+        if (IU := GetPlayerUI[J]):
             C := canvas{Slots := S}
             if (Souris?):
-                UI.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+                IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
             else:
-                UI.AddWidget(C)
+                IU.AddWidget(C)
             if (set Ecrans[J] = C, set Chronos[J] = Chrono) {}
 
     NouveauChrono() : []texture_block =
@@ -2031,9 +2031,9 @@ hands_manager := class(creative_device):
 
     # le message du haut, ecrit au pinceau (remplace le precedent ; "" = efface)
     MessagePour(J : player, S : string) : void =
-        if (UI := GetPlayerUI[J]):
+        if (IU := GetPlayerUI[J]):
             if (Ancien := Bandeaux[J]):
-                UI.RemoveWidget(Ancien)
+                IU.RemoveWidget(Ancien)
             C := canvas{Slots := if (EnMachine[J]?) then TexteEcrit(S, 0.0, 0.5, 330.0, 220.0, 30.0) else TexteEcrit(S, 0.5, 0.0, 0.0, 90.0, 46.0)}
-            UI.AddWidget(C)
+            IU.AddWidget(C)
             if (set Bandeaux[J] = C) {}

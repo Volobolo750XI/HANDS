@@ -25,3 +25,4 @@ qui porte le meme nom qu'un dossier -> erreur 3532 / 3588 "ambiguous". Les anima
 
 ## Pas de += sur un vector3
 `set V += ...` ne marche que pour int, float et tableaux. Pour un vector3 : `set V = V + ...`.
+- Un dossier du Contenu ne doit jamais s'appeler UI (nom utilise dans le code -> renomme en IU)
