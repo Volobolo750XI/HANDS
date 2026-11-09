@@ -558,6 +558,10 @@ hands_manager := class(creative_device):
     # souris, coche / decoche ces cases
     @editable InverserColonnes : logic = false
     @editable InverserLignes : logic = false
+    # Angle de vue (Champ de vision) de la camera du clavier, en degres : MEME valeur que dans la camera
+    @editable ChampVisionClavier : float = 80.0
+    # Largeur d'un bouton (cm) : taille de la zone cliquable
+    @editable TailleBoutonClavier : float = 9.0
     # La machine : le centre (Corps), la machoire du haut (Gueule) et les 24 boutons DANS L'ORDRE Bouton_01..Bouton_24
     @editable Centre : creative_prop = creative_prop{}
     @editable Gueule : creative_prop = creative_prop{}
@@ -652,7 +656,7 @@ hands_manager := class(creative_device):
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
     @editable AxeFermeture : int = 1             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
-    @editable Enfoncement : float = 2.0          # cm : un bouton appuye descend de ca
+    @editable Enfoncement : float = 3.0          # cm : un bouton appuye descend de ca
     Colonnes : int = 4
     PaquetMax : int = 3
 
@@ -1525,23 +1529,32 @@ hands_manager := class(creative_device):
         C := if (M := Mod[K, Colonnes]) then M else 0
         if (InverserColonnes?) then Colonnes - 1 - C else C
 
-    # une zone de clic invisible (TEST1) sur chaque bouton libre, a sa place exacte A L'ECRAN
+    # une zone de clic invisible (TEST1) sur chaque bouton libre, a sa place exacte A L'ECRAN.
+    # La place est CALCULEE : position 3D du bouton vue par la camera fixe (angle de vue ChampVisionClavier).
+    # Plus besoin de mesurer l'ecran, et l'ordre des boutons n'a plus d'importance.
     PoserZones(J : player) : void =
-        if (C := Ecrans[J]):
-            for (K -> T : Touches, not Enfoncee[K]?, R := RangeeDe(K), H0 := LignesY[R], H1 := LignesY[R + 1], G0 := BordGauche[R], G1 := BordGauche[R + 1], D0 := BordDroit[R], D1 := BordDroit[R + 1]):
-                Gauche := (G0 + G1) * 0.5
-                Droite := (D0 + D1) * 0.5
-                Largeur := (Droite - Gauche) / (Colonnes * 1.0)
-                X := Gauche + (ColonneDe(K) * 1.0 + 0.5) * Largeur
-                Y := (H0 + H1) * 0.5
-                # taille de la zone (unites de l'interface : 1920 x 1080), un peu plus petite que le bouton
-                L := Largeur * 1920.0 * 0.88
-                H := (H1 - H0) * 1080.0 * 0.88
-                Zone := TEST1{}
-                ZB := zone_bouton{Manager := Self, K := K, Zone := Zone}
-                spawn{ ZB.Suivre() }
-                C.AddWidget(canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := X, Y := Y}, Maximum := vector2{X := X, Y := Y}},
-                    Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := L, Bottom := H}, SizeToContent := false})
+        if (C := Ecrans[J], Cam := CameraDe(J)?):
+            CT := Cam.GetTransform()
+            Avant := CT.Rotation.GetLocalForward()
+            Droite := CT.Rotation.GetLocalRight()
+            Haut := CT.Rotation.GetLocalUp()
+            Demi := ChampVisionClavier * 0.5 * PiFloat / 180.0
+            TanX := Sin(Demi) / Max(0.001, Cos(Demi))
+            TanY := TanX * 1080.0 / 1920.0
+            for (K -> T : Touches, not Enfoncee[K]?):
+                V := T.GetTransform().Translation - CT.Translation
+                Z := DotProduct(V, Avant)
+                if (Z > 1.0):
+                    X := 0.5 + DotProduct(V, Droite) / (Z * TanX) * 0.5
+                    Y := 0.5 - DotProduct(V, Haut) / (Z * TanY) * 0.5
+                    # taille de la zone a l'ecran (unites 1920 x 1080) selon la distance du bouton
+                    L := TailleBoutonClavier / (Z * TanX) * 0.5 * 1920.0
+                    H := L * 0.8
+                    Zone := TEST1{}
+                    ZB := zone_bouton{Manager := Self, K := K, Zone := Zone}
+                    spawn{ ZB.Suivre() }
+                    C.AddWidget(canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := X, Y := Y}, Maximum := vector2{X := X, Y := Y}},
+                        Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 0.0, Right := L, Bottom := H}, SizeToContent := false})
 
     # STEAL : il regarde un joueur (son nom s'affiche) et clique. Temps ecoule : un joueur au hasard.
     Voler(J : player)<suspends> : void =
