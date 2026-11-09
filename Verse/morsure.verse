@@ -913,6 +913,9 @@ hands_manager := class(creative_device):
         if (J := player[Agent], Contient(Assis, J)?, not Contient(Vivants, J)?, not Contient(DejaRentres, J)?):
             RenvoyerAuLobby(array{J})
             set DejaRentres += array{J}
+            # il ne fait plus partie de CETTE table : plus aucun message, ecran ni camera d'ici (il peut rejouer ailleurs)
+            set Table = for (X : Table, X <> J) do X
+            MessagePour(J, "")
 
     # fin de partie : les joueurs de la table sont renvoyes au lobby (sur RetourLobby, ou a leur point
     # d'apparition si RetourLobby est vide)
