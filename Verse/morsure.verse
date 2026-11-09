@@ -644,6 +644,15 @@ hands_manager := class(creative_device):
     # BACK TO LOBBY : un appareil Bouton (Button) dans la piece (Temps d'interaction : 2 s). Un joueur mordu
     # (plus dans le jeu) qui l'utilise rentre au lobby tout de suite. Les joueurs encore en jeu ne peuvent pas.
     @editable BoutonRetourLobby : button_device = button_device{}
+    # VICTOIRE : une camera fixe (UNE par table, posee n'importe ou ; "Ajouter aux joueurs au debut" : NON).
+    # Quand quelqu'un gagne, le code la place devant le gagnant, tournee vers lui, puis la recule doucement
+    # (leger dezoom). Toute la table la voit.
+    @editable CameraVictoire : gameplay_camera_fixed_point_device = gameplay_camera_fixed_point_device{}
+    @editable DistanceDebutVictoire : float = 120.0    # cm devant le gagnant au debut
+    @editable DistanceFinVictoire : float = 260.0      # cm devant le gagnant a la fin (dezoom)
+    @editable HauteurVictoire : float = 165.0          # hauteur de la camera (cm au-dessus de ses pieds)
+    @editable InclinaisonVictoire : float = -8.0       # degres : negatif = la camera regarde un peu vers le bas
+    @editable DureeVictoire : float = 4.0              # secondes du dezoom
     # Les panneaux (BACK TO LOBBY...) qui FLOTTENT doucement de haut en bas, comme dans Football Pillars
     @editable PanneauxFlottants : []creative_prop = array{}
     @editable Flottement : float = 15.0           # cm de haut en bas
@@ -802,6 +811,33 @@ hands_manager := class(creative_device):
 
     BougerPanneau(Pan : creative_prop, Ou : vector3, Rot : rotation, Duree : float)<suspends> : void =
         Pan.MoveTo(Ou, Rot, Duree)
+
+    # LA VICTOIRE : la camera se place devant le gagnant (tournee vers lui) et recule doucement ; toute la table
+    # la voit, puis elle est retiree. Sans personnage (deconnecte) : simple attente.
+    CinematiqueVictoire(G : player)<suspends> : void =
+        if (Perso := G.GetFortCharacter[]):
+            EnleverCameras()
+            P := Perso.GetTransform().Translation
+            # direction ou il regarde (a plat)
+            F0 := Perso.GetTransform().Rotation.GetLocalForward()
+            Lg := Sqrt(F0.X * F0.X + F0.Y * F0.Y)
+            F := if (Lg > 0.01) then vector3{X := F0.X / Lg, Y := F0.Y / Lg, Z := 0.0} else vector3{X := 1.0, Y := 0.0, Z := 0.0}
+            Haut := vector3{X := 0.0, Y := 0.0, Z := HauteurVictoire}
+            # la camera regarde le gagnant : direction opposee a la sienne
+            Lacet := ArcTan(-F.Y, -F.X) * 180.0 / PiFloat
+            Rot := MakeRotationFromYawPitchRollDegrees(Lacet, InclinaisonVictoire, 0.0)
+            if (CameraVictoire.TeleportTo[P + F * DistanceDebutVictoire + Haut, Rot]) {}
+            for (X : Table, EstLa(X)?):
+                CameraVictoire.AddTo(X)
+            Sleep(0.2)
+            Debut := GetSimulationElapsedTime()
+            CameraVictoire.MoveTo(P + F * DistanceFinVictoire + Haut, Rot, Max(0.5, DureeVictoire))
+            # securite : la scene dure toujours au moins DureeVictoire, meme si le deplacement finit trop tot
+            Sleep(Max(0.0, DureeVictoire - (GetSimulationElapsedTime() - Debut)) + 0.6)
+            for (X : Table, EstLa(X)?):
+                CameraVictoire.RemoveFrom(X)
+        else:
+            Sleep(4.0)
 
     # les joueurs mordus deja rentres au lobby par le bouton (on ne les y renvoie pas une 2e fois)
     var DejaRentres : []player = array{}
@@ -1026,9 +1062,14 @@ hands_manager := class(creative_device):
         FermerEcrans()
         if (G := Vivants[0], not TestSolo?):
             Bandeau("P{NumeroDe(G)} WINS THE ROUND!")
+            CinematiqueVictoire(G)
         else:
             Bandeau(if (TestSolo?) then "GAME OVER - THE TRAP GOT YOU" else "NO WINNER")
-        Sleep(4.0)
+            # TEST SOLO : la cinematique est jouee quand meme sur toi, pour la regler
+            if (TestSolo?, Seul := Assis[0]):
+                CinematiqueVictoire(Seul)
+            else:
+                Sleep(4.0)
         Bandeau("")
         set Orientations = map{}
         for (J : Assis, Perso := J.GetFortCharacter[]):
