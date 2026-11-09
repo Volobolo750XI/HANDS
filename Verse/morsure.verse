@@ -422,11 +422,14 @@ bouton_texte := class:
     LargFond : float
     HautFond : float
 
+    Son : audio_player_device
+
     Suivre()<suspends> : void =
         race:
             Fin.Await()
             loop:
                 Zone.Clic.Await()
+                Son.Play()
                 Ev.Signal(Code)
             loop:
                 Zone.Entre.Await()
@@ -455,11 +458,14 @@ carte_main := class:
     Zone : TEST1
     var Gardee : logic = false                 # carte prise (choix du debut) : elle reste grande et claire
 
+    Son : audio_player_device
+
     Suivre()<suspends> : void =
         race:
             Fin.Await()
             loop:
                 Zone.Clic.Await()
+                Son.Play()
                 Ev.Signal(Code)
             loop:
                 Zone.Entre.Await()
@@ -611,6 +617,9 @@ hands_manager := class(creative_device):
     # LA FEINTE : a chaque bouton sur, la machoire claque un peu (degres) puis se rouvre
     @editable AngleFeinte : float = 14.0
     @editable SonCarte : audio_player_device = audio_player_device{}
+    # Son des BOUTONS et des CARTES qu'on clique (confirmer, jouer une carte, choisir ses cartes...).
+    # Lecteur audio : lecture automatique NON, en boucle NON, spatialisation NON.
+    @editable SonBouton : audio_player_device = audio_player_device{}
     # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
     @editable AnimAppui : ?animation_sequence = false
     # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
@@ -1854,7 +1863,7 @@ hands_manager := class(creative_device):
             else:
                 Img := ImgH(ImageRelique(Id), 230.0, 230.0)
                 Zone := TEST1{}
-                CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 100 + I, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 230.0, Zone := Zone}
+                CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 100 + I, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 230.0, Zone := Zone, Son := SonBouton}
                 spawn{ CM.Suivre() }
                 set S += array{PlaceLibre(Img, 0.5, 1.0, X, -125.0), PlaceH(Zone, 0.5, 1.0, X, -125.0, 165.0, 220.0)}
         S
@@ -1893,7 +1902,7 @@ hands_manager := class(creative_device):
             set Cx += L + T * 0.06
         Zone := TEST1{}
         BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
-            Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
+            Son := SonBouton, Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
         spawn{ BT.Suivre() }
         Slots + array{canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
             Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
@@ -1929,7 +1938,7 @@ hands_manager := class(creative_device):
                 X := (Place * 1.0 - 2.5) * 290.0
                 Img := ImgH(ImageRelique(Id), 240.0, 240.0)
                 Zone := TEST1{}
-                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 500 + Place, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone}
+                CM := carte_main{Ev := EvJ, Fin := FinEcran, Code := 500 + Place, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 240.0, Zone := Zone, Son := SonBouton}
                 spawn{ CM.Suivre() }
                 set Cartes += array{CM}
                 set S += array{PlaceLibre(Img, 0.5, 0.5, X, 0.0), PlaceH(Zone, 0.5, 0.5, X, 0.0, 200.0, 240.0)}
@@ -2013,7 +2022,7 @@ hands_manager := class(creative_device):
                         X := (N * 1.0 - 2.0) * 200.0
                         Img := ImgH(ImageRelique(Id), 210.0, 210.0)
                         Zone := TEST1{}
-                        CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 300 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 210.0, Zone := Zone}
+                        CM := carte_main{Ev := Choix, Fin := FinEcran, Code := 300 + Id, Image := Img, Normale := ImageRelique(Id), Lueur := ImageReliqueSurvol(Id), Taille := 210.0, Zone := Zone, Son := SonBouton}
                         spawn{ CM.Suivre() }
                         set S += array{PlaceLibre(Img, 0.5, 0.5, X, -20.0), PlaceH(Zone, 0.5, 0.5, X, -20.0, 150.0, 200.0)}
                         set N += 1
