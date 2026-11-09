@@ -1765,14 +1765,20 @@ hands_manager := class(creative_device):
     # =========================================================================
     FermerEcrans() : void =
         FinEcran.Signal()
+        set DernierChrono = -1
         for (J -> C : Ecrans, UI := GetPlayerUI[J]):
             UI.RemoveWidget(C)
         set Ecrans = map{}
         set Chronos = map{}
 
+    var DernierChrono : int = -1
     MajChronos(Reste : float) : void =
         if (S := Ceil[Reste]):
             V := Max(0, Min(99, S))
+            # les chiffres ne sont redessines que quand la seconde change (sinon on ne fait rien)
+            if (V = DernierChrono):
+                return
+            set DernierChrono = V
             Dizaine := if (Q := Floor[(V * 1.0) / 10.0]) then Q else 0
             Unite := if (R := Mod[V, 10]) then R else 0
             for (J -> T : Chronos, Diz := T[0], Uni := T[1]):
@@ -1872,6 +1878,7 @@ hands_manager := class(creative_device):
             if (set Ecrans[J] = C, set Chronos[J] = Chrono) {}
 
     NouveauChrono() : []texture_block =
+        set DernierChrono = -1
         array{ImgH(Ecriture.E_0, 64.0, 64.0), ImgH(Ecriture.E_0, 64.0, 64.0)}
 
     # LE CHOIX DES CARTES : les 6 cartes, leur effet ; on en prend 3 (clic = prise / rendue), puis CONFIRM
