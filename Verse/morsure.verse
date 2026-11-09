@@ -1352,13 +1352,8 @@ hands_manager := class(creative_device):
         if (Camera := CameraDe(J)?):
             return CliquerALaSouris(J, Requis, Vu, Fin)
         EcranVisee(J, Requis, Vu, false)
-        # sans camera fixe (TEST) : on attend la fin du temps, puis un bouton au hasard
-        loop:
-            Reste := Fin - GetSimulationElapsedTime()
-            MajChronos(Reste)
-            if (Reste <= 0.0):
-                break
-            Sleep(Min(0.5, Reste))
+        # sans camera fixe (TEST) : au bout de 3 s, un bouton au hasard est appuye (pour regarder l'animation)
+        Sleep(Max(0.0, Min(3.0, Fin - GetSimulationElapsedTime())))
         BoutonLibre()
 
     # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
