@@ -1092,7 +1092,10 @@ hands_manager := class(creative_device):
         if (Pl := Places[I]):
             Ici := Pl.GetTransform().Translation
             C := BaseCentre.Translation
-            Cible := ArcTan(Ici.Y - C.Y, Ici.X - C.X) * 180.0 / PiFloat - FaceDepart
+            Brut := ArcTan(Ici.Y - C.Y, Ici.X - C.X) * 180.0 / PiFloat - FaceDepart
+            # la machine ne tourne QUE par quarts de tour (0, 90, 180, 270) depuis sa position de depart :
+            # elle prend le quart de tour le plus proche de la place, meme si la place est decalee de quelques degres
+            Cible := if (Q := Round[Brut / 90.0]) then Q * 90.0 else Brut
             var Ecart : float = Cible - LacetMachine
             loop:
                 if (Ecart <= 180.0):
