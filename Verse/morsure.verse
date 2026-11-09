@@ -269,6 +269,11 @@ PlaceLibre(W : widget, AX : float, AY : float, X : float, Y : float) : canvas_sl
     canvas_slot{Widget := W, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
         Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := 0.0, Bottom := 0.0}, SizeToContent := true}
 
+# comme PlaceLibre, avec un ordre d'affichage (plus grand = devant)
+PlaceZ(W : widget, AX : float, AY : float, X : float, Y : float, Z : type{_X:int where 0 <= _X, _X <= 2147483647}) : canvas_slot =
+    canvas_slot{Widget := W, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
+        Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := 0.0, Bottom := 0.0}, SizeToContent := true, ZOrder := Z}
+
 # un TEXTE au pinceau (non cliquable), centre en (X, Y)
 TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : float) : []canvas_slot =
     var Slots : []canvas_slot = array{}
@@ -1873,7 +1878,8 @@ hands_manager := class(creative_device):
         Brut := LargeurTexte(S, Taille)
         T := if (Brut > LargB * 0.8) then Taille * LargB * 0.8 / Brut else Taille
         Fond := ImgH(FondN, LargB, HautB)
-        set Slots += array{PlaceLibre(Fond, AX, AY, X, Y)}
+        # ORDRE D'AFFICHAGE FIXE : le fond derriere (0), les lettres devant (1), la zone de clic par-dessus (2)
+        set Slots += array{PlaceZ(Fond, AX, AY, X, Y, 0)}
         Largeur := LargeurTexte(S, T)
         var Cx : float = X - Largeur * 0.5
         for (C : S):
@@ -1883,13 +1889,14 @@ hands_manager := class(creative_device):
                 set Lettres += array{Img}
                 set Normales += array{Gn}
                 set Claires += array{Gc}
-                set Slots += array{PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04)}
+                set Slots += array{PlaceZ(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04, 1)}
             set Cx += L + T * 0.06
         Zone := TEST1{}
         BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
             Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
         spawn{ BT.Suivre() }
-        Slots + array{PlaceH(Zone, AX, AY, X, Y, LargB, HautB)}
+        Slots + array{canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
+            Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
         if (UI := GetPlayerUI[J]):
