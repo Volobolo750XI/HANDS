@@ -653,7 +653,7 @@ hands_manager := class(creative_device):
     @editable CameraVictoire : gameplay_camera_fixed_point_device = gameplay_camera_fixed_point_device{}
     @editable DistanceDebutVictoire : float = 55.0     # cm devant le gagnant au debut (gros plan sur la tete)
     @editable DistanceFinVictoire : float = 170.0      # cm devant le gagnant a la fin (dezoom)
-    @editable HauteurVictoire : float = 168.0          # hauteur de la camera (cm au-dessus de ses pieds) = sa tete
+    @editable HauteurVictoire : float = 70.0           # hauteur de la camera par rapport au CENTRE du personnage (sa tete = environ 70)
     @editable InclinaisonVictoire : float = -4.0       # degres : negatif = la camera regarde un peu vers le bas
     @editable DureeVictoire : float = 4.0              # secondes du dezoom
     # TEST : coche pour gagner tout de suite (5 s apres l'arrivee : pose a ta place, puis la scene de victoire)
