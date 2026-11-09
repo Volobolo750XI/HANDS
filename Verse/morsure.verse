@@ -411,6 +411,11 @@ bouton_texte := class:
     Claires : []texture
     Taille : float
     Zone : TEST1
+    Fond : texture_block
+    FondNormal : texture
+    FondSurvol : texture
+    LargFond : float
+    HautFond : float
 
     Suivre()<suspends> : void =
         race:
@@ -420,10 +425,15 @@ bouton_texte := class:
                 Ev.Signal(Code)
             loop:
                 Zone.Entre.Await()
+                # survol : le bouton s'eclaircit et grossit un peu, le texte devient plus blanc et plus gros
+                Fond.SetImage(FondSurvol)
+                Fond.SetDesiredSize(vector2{X := LargFond * 1.06, Y := HautFond * 1.06})
                 for (I -> Img : Lettres, T := Claires[I]):
                     Img.SetImage(T)
-                    Img.SetDesiredSize(vector2{X := Taille * 1.18, Y := Taille * 1.18})
+                    Img.SetDesiredSize(vector2{X := Taille * 1.12, Y := Taille * 1.12})
                 Zone.Sort.Await()
+                Fond.SetImage(FondNormal)
+                Fond.SetDesiredSize(vector2{X := LargFond, Y := HautFond})
                 for (I -> Img : Lettres, T := Normales[I]):
                     Img.SetImage(T)
                     Img.SetDesiredSize(vector2{X := Taille, Y := Taille})
@@ -1853,21 +1863,33 @@ hands_manager := class(creative_device):
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
         var Claires : []texture = array{}
-        Largeur := LargeurTexte(S, Taille)
+        # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
+        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198) then true else false
+        FondN := if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
+        FondS := if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
+        HautB := Taille * 1.45
+        LargB := HautB * 4.0
+        # le texte tient dans le bouton (il est reduit s'il est trop long)
+        Brut := LargeurTexte(S, Taille)
+        T := if (Brut > LargB * 0.8) then Taille * LargB * 0.8 / Brut else Taille
+        Fond := ImgH(FondN, LargB, HautB)
+        set Slots += array{PlaceLibre(Fond, AX, AY, X, Y)}
+        Largeur := LargeurTexte(S, T)
         var Cx : float = X - Largeur * 0.5
         for (C : S):
-            L := LargeurGlyphe(C) * Taille
-            if (T := GlypheNormal(C)?, T2 := GlypheClair(C)?):
-                Img := ImgH(T, Taille, Taille)
+            L := LargeurGlyphe(C) * T
+            if (Gn := GlypheNormal(C)?, Gc := GlypheClair(C)?):
+                Img := ImgH(Gn, T, T)
                 set Lettres += array{Img}
-                set Normales += array{T}
-                set Claires += array{T2}
-                set Slots += array{PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y)}
-            set Cx += L + Taille * 0.06
+                set Normales += array{Gn}
+                set Claires += array{Gc}
+                set Slots += array{PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04)}
+            set Cx += L + T * 0.06
         Zone := TEST1{}
-        BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := Taille, Zone := Zone}
+        BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
+            Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
         spawn{ BT.Suivre() }
-        Slots + array{PlaceH(Zone, AX, AY, X, Y, Largeur + 20.0, Taille * 0.9)}
+        Slots + array{PlaceH(Zone, AX, AY, X, Y, LargB, HautB)}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
         if (UI := GetPlayerUI[J]):
@@ -1975,8 +1997,8 @@ hands_manager := class(creative_device):
                     set S += TexteEcrit("CHOOSE A CARD", 0.5, 0.0, 0.0, 300.0, 100.0)
                 else if (not Mensonge?):
                     set S += TexteEcrit("TRUTH OR LIE?", 0.5, 0.0, 0.0, 300.0, 100.0)
-                    set S += BoutonTexte("TRUTH", 0.5, 1.0, XChoisie - 110.0, -360.0, 64.0, 400)
-                    set S += BoutonTexte("LIE", 0.5, 1.0, XChoisie + 110.0, -360.0, 64.0, 401)
+                    set S += BoutonTexte("TRUTH", 0.5, 1.0, XChoisie - 170.0, -360.0, 52.0, 400)
+                    set S += BoutonTexte("LIE", 0.5, 1.0, XChoisie + 170.0, -360.0, 52.0, 401)
                 else:
                     set S += TexteEcrit("SAY IT IS...", 0.5, 0.0, 0.0, 300.0, 100.0)
                     var N : int = 0
