@@ -748,6 +748,7 @@ hands_manager := class(creative_device):
             race:
                 Manche(Table0)
                 ZonePendantPartie()
+                GarderEnPlace()
             ZoneLobby.UnregisterAll()
             Sleep(1.0)
 
@@ -1002,18 +1003,19 @@ hands_manager := class(creative_device):
         if (C := Noir?, IU := GetPlayerUI[J]):
             IU.RemoveWidget(C)
 
-    # apres une teleportation LOINTAINE, Fortnite charge la zone (ecran noir "deplacement") et annule le gel :
-    # on le refige plusieurs fois ; s'il n'est plus sur sa place, on l'y repose
-    RefigerApresArrivee(J : player)<suspends> : void =
-        for (Attente : array{1.0, 1.0, 2.0}):
-            Sleep(Attente)
-            if (Perso := J.GetFortCharacter[], Perso.IsActive[], Contient(Vivants, J)?, not EnMachine[J]?, Pl := Places[PlaceIndex(J)]):
-                E := Perso.GetTransform().Translation - Pl.GetTransform().Translation
-                if (E.X * E.X + E.Y * E.Y > 10000.0):
+    # FILET DE SECURITE pendant TOUTE la partie : apres une teleportation lointaine, Fortnite charge la zone (ecran
+    # "deplacement") et peut annuler le gel. Toutes les 0,5 s : un joueur en jeu qui n'est plus devant la table (plus
+    # de 60 cm de sa place) y est REPOSE et REFIGE. S'il est bien a sa place, rien ne se passe.
+    # la position ou il a REELLEMENT ete pose a sa place (reference du filet de securite)
+    var PoseDe : [player]vector3 = map{}
+    GarderEnPlace()<suspends> : void =
+        loop:
+            Sleep(0.5)
+            for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
+                E := Perso.GetTransform().Translation - P
+                if (E.X * E.X + E.Y * E.Y > 3600.0):
                     Perso.ReleaseFromStasis()
                     Asseoir(J, PlaceIndex(J), ?Annonce := false)
-                else:
-                    Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -1135,7 +1137,6 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
-            spawn{ RefigerApresArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
@@ -1180,6 +1181,7 @@ hands_manager := class(creative_device):
                 Sleep(4.0)
         Bandeau("")
         set Orientations = map{}
+        set PoseDe = map{}
         for (J : Assis, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
@@ -1208,6 +1210,7 @@ hands_manager := class(creative_device):
                 if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+                if (set PoseDe[J] = Perso.GetTransform().Translation) {}
             else:
                 # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
