@@ -843,11 +843,12 @@ hands_manager := class(creative_device):
             Lacet := ArcTan(-F.Y, -F.X) * 180.0 / PiFloat
             Rot := MakeRotationFromYawPitchRollDegrees(Lacet, InclinaisonVictoire, 0.0)
             if (CameraVictoire.TeleportTo[P + F * DistanceDebutVictoire + Haut, Rot]) {}
-            for (X : Table, EstLa(X)?):
+            # SEULEMENT les joueurs de CETTE table encore dans la porcherie (pas les autres tables, pas ceux deja rentres)
+            for (X : Table, EstLa(X)?, not Contient(DejaRentres, X)?):
                 CameraVictoire.AddTo(X)
             # L'ECRAN DU GAGNANT : la couronne, WINNER, et son pseudo (pour toute la table)
             var EcransV : [player]canvas = map{}
-            for (X : Table, EstLa(X)?, IU := GetPlayerUI[X]):
+            for (X : Table, EstLa(X)?, not Contient(DejaRentres, X)?, IU := GetPlayerUI[X]):
                 CV := EcranGagnant(G)
                 IU.AddWidget(CV)
                 if (set EcransV[X] = CV) {}
