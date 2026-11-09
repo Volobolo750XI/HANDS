@@ -609,8 +609,6 @@ hands_manager := class(creative_device):
     # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
     @editable AvanceAssis : float = 0.0
     @editable HauteurAssis : float = 0.0
-    # decoche pour essayer de garder le CORPS immobile (si la tete ne bouge plus du tout, recoche-la)
-    @editable CorpsTourne : logic = true
     # correction (degres) de la direction de la vue a sa place : +90 = un quart de tour a droite, -90 a gauche
     @editable CorrectionVue : float = 0.0
     # Reglages
@@ -828,7 +826,7 @@ hands_manager := class(creative_device):
                 Ici := Perso.GetTransform().Translation
                 Perso.ReleaseFromStasis()
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := false, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -1003,7 +1001,7 @@ hands_manager := class(creative_device):
                 Vue := Lacet + CorrectionVue
                 if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
-                Perso.PutInStasis(stasis_args{AllowTurning := CorpsTourne, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
