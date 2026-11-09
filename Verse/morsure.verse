@@ -748,7 +748,6 @@ hands_manager := class(creative_device):
             race:
                 Manche(Table0)
                 ZonePendantPartie()
-                GarderEnPlace()
             ZoneLobby.UnregisterAll()
             Sleep(1.0)
 
@@ -994,9 +993,9 @@ hands_manager := class(creative_device):
         # teleportation de retour a ete refusee)
         for (Cam : CamerasClavier):
             Cam.RemoveFrom(J)
-        # securite : plus jamais fige apres son tour (vue libre a 360 ; GarderEnPlace le garde sur sa place)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
+            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
         Sleep(0.45)
@@ -1014,20 +1013,9 @@ hands_manager := class(creative_device):
             Sleep(Attente)
             if (Perso := J.GetFortCharacter[]):
                 Ici := Perso.GetTransform().Translation
-                if (not EnMachine[J]?):
-                    Perso.ReleaseFromStasis()
-                    if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-
-    # PIEDS BLOQUES AU SOL, VUE LIBRE : 10 fois par seconde, un joueur en jeu qui a bouge de plus de 25 cm de sa place
-    # y est remis tout de suite (sa vue n'est pas touchee). Ne fait rien tant qu'il ne bouge pas.
-    var PoseDe : [player]vector3 = map{}
-    GarderEnPlace()<suspends> : void =
-        loop:
-            Sleep(0.1)
-            for (J : Vivants, not EnMachine[J]?, P := PoseDe[J], Perso := J.GetFortCharacter[], Perso.IsActive[]):
-                E := Perso.GetTransform().Translation - P
-                if (E.X * E.X + E.Y * E.Y > 625.0 or E.Z > 40.0):
-                    if (Perso.TeleportTo[P, Perso.GetTransform().Rotation]) {}
+                Perso.ReleaseFromStasis()
+                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -1178,7 +1166,6 @@ hands_manager := class(creative_device):
                 Sleep(4.0)
         Bandeau("")
         set Orientations = map{}
-        set PoseDe = map{}
         for (J : Assis, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
         EnleverCameras()
@@ -1199,16 +1186,14 @@ hands_manager := class(creative_device):
             Rot := MakeRotationFromYawPitchRollDegrees(Lacet + CorrectionVue, 0.0, 0.0)
             # Fortnite REFUSE la teleportation si le joueur ne rentre pas a cet endroit : on essaie plus haut, puis devant
             Resultat := PoserPres(Perso, Pose, Avant, Rot)
+            Exact := if (Resultat = 0) then true else false
             if (TestSolo?, Annonce?):
                 Avertir(J, if (Resultat = 0) then "SEAT: ON YOUR PLACE" else if (Resultat = 1) then "SEAT: SOMETHING IN THE WAY - DROPPED FROM ABOVE" else if (Resultat = 2) then "SEAT: SOMETHING IN THE WAY - IN FRONT" else "SEAT: TELEPORT REFUSED - MOVE YOUR PLACE")
             if (Resultat >= 0):
                 Vue := Lacet + CorrectionVue
                 if (set Orientations[J] = Vue) {}
-                # PAS fige (le gel de Fortnite bloque aussi la vue a gauche / a droite) : la vue est libre a 360,
-                # et GarderEnPlace le remet aussitot sur sa place s'il bouge (pieds bloques au sol)
-                Perso.ReleaseFromStasis()
-                if (set PoseDe[J] = Perso.GetTransform().Translation) {}
                 spawn{ FaceMachine(J, Vue) }
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
