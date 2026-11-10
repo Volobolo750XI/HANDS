@@ -980,6 +980,7 @@ hands_manager := class(creative_device):
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
+        ArreterAppui(J)
         # (plus d'ecran noir : le retour a sa place se fait directement)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
@@ -1568,6 +1569,7 @@ hands_manager := class(creative_device):
     # ou il rentre au lobby avec le bouton BACK TO LOBBY
     DevenirSpectateur(J : player, K : int)<suspends> : void =
         Sleep(0.5)
+        ArreterAppui(J)
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             # INVISIBLE pour les autres : en se promenant, il ne peut pas cacher la machine aux joueurs encore en jeu
@@ -1842,7 +1844,8 @@ hands_manager := class(creative_device):
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Vue + CorrectionCorps, 0.0, 0.0)]) {}
                 Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            Controle.Play(Anim)
+            InstAppui := Controle.Play(Anim)
+            if (set AnimEnCours[J] = InstAppui) {}
             Num := (if (N0 := NumAppui[J]) then N0 else 0) + 1
             if (set NumAppui[J] = Num) {}
             spawn{ FigerAppui(J, Arret, Num) }
@@ -1852,10 +1855,20 @@ hands_manager := class(creative_device):
     SauterALaPose(J : player) : void =
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
             Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
+            InstAppui := Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
+            if (set AnimEnCours[J] = InstAppui) {}
 
     # (Num : on ne fige que si l'animation n'a pas deja repris entre-temps)
     var NumAppui : [player]int = map{}
+    # l'animation d'appui en cours de chaque joueur (pour pouvoir l'ARRETER net)
+    var AnimEnCours : [player]play_animation_instance = map{}
+
+    # retour a sa place : l'animation d'appui est arretee et ne peut plus etre reprise (sinon il reste penche,
+    # la tete dans la table -> en premiere personne, ecran noir)
+    ArreterAppui(J : player) : void =
+        if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1000) {}
+        if (A := AnimEnCours[J]):
+            A.Stop()
     FigerAppui(J : player, Arret : float, Num : int)<suspends> : void =
         Sleep(Arret)
         TenirPose(J, Arret, Num)
@@ -1867,7 +1880,8 @@ hands_manager := class(creative_device):
             if (not NumAppui[J] = Num):
                 break
             if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-                Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0, ?BlendOutTime := 0.0)
+                InstAppui := Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0, ?BlendOutTime := 0.0)
+                if (set AnimEnCours[J] = InstAppui) {}
             else:
                 break
             Sleep(1.0)
@@ -1875,7 +1889,8 @@ hands_manager := class(creative_device):
     ReprendreAppui(J : player) : void =
         if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1) {}
         if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            Controle.Play(Anim, ?StartPositionSeconds := ImageArretAppui / Max(1.0, ImagesParSecondeAppui), ?BlendInTime := 0.0)
+            InstAppui := Controle.Play(Anim, ?StartPositionSeconds := ImageArretAppui / Max(1.0, ImagesParSecondeAppui), ?BlendInTime := 0.0)
+            if (set AnimEnCours[J] = InstAppui) {}
 
     # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
     # et la grille repart a zero
