@@ -985,7 +985,7 @@ hands_manager := class(creative_device):
             Cam.RemoveFrom(J)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
-            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
         Sleep(0.3)
@@ -1023,7 +1023,7 @@ hands_manager := class(creative_device):
                 if (E.X * E.X + E.Y * E.Y > 900.0):
                     Perso.ReleaseFromStasis()
                     if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := 15.0}, Perso.GetTransform().Rotation]) {}
-            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+            Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
 
     # ARRIVEE A LA TABLE : pendant 3 s, il est reverrouille 5 fois par seconde (Fortnite annule parfois le gel
     # pendant le chargement de la zone) : il n'a jamais le temps de bouger
@@ -1045,7 +1045,7 @@ hands_manager := class(creative_device):
                 Ici := Perso.GetTransform().Translation
                 Perso.ReleaseFromStasis()
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
 
     # LES CARTES : a l'ouverture de l'ecran des cartes, chaque joueur encore en jeu est remis face a la machine (une fois)
     RemettreDroit() : void =
@@ -1172,14 +1172,14 @@ hands_manager := class(creative_device):
                 Vue := Lacet + CorrectionVue
                 if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
                 # on retient l'endroit DEMANDE (sa place), pas la position lue juste apres la teleportation (elle peut
                 # encore etre l'ancienne : il serait alors teleporte en boucle sans bouger)
                 if (set PoseDe[J] = Pose) {}
                 spawn{ RefigerPlusTard(J) }
             else:
                 # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := true, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
