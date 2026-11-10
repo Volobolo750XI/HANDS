@@ -592,9 +592,6 @@ hands_manager := class(creative_device):
     @editable RetourLobby : []creative_prop = array{}
     # Secondes a passer dans la zone avant le depart
     @editable AttenteLobby : float = 10.0
-    # LA TABLE VUE DU DESSUS : un 2e Declencheur d'entree (une touche au choix). Appuyer = la table s'affiche 5 s
-    # (la machine au milieu, chaque joueur a sa place avec ses cartes en dos de carte, et a qui c'est le tour).
-    @editable ToucheVue : input_trigger_device = input_trigger_device{}
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
     @editable SonRotation : audio_player_device = audio_player_device{}
@@ -706,7 +703,6 @@ hands_manager := class(creative_device):
         set BasePlaque = Plaque.GetTransform()
         set Enfoncee = for (T : Touches) do false
         set Piegee = for (T : Touches) do false
-        ToucheVue.PressedEvent.Subscribe(QuandVue)
         EnleverCameras()
         # SECURITE (reglages des appareils) : rien ne doit gener, meme si une case est mal reglee dans l'editeur
         #  - aucun son du jeu ne joue tout seul au lancement (si "lecture automatique" est cochee par erreur)
@@ -1048,32 +1044,6 @@ hands_manager := class(creative_device):
                 set A += 360.0
         A
 
-    # LA TABLE VUE DU DESSUS (touche ToucheVue) : affichee 5 s ; appuyer encore la cache
-    var Vues : [player]canvas = map{}
-    QuandVue(Agent : agent) : void =
-        if (J := player[Agent], IU := GetPlayerUI[J]):
-            if (Ancienne := Vues[J]):
-                IU.RemoveWidget(Ancienne)
-                OterVue(J)
-            else if (Contient(Assis, J)?):
-                V := DessinerVue(J)
-                IU.AddWidget(V)
-                if (set Vues[J] = V) {}
-                spawn{ CacherVue(J, V) }
-
-    OterVue(J : player) : void =
-        var Reste : [player]canvas = map{}
-        for (X -> W : Vues, X <> J):
-            if (set Reste[X] = W) {}
-        set Vues = Reste
-
-    CacherVue(J : player, V : canvas)<suspends> : void =
-        Sleep(5.0)
-        if (Actuelle := Vues[J], Actuelle = V, IU := GetPlayerUI[J]):
-            IU.RemoveWidget(V)
-            OterVue(J)
-
-    # le centre de la table = la moyenne de toutes les Places (elles sont disposees autour de la machine)
     CentreTable()<transacts> : vector3 =
         var Somme : vector3 = vector3{}
         var N : float = 0.0
@@ -1081,38 +1051,6 @@ hands_manager := class(creative_device):
             set Somme = Somme + Pl.GetTransform().Translation
             set N += 1.0
         if (N > 0.0) then Somme / N else BaseCentre.Translation
-
-    # la table vue du dessus, TOI en bas : la machine au milieu, chaque joueur a sa vraie place autour
-    DessinerVue(J : player) : canvas =
-        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.82}, 0.5, 0.5, 0.0, 0.0, 820.0, 820.0)}
-        C := CentreTable()
-        if (PlMoi := Places[PlaceIndex(J)]):
-            Moi := PlMoi.GetTransform().Translation
-            L0 := Max(1.0, Sqrt((C.X - Moi.X) * (C.X - Moi.X) + (C.Y - Moi.Y) * (C.Y - Moi.Y)))
-            # vers l'avant (de moi vers la machine) = le HAUT de l'ecran ; ma droite = la droite de l'ecran
-            FX := (C.X - Moi.X) / L0
-            FY := (C.Y - Moi.Y) / L0
-            set S += TexteEcrit("THE MACHINE", 0.5, 0.5, 0.0, 0.0, 38.0)
-            for (I -> X : Assis, Pl := Places[PlaceIndex(X)]):
-                P := Pl.GetTransform().Translation
-                RX := P.X - C.X
-                RY := P.Y - C.Y
-                L := Max(1.0, Sqrt(RX * RX + RY * RY))
-                SX := (RX * (-FY) + RY * FX) / L * 280.0
-                SY := -(RX * FX + RY * FY) / L * 280.0
-                Nom := if (X = J) then "YOU" else "P{I + 1}"
-                set S += TexteEcrit(Nom, 0.5, 0.5, SX, SY - 55.0, 44.0)
-                if (PlaceIndex(X) = DernierTourne):
-                    set S += TexteEcrit("HIS TURN", 0.5, 0.5, SX, SY - 100.0, 30.0)
-                if (not Contient(Vivants, X)?):
-                    set S += TexteEcrit("OUT", 0.5, 0.5, SX, SY + 10.0, 40.0)
-                else:
-                    N := NombreDe(X)
-                    if (N = 0):
-                        set S += TexteEcrit("NO CARD", 0.5, 0.5, SX, SY + 10.0, 28.0)
-                    for (K := 0..N - 1):
-                        set S += DosCarte(0.5, 0.5, SX + (K * 1.0 - (N - 1) * 0.5) * 44.0, SY + 15.0, 50.0)
-        canvas{Slots := S}
 
     # =========================================================================
     #  UNE MANCHE
@@ -1851,9 +1789,6 @@ hands_manager := class(creative_device):
         # plus AUCUN texte a l'ecran pendant le screamer (ecrans, chrono, message du haut, vue de la table)
         FermerEcrans()
         MessagePour(J, "")
-        if (V := Vues[J], UIv := GetPlayerUI[J]):
-            UIv.RemoveWidget(V)
-            OterVue(J)
         if (IU := GetPlayerUI[J], Premiere := ImagesCauchemar[0]):
             Plein := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}
             Couches := for (Im : ImagesCauchemar) do texture_block{DefaultImage := Im, DefaultDesiredSize := vector2{X := 1920.0, Y := 1080.0}}
