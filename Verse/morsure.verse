@@ -946,19 +946,27 @@ hands_manager := class(creative_device):
                     if (Perso.TeleportTo[T.Translation + vector3{X := 0.0, Y := 0.0, Z := H}, T.Rotation]):
                         set Pose = true
 
-    # LA camera fixe d'un joueur : celle qui est posee le plus pres de SA place (l'ordre de la liste ne compte pas)
+    # LA camera fixe d'un joueur : chaque place (dans l'ordre) prend la camera LIBRE la plus proche (moins de 20 m).
+    # Deux places n'ont JAMAIS la meme camera (sinon un des deux joueurs se retrouve avec un ecran noir).
     CameraDe(J : player)<transacts> : ?gameplay_camera_fixed_point_device =
-        var Meilleure : ?gameplay_camera_fixed_point_device = false
-        if (Pl := Places[PlaceIndex(J)]):
+        Voulue := PlaceIndex(J)
+        var Prises : []int = array{}
+        var Resultat : ?gameplay_camera_fixed_point_device = false
+        for (K -> Pl : Places, K <= Voulue):
             Ici := Pl.GetTransform().Translation
-            var PlusPres : float = 2000.0 * 2000.0   # une camera a plus de 20 m de la place est ignoree (camera d'une autre table)
-            for (Cam : CamerasClavier):
+            var PlusPres : float = 2000.0 * 2000.0
+            var Choix : int = -1
+            for (C -> Cam : CamerasClavier, not ContientEntier(Prises, C)?):
                 V := Cam.GetTransform().Translation - Ici
                 D := DotProduct(V, V)
                 if (D < PlusPres):
                     set PlusPres = D
-                    set Meilleure = option{Cam}
-        Meilleure
+                    set Choix = C
+            if (Choix >= 0):
+                set Prises += array{Choix}
+                if (K = Voulue, Cam := CamerasClavier[Choix]):
+                    set Resultat = option{Cam}
+        Resultat
 
     # aucune camera fixe sur personne (au demarrage et a chaque manche) : on ne la voit que pendant son tour
     EnleverCameras() : void =
@@ -1188,6 +1196,12 @@ hands_manager := class(creative_device):
     EstLa(J : player)<transacts> : logic =
         var Trouve : logic = false
         for (X : GetPlayspace().GetPlayers(), X = J):
+            set Trouve = true
+        Trouve
+
+    ContientEntier(L : []int, X : int)<transacts> : logic =
+        var Trouve : logic = false
+        for (Y : L, Y = X):
             set Trouve = true
         Trouve
 
