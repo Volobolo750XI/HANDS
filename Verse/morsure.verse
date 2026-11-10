@@ -1002,12 +1002,6 @@ hands_manager := class(creative_device):
             # camera fixe du clavier sur lui (sinon il voit par une camera qui n'est pas la sienne : ecran noir, vue bloquee)
             for (J : Table, not EnMachine[J]?, Cam : CamerasClavier):
                 Cam.RemoveFrom(J)
-            # TOUJOURS FACE A LA MACHINE : un joueur tourne de plus de 90 degres (dos ou cote a la table, souvent un bug)
-            # est remis face a la machine
-            for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], Vue := Orientations[J]):
-                F := Perso.GetTransform().Rotation.GetLocalForward()
-                if (Abs(AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Vue)) > 90.0):
-                    spawn{ FaceMachineApres(J, Vue, array{0.0}) }
             for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
                 E := Perso.GetTransform().Translation - P
                 if (E.X * E.X + E.Y * E.Y > 22500.0):
@@ -1109,6 +1103,10 @@ hands_manager := class(creative_device):
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
             spawn{ VerrouArrivee(J) }
+            # DES LE DEBUT face a la machine : verifie 1,5 s puis 4 s apres l'arrivee (apres le chargement de la zone)
+            if (Vue := Orientations[J]):
+                spawn{ FaceSiBesoin(J, Vue, 1.5) }
+                spawn{ FaceSiBesoin(J, Vue, 4.0) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
@@ -1977,10 +1975,6 @@ hands_manager := class(creative_device):
             Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
-        # ecran a la souris : s'il ne regarde PAS la table (plus de 25 degres d'ecart), il est remis face a la table,
-        # UNE seule fois, 1 seconde apres l'ouverture de l'ecran (pas deux teleportations collees a l'ouverture)
-        if (Souris?, not EnMachine[J]?, Vue := Orientations[J]):
-            spawn{ FaceSiBesoin(J, Vue, 1.0) }
         if (IU := GetPlayerUI[J]):
             C := canvas{Slots := S}
             if (Souris?):
