@@ -981,12 +981,7 @@ hands_manager := class(creative_device):
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
-        var Noir : ?canvas = false
-        if (IU := GetPlayerUI[J]):
-            C := canvas{Slots := array{canvas_slot{Widget := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 1.0},
-                Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}}}}
-            IU.AddWidget(C)
-            set Noir = option{C}
+        # (plus d'ecran noir : le retour a sa place se fait directement)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
             Asseoir(J, PlaceIndex(J), ?Annonce := false)
@@ -999,9 +994,7 @@ hands_manager := class(creative_device):
             Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
-        Sleep(0.45)
-        if (C := Noir?, IU := GetPlayerUI[J]):
-            IU.RemoveWidget(C)
+        Sleep(0.3)
 
     # FILET DE SECURITE pendant TOUTE la partie : apres une teleportation lointaine, Fortnite charge la zone (ecran
     # "deplacement") et peut annuler le gel. Toutes les 0,5 s : un joueur en jeu qui n'est plus devant la table (plus
