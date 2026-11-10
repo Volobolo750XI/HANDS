@@ -997,7 +997,7 @@ hands_manager := class(creative_device):
 
     # FILET DE SECURITE pendant TOUTE la partie : apres une teleportation lointaine, Fortnite charge la zone (ecran
     # "deplacement") et peut annuler le gel. Toutes les 0,5 s : un joueur en jeu qui n'est plus devant la table (plus
-    # de 60 cm de sa place) y est REPOSE et REFIGE. S'il est bien a sa place, rien ne se passe.
+    # de 1,50 m de sa place) y est REPOSE et REFIGE. S'il est bien a sa place, rien ne se passe.
     # la position ou il a REELLEMENT ete pose a sa place (reference du filet de securite)
     var PoseDe : [player]vector3 = map{}
     GarderEnPlace()<suspends> : void =
@@ -1005,11 +1005,11 @@ hands_manager := class(creative_device):
             Sleep(0.5)
             for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
                 E := Perso.GetTransform().Translation - P
-                if (E.X * E.X + E.Y * E.Y > 3600.0):
+                if (E.X * E.X + E.Y * E.Y > 22500.0):
                     # remis EXACTEMENT a l'endroit retenu (sa vue garde sa direction), puis refige un peu plus tard
                     # (un gel pose en meme temps que la teleportation peut etre annule par Fortnite)
                     Perso.ReleaseFromStasis()
-                    if (Perso.TeleportTo[P, Perso.GetTransform().Rotation]) {}
+                    if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := 15.0}, Perso.GetTransform().Rotation]) {}
                     spawn{ RefigerPlusTard(J) }
 
     RefigerPlusTard(J : player)<suspends> : void =
@@ -1210,7 +1210,9 @@ hands_manager := class(creative_device):
                 if (set Orientations[J] = Vue) {}
                 spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
-                if (set PoseDe[J] = Perso.GetTransform().Translation) {}
+                # on retient l'endroit DEMANDE (sa place), pas la position lue juste apres la teleportation (elle peut
+                # encore etre l'ancienne : il serait alors teleporte en boucle sans bouger)
+                if (set PoseDe[J] = Pose) {}
                 spawn{ RefigerPlusTard(J) }
             else:
                 # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
