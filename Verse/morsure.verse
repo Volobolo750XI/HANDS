@@ -1956,9 +1956,7 @@ hands_manager := class(creative_device):
             Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
-        # ecran a la souris (on ne peut plus tourner la tete) : il est d'abord tourne FACE A LA TABLE
-        if (Souris?, not EnMachine[J]?, Vue := Orientations[J]):
-            spawn{ FaceMachineApres(J, Vue, array{0.0, 0.15}) }
+        # (plus de teleportation ici : se re-teleporter sur place a chaque ecran donnait un ecran noir a plusieurs)
         if (IU := GetPlayerUI[J]):
             C := canvas{Slots := S}
             if (Souris?):
