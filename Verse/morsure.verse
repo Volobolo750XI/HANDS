@@ -526,7 +526,6 @@ choix_depart := class:
                     if (Code = 599):
                         if (Pris.Length = 3):
                             set Confirme = true
-                            Manager.Avertir(J, "WAITING FOR THE OTHERS...")
                         else:
                             Manager.Avertir(J, "CHOOSE 3 CARDS")
                     else:
@@ -1007,8 +1006,16 @@ hands_manager := class(creative_device):
             for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
                 E := Perso.GetTransform().Translation - P
                 if (E.X * E.X + E.Y * E.Y > 3600.0):
+                    # remis EXACTEMENT a l'endroit retenu (sa vue garde sa direction), puis refige un peu plus tard
+                    # (un gel pose en meme temps que la teleportation peut etre annule par Fortnite)
                     Perso.ReleaseFromStasis()
-                    Asseoir(J, PlaceIndex(J), ?Annonce := false)
+                    if (Perso.TeleportTo[P, Perso.GetTransform().Rotation]) {}
+                    spawn{ RefigerPlusTard(J) }
+
+    RefigerPlusTard(J : player)<suspends> : void =
+        Sleep(0.3)
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?):
+            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -1204,6 +1211,7 @@ hands_manager := class(creative_device):
                 spawn{ FaceMachine(J, Vue) }
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := if (Exact?) then false else true, AllowEmotes := false})
                 if (set PoseDe[J] = Perso.GetTransform().Translation) {}
+                spawn{ RefigerPlusTard(J) }
             else:
                 # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
@@ -2091,12 +2099,17 @@ hands_manager := class(creative_device):
             var Tous : logic = true
             for (CD : Liste, not CD.Confirme?):
                 set Tous = false
+            # ceux qui ont confirme voient combien de joueurs sont prets : WAITING FOR PLAYERS 1/3
+            NbPrets := (for (CD : Liste, CD.Confirme?) do CD).Length
+            for (CD : Liste, CD.Confirme?):
+                AfficherLobby(CD.J, "WAITING FOR PLAYERS {NbPrets}/{Liste.Length}")
             if (Reste <= 0.0 or Tous?):
                 break
             Sleep(0.25)
         for (CD : Liste):
             CD.Completer()
             if (set Paquets[CD.J] = CD.Main()) {}
+            AfficherLobby(CD.J, "")
         FermerEcrans()
 
     # LES REGLES, au debut de la manche, pour tout le monde
