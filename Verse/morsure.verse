@@ -656,8 +656,6 @@ hands_manager := class(creative_device):
     # (3 pour une table de 4). Vide = il reste a sa place. Ensuite il peut se deplacer librement.
     @editable PointsElimines : []creative_prop = array{}
     @editable PiegesParGrille : int = 2
-    # a la table : on peut tourner la tete de ce nombre de degres a gauche et a droite de la machine, pas plus
-    @editable LimiteTete : float = 70.0
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
@@ -737,7 +735,6 @@ hands_manager := class(creative_device):
                 Manche(Table0)
                 ZonePendantPartie()
                 GarderEnPlace()
-                LimiterLaTete()
             ZoneLobby.UnregisterAll()
             Sleep(1.0)
 
@@ -982,7 +979,7 @@ hands_manager := class(creative_device):
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
             Asseoir(J, PlaceIndex(J), ?Annonce := false)
-        # securite : AUCUNE camera fixe ne reste sur lui, et il est refige (tete limitee, voir LimiterLaTete) (meme si la
+        # securite : AUCUNE camera fixe ne reste sur lui, et il est refige (meme si la
         # teleportation de retour a ete refusee)
         for (Cam : CamerasClavier):
             Cam.RemoveFrom(J)
@@ -1014,25 +1011,11 @@ hands_manager := class(creative_device):
                     if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := 15.0}, Perso.GetTransform().Rotation]) {}
                     spawn{ RefigerPlusTard(J) }
 
-    # LA TETE LIMITEE : a la table, on peut regarder autour de soi, mais pas plus de LimiteTete degres a gauche ou
-    # a droite de la machine (pas de 360). S'il va plus loin, il est remis AU BORD de la limite (pas au centre).
-    LimiterLaTete()<suspends> : void =
-        loop:
-            Sleep(0.2)
-            Borne := Min(170.0, Max(20.0, LimiteTete))
-            for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], Vue := Orientations[J]):
-                F := Perso.GetTransform().Rotation.GetLocalForward()
-                Ecart := AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Vue)
-                if (Ecart > Borne + 5.0):
-                    spawn{ FaceMachineApres(J, Vue + Borne, array{0.0}) }
-                else if (Ecart < -Borne - 5.0):
-                    spawn{ FaceMachineApres(J, Vue - Borne, array{0.0}) }
-
     RefigerPlusTard(J : player)<suspends> : void =
         Sleep(0.3)
         Verrouiller(J)
 
-    # le joueur est FIGE SUR SA PLACE : s'il en est a plus de 30 cm, il y est d'abord remis, puis fige (tete limitee)
+    # le joueur est FIGE SUR SA PLACE : s'il en est a plus de 30 cm, il y est d'abord remis, puis fige
     Verrouiller(J : player) : void =
         if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?, Contient(Vivants, J)?):
             if (P := PoseDe[J]):
@@ -1064,13 +1047,10 @@ hands_manager := class(creative_device):
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
-    FaceSiBesoin(J : player, Lacet : float, Delai : float)<suspends> : void =
-        Sleep(Delai)
-        if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?):
-            F := Perso.GetTransform().Rotation.GetLocalForward()
-            Actuel := ArcTan(F.Y, F.X) * 180.0 / PiFloat
-            if (Abs(AngleCourt(Actuel - Lacet)) > 25.0):
-                FaceMachineApres(J, Lacet, array{0.0})
+    # LES CARTES : a l'ouverture de l'ecran des cartes, chaque joueur encore en jeu est remis face a la machine (une fois)
+    RemettreDroit() : void =
+        for (J : Table, ALaTable(J)?, not EnMachine[J]?, Vue := Orientations[J]):
+            spawn{ FaceMachineApres(J, Vue, array{0.3}) }
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -1120,10 +1100,6 @@ hands_manager := class(creative_device):
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
             spawn{ VerrouArrivee(J) }
-            # DES LE DEBUT face a la machine : verifie 1,5 s puis 4 s apres l'arrivee (apres le chargement de la zone)
-            if (Vue := Orientations[J]):
-                spawn{ FaceSiBesoin(J, Vue, 1.5) }
-                spawn{ FaceSiBesoin(J, Vue, 4.0) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
@@ -1338,9 +1314,6 @@ hands_manager := class(creative_device):
                 Dt := Duree / (Pas * 1.0)
                 Depart := LacetMachine
                 SonRotation.Play()
-                # la machine tourne : TOUS les joueurs encore en jeu sont re-teleportes face a la machine
-                for (JT : Table, ALaTable(JT)?, Vue := Orientations[JT]):
-                    spawn{ FaceMachineApres(JT, Vue, array{0.0}) }
                 for (K := 1..Pas):
                     Frac := (K * 1.0) / (Pas * 1.0)
                     # vitesse constante, et elle s'arrete d'un coup (roulette comprise)
@@ -2007,6 +1980,7 @@ hands_manager := class(creative_device):
     # LE CHOIX DES CARTES : les 6 cartes, leur effet ; on en prend 3 (clic = prise / rendue), puis CONFIRM
     ChoixDepart()<suspends> : void =
         FermerEcrans()
+        RemettreDroit()
         var Liste : []choix_depart = array{}
         for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
@@ -2070,6 +2044,7 @@ hands_manager := class(creative_device):
     # SON CHOIX : deux gros mots, PLAY A CARD / NO CARD (et les boutons qui l'attendent, s'il y en a)
     EcranAction(Actif : player, Attente : int, PeutJouer : logic, PeutPiocher : logic) : void =
         FermerEcrans()
+        RemettreDroit()
         for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = Entete(J, Chrono)
