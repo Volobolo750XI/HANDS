@@ -1002,6 +1002,12 @@ hands_manager := class(creative_device):
             # camera fixe du clavier sur lui (sinon il voit par une camera qui n'est pas la sienne : ecran noir, vue bloquee)
             for (J : Table, not EnMachine[J]?, Cam : CamerasClavier):
                 Cam.RemoveFrom(J)
+            # TOUJOURS FACE A LA MACHINE : un joueur tourne de plus de 90 degres (dos ou cote a la table, souvent un bug)
+            # est remis face a la machine
+            for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], Vue := Orientations[J]):
+                F := Perso.GetTransform().Rotation.GetLocalForward()
+                if (Abs(AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Vue)) > 90.0):
+                    spawn{ FaceMachineApres(J, Vue, array{0.0}) }
             for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
                 E := Perso.GetTransform().Translation - P
                 if (E.X * E.X + E.Y * E.Y > 22500.0):
