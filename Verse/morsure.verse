@@ -657,7 +657,7 @@ hands_manager := class(creative_device):
     @editable PointsElimines : []creative_prop = array{}
     @editable PiegesParGrille : int = 2
     # a la table : on peut tourner la tete de ce nombre de degres a gauche et a droite de la machine, pas plus
-    @editable LimiteTete : float = 70.0
+    @editable LimiteTete : float = 60.0
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
@@ -1014,19 +1014,19 @@ hands_manager := class(creative_device):
                     if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := 15.0}, Perso.GetTransform().Rotation]) {}
                     spawn{ RefigerPlusTard(J) }
 
-    # LA TETE LIMITEE : a la table, on peut regarder autour de soi, mais pas plus de LimiteTete degres a gauche ou
-    # a droite de la machine (pas de 360). S'il va plus loin, il est remis AU BORD de la limite (pas au centre).
+    # LA TETE LIMITEE (comme dans l'ancienne version qui marchait) : on regarde ou on veut jusqu'a LimiteTete degres
+    # a gauche et a droite de la machine ; au-dela, la vue est simplement retenue a la limite (seule la rotation
+    # change, le joueur n'est NI libere NI refige, il ne bouge pas de place : pas de saccade)
     LimiterLaTete()<suspends> : void =
         loop:
             Sleep(0.1)
-            Borne := Min(170.0, Max(20.0, LimiteTete))
-            for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], Vue := Orientations[J]):
-                F := Perso.GetTransform().Rotation.GetLocalForward()
-                Ecart := AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Vue)
-                if (Ecart > Borne + 2.0):
-                    spawn{ FaceMachineApres(J, Vue + Borne, array{0.0}) }
-                else if (Ecart < -Borne - 2.0):
-                    spawn{ FaceMachineApres(J, Vue - Borne, array{0.0}) }
+            Borne := Min(170.0, Max(10.0, LimiteTete))
+            for (J : Vivants, not EnMachine[J]?, Cible := Orientations[J], Perso := J.GetFortCharacter[], Perso.IsActive[]):
+                F := Perso.GetViewRotation().GetLocalForward()
+                Ecart := AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Cible)
+                Retenu := if (Ecart > Borne) then Borne else if (Ecart < -Borne) then -Borne else Ecart
+                if (Retenu <> Ecart):
+                    if (Perso.TeleportTo[Perso.GetTransform().Translation, MakeRotationFromYawPitchRollDegrees(Cible + Retenu, 0.0, 0.0)]) {}
 
     RefigerPlusTard(J : player)<suspends> : void =
         Sleep(0.3)
