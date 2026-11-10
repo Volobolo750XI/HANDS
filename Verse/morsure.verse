@@ -991,7 +991,7 @@ hands_manager := class(creative_device):
             Cam.RemoveFrom(J)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
-            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
+            Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
         if (Vue := Orientations[J]):
             spawn{ FaceMachineApres(J, Vue, array{0.05, 0.1, 0.15, 0.25}) }
         Sleep(0.3)
@@ -1023,7 +1023,7 @@ hands_manager := class(creative_device):
                 Ici := Perso.GetTransform().Translation
                 Perso.ReleaseFromStasis()
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
@@ -1206,7 +1206,7 @@ hands_manager := class(creative_device):
                 if (set PoseDe[J] = Perso.GetTransform().Translation) {}
             else:
                 # teleportation refusee partout : il est quand meme FIGE (jamais libre de marcher a la table)
-                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := false, AllowEmotes := false})
+                Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
     # teleporte le joueur a Pose ; si Fortnite refuse (il ne rentre pas : table, mur...), plus haut, puis devant.
     # 0 = pile a Pose, 1 = au-dessus (il tombe), 2 = devant, -1 = refuse partout (il reste ou il est)
@@ -1214,7 +1214,8 @@ hands_manager := class(creative_device):
         var Resultat : int = -1
         if (Perso.TeleportTo[Pose, Rot]):
             set Resultat = 0
-        for (H : array{40.0, 80.0, 130.0, 200.0}, Resultat < 0):
+        # (jamais trop haut : a 1,30 m ou 2 m, il pouvait se retrouver dans le toit -> ecran noir)
+        for (H : array{15.0, 40.0, 80.0}, Resultat < 0):
             if (Perso.TeleportTo[Pose + vector3{X := 0.0, Y := 0.0, Z := H}, Rot]):
                 set Resultat = 1
         for (D : array{60.0, 120.0}, Resultat < 0):
