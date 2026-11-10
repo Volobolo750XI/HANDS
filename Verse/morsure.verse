@@ -955,16 +955,16 @@ hands_manager := class(creative_device):
         for (K -> Pl : Places, K <= Voulue):
             Ici := Pl.GetTransform().Translation
             var PlusPres : float = 2000.0 * 2000.0
-            var Choix : int = -1
+            var ChoixCam : int = -1
             for (C -> Cam : CamerasClavier, not ContientEntier(Prises, C)?):
                 V := Cam.GetTransform().Translation - Ici
                 D := DotProduct(V, V)
                 if (D < PlusPres):
                     set PlusPres = D
-                    set Choix = C
-            if (Choix >= 0):
-                set Prises += array{Choix}
-                if (K = Voulue, Cam := CamerasClavier[Choix]):
+                    set ChoixCam = C
+            if (ChoixCam >= 0):
+                set Prises += array{ChoixCam}
+                if (K = Voulue, Cam := CamerasClavier[ChoixCam]):
                     set Resultat = option{Cam}
         Resultat
 
