@@ -12,7 +12,6 @@
 using { /Fortnite.com/Devices }
 using { /Fortnite.com/Characters }
 using { /Fortnite.com/UI }
-using { /Fortnite.com/Animation/PlayAnimation }
 using { /Verse.org/Simulation }
 using { /Verse.org/Random }
 using { /Verse.org/Colors }
@@ -620,14 +619,6 @@ hands_manager := class(creative_device):
     # Son des BOUTONS et des CARTES qu'on clique (confirmer, jouer une carte, choisir ses cartes...).
     # Lecteur audio : lecture automatique NON, en boucle NON, spatialisation NON.
     @editable SonBouton : audio_player_device = audio_player_device{}
-    # Animation "se pencher et appuyer" (Mixamo -> squelette Fortnite). Vide = pas d'animation.
-    @editable AnimAppui : ?animation_sequence = false
-    # l'animation d'appui s'ARRETE (reste figee) sur cette image le temps que le bouton reagisse (feinte ou
-    # morsure), puis elle reprend jusqu'a la fin. ImagesParSecondeAppui : 30 pour une animation Mixamo.
-    @editable ImageArretAppui : float = 210.0
-    # direction du CORPS pendant l'animation, par rapport a la machine (degres) : -90 = un quart de tour a gauche
-    @editable CorrectionCorps : float = -90.0
-    @editable ImagesParSecondeAppui : float = 30.0
     # A SA PLACE : le joueur est pose PILE sur sa Place (debout), tourne vers la machine, fige, a la PREMIERE
     # PERSONNE (si Fortnite refuse la teleportation, il est pose un peu plus haut ou un peu devant).
     # Pour le caler : AvanceAssis = cm vers la table (negatif = en arriere), HauteurAssis = cm vers le haut.
@@ -980,7 +971,6 @@ hands_manager := class(creative_device):
 
     # a l'arrivee a sa place : sa vue est tournee FACE A LA MACHINE (refait 2 fois, Fortnite l'applique parfois en retard)
     RetourPlace(J : player)<suspends> : void =
-        ArreterAppui(J)
         # (plus d'ecran noir : le retour a sa place se fait directement)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
             Perso.ReleaseFromStasis()
@@ -1526,12 +1516,7 @@ hands_manager := class(creative_device):
             loop:
                 if (Requis <= 0 or Elimine? or LibresRestants() = 0):
                     break
-                # l'animation part tout de suite et reste figee a l'image d'arret jusqu'au clic
-                Pret := LancerAppui(J)
                 K := ViserEtCliquer(J, Requis, Vu, Fin)
-                # clic avant que la pose soit atteinte : l'animation SAUTE a la pose, le clic est pris tout de suite
-                if (GetSimulationElapsedTime() < Pret):
-                    SauterALaPose(J)
                 if (K >= 0):
                     if (K = Vu):
                         set Vu = -1
@@ -1550,8 +1535,6 @@ hands_manager := class(creative_device):
                     else:
                         Feinte()
                         set Requis -= 1
-                    # le geste reprend la ou il etait fige, jusqu'a la fin (il retire sa main)
-                    ReprendreAppui(J)
             if (not Elimine?):
                 # retour a sa place SANS temps mort : ecran noir tres court, on le re-pose (comme au debut de la
                 # manche) PENDANT qu'il voit encore la camera du clavier, on enleve la camera, on corrige tout de suite
@@ -1569,7 +1552,6 @@ hands_manager := class(creative_device):
     # ou il rentre au lobby avec le bouton BACK TO LOBBY
     DevenirSpectateur(J : player, K : int)<suspends> : void =
         Sleep(0.5)
-        ArreterAppui(J)
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             # INVISIBLE pour les autres : en se promenant, il ne peut pas cacher la machine aux joueurs encore en jeu
@@ -1823,7 +1805,7 @@ hands_manager := class(creative_device):
         if (M := Paquets[J], M.Length > 0):
             RetirerRelique(J, GetRandomInt(0, M.Length - 1))
 
-    # le personnage se penche (animation), puis le bouton s'enfonce
+    # le bouton s'enfonce
     Appuyer(J : player, K : int)<suspends> : void =
         if (set Enfoncee[K] = true) {}
         if (T := Touches[K], B0 := BaseTouches[K]):
@@ -1832,65 +1814,6 @@ hands_manager := class(creative_device):
         Sleep(0.1)
         SonClic.Play()
         Sleep(0.4)
-
-    # DES QUE C'EST A LUI D'APPUYER : le corps face a la machine (bloque), le geste jusqu'a l'image d'arret, et il
-    # reste FIGE dessus (le doigt sur le bouton) tant qu'il n'a pas clique. Renvoie le moment ou la pose est atteinte.
-    LancerAppui(J : player) : float =
-        var Pret : float = GetSimulationElapsedTime()
-        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            if (Vue := Orientations[J]):
-                Ici := Perso.GetTransform().Translation
-                Perso.ReleaseFromStasis()
-                if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Vue + CorrectionCorps, 0.0, 0.0)]) {}
-                Perso.PutInStasis(stasis_args{AllowTurning := false, AllowFalling := false, AllowEmotes := false})
-            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            InstAppui := Controle.Play(Anim)
-            if (set AnimEnCours[J] = InstAppui) {}
-            Num := (if (N0 := NumAppui[J]) then N0 else 0) + 1
-            if (set NumAppui[J] = Num) {}
-            spawn{ FigerAppui(J, Arret, Num) }
-            set Pret = GetSimulationElapsedTime() + Arret
-        Pret
-
-    SauterALaPose(J : player) : void =
-        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            Arret := ImageArretAppui / Max(1.0, ImagesParSecondeAppui)
-            InstAppui := Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.1)
-            if (set AnimEnCours[J] = InstAppui) {}
-
-    # (Num : on ne fige que si l'animation n'a pas deja repris entre-temps)
-    var NumAppui : [player]int = map{}
-    # l'animation d'appui en cours de chaque joueur (pour pouvoir l'ARRETER net)
-    var AnimEnCours : [player]play_animation_instance = map{}
-
-    # retour a sa place : l'animation d'appui est arretee et ne peut plus etre reprise (sinon il reste penche,
-    # la tete dans la table -> en premiere personne, ecran noir)
-    ArreterAppui(J : player) : void =
-        if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1000) {}
-        if (A := AnimEnCours[J]):
-            A.Stop()
-    FigerAppui(J : player, Arret : float, Num : int)<suspends> : void =
-        Sleep(Arret)
-        TenirPose(J, Arret, Num)
-
-    # Fortnite refuse la vitesse 0 : on rejoue l'animation sur l'image d'arret au RALENTI EXTREME (1 %), remise pile
-    # sur l'image chaque seconde -> a l'oeil, elle est figee. S'arrete des que l'animation reprend (Num change).
-    TenirPose(J : player, Arret : float, Num : int)<suspends> : void =
-        loop:
-            if (not NumAppui[J] = Num):
-                break
-            if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-                InstAppui := Controle.Play(Anim, ?PlayRate := 0.01, ?StartPositionSeconds := Arret, ?BlendInTime := 0.0, ?BlendOutTime := 0.0)
-                if (set AnimEnCours[J] = InstAppui) {}
-            else:
-                break
-            Sleep(1.0)
-
-    ReprendreAppui(J : player) : void =
-        if (N0 := NumAppui[J], set NumAppui[J] = N0 + 1) {}
-        if (Anim := AnimAppui?, Perso := J.GetFortCharacter[], Controle := Perso.GetPlayAnimationController[]):
-            InstAppui := Controle.Play(Anim, ?StartPositionSeconds := ImageArretAppui / Max(1.0, ImagesParSecondeAppui), ?BlendInTime := 0.0)
-            if (set AnimEnCours[J] = InstAppui) {}
 
     # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
     # et la grille repart a zero
