@@ -2048,6 +2048,8 @@ hands_manager := class(creative_device):
     # LES REGLES, au debut de la manche, pour tout le monde
     EcranRegles() : void =
         FermerEcrans()
+        # pendant les regles : TOTALEMENT FIGE (ecran a la souris = la vue ne bouge pas), face a la machine
+        RemettreDroit()
         for (J : Assis, ALaTable(J)?):
             Chrono := NouveauChrono()
             var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.75}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
@@ -2056,7 +2058,7 @@ hands_manager := class(creative_device):
             set S += TexteEcrit("OR TO TRAP THE OTHERS", 0.5, 0.5, 0.0, -20.0, 56.0)
             set S += TexteEcrit("THEN PRESS A BUTTON ON THE MACHINE...", 0.5, 0.5, 0.0, 70.0, 56.0)
             set S += TexteEcrit("AND PRAY.", 0.5, 0.5, 0.0, 170.0, 80.0)
-            Montrer(J, S, Chrono, false)
+            Montrer(J, S, Chrono, true)
 
     # SON CHOIX : deux gros mots, PLAY A CARD / NO CARD (et les boutons qui l'attendent, s'il y en a)
     EcranAction(Actif : player, Attente : int, PeutJouer : logic, PeutPiocher : logic) : void =
