@@ -1014,8 +1014,24 @@ hands_manager := class(creative_device):
 
     RefigerPlusTard(J : player)<suspends> : void =
         Sleep(0.3)
-        if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?):
+        Verrouiller(J)
+
+    # le joueur est FIGE SUR SA PLACE : s'il en est a plus de 30 cm, il y est d'abord remis, puis fige (tete libre)
+    Verrouiller(J : player) : void =
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?, Contient(Vivants, J)?):
+            if (P := PoseDe[J]):
+                E := Perso.GetTransform().Translation - P
+                if (E.X * E.X + E.Y * E.Y > 900.0):
+                    Perso.ReleaseFromStasis()
+                    if (Perso.TeleportTo[P + vector3{X := 0.0, Y := 0.0, Z := 15.0}, Perso.GetTransform().Rotation]) {}
             Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
+
+    # ARRIVEE A LA TABLE : pendant 3 s, il est reverrouille 5 fois par seconde (Fortnite annule parfois le gel
+    # pendant le chargement de la zone) : il n'a jamais le temps de bouger
+    VerrouArrivee(J : player)<suspends> : void =
+        for (K := 1..15):
+            Sleep(0.2)
+            Verrouiller(J)
 
     # (un joueur FIGE ignore la rotation : on le libere un instant, on le tourne, on le refige)
     FaceMachine(J : player, Lacet : float)<suspends> : void =
@@ -1137,6 +1153,7 @@ hands_manager := class(creative_device):
         set Bloque = 0
         for (I -> J : Liste):
             Asseoir(J, PlaceIndex(J))
+            spawn{ VerrouArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
         EcranRegles()
