@@ -1010,10 +1010,6 @@ hands_manager := class(creative_device):
     GarderEnPlace()<suspends> : void =
         loop:
             Sleep(0.5)
-            # SECURITE ECRAN NOIR : un joueur qui n'est PAS en train de jouer sur la machine ne doit avoir AUCUNE
-            # camera fixe du clavier sur lui (sinon il voit par une camera qui n'est pas la sienne : ecran noir, vue bloquee)
-            for (J : Table, not EnMachine[J]?, Cam : CamerasClavier):
-                Cam.RemoveFrom(J)
             for (J : Vivants, not EnMachine[J]?, Perso := J.GetFortCharacter[], Perso.IsActive[], P := PoseDe[J]):
                 E := Perso.GetTransform().Translation - P
                 if (E.X * E.X + E.Y * E.Y > 22500.0):
