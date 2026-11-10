@@ -1043,6 +1043,14 @@ hands_manager := class(creative_device):
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
+    FaceSiBesoin(J : player, Lacet : float)<suspends> : void =
+        Sleep(0.4)
+        if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?):
+            F := Perso.GetTransform().Rotation.GetLocalForward()
+            Actuel := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+            if (Abs(AngleCourt(Actuel - Lacet)) > 25.0):
+                FaceMachineApres(J, Lacet, array{0.0})
+
     AngleCourt(A0 : float)<transacts> : float =
         var A : float = A0
         for (K := 1..4):
@@ -1956,7 +1964,10 @@ hands_manager := class(creative_device):
             Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
-        # (plus de teleportation ici : se re-teleporter sur place a chaque ecran donnait un ecran noir a plusieurs)
+        # ecran a la souris : s'il ne regarde PAS la table (plus de 25 degres d'ecart), il est remis face a la table,
+        # UNE seule fois, un peu apres l'ouverture de l'ecran (pas deux teleportations collees a l'ouverture)
+        if (Souris?, not EnMachine[J]?, Vue := Orientations[J]):
+            spawn{ FaceSiBesoin(J, Vue) }
         if (IU := GetPlayerUI[J]):
             C := canvas{Slots := S}
             if (Souris?):
