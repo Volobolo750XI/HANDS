@@ -657,7 +657,7 @@ hands_manager := class(creative_device):
     @editable PointsElimines : []creative_prop = array{}
     @editable PiegesParGrille : int = 2
     # a la table : on peut tourner la tete de ce nombre de degres a gauche et a droite de la machine, pas plus
-    @editable LimiteTete : float = 60.0
+    @editable LimiteTete : float = 70.0
     @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
     @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
     @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
@@ -838,7 +838,16 @@ hands_manager := class(creative_device):
 
     # LA VICTOIRE : la camera se place devant le gagnant (tournee vers lui) et recule doucement ; toute la table
     # la voit, puis elle est retiree. Sans personnage (deconnecte) : simple attente.
+    var EnVictoire : logic = false
     CinematiqueVictoire(G : player)<suspends> : void =
+        # pendant la scene : PERSONNE ne peut interagir (bouton BACK TO LOBBY coupe), la tete n'est plus limitee
+        set EnVictoire = true
+        BoutonRetourLobby.Disable()
+        SceneVictoire(G)
+        BoutonRetourLobby.Enable()
+        set EnVictoire = false
+
+    SceneVictoire(G : player)<suspends> : void =
         if (Perso := G.GetFortCharacter[]):
             EnleverCameras()
             P := Perso.GetTransform().Translation
@@ -1021,7 +1030,7 @@ hands_manager := class(creative_device):
         loop:
             Sleep(0.1)
             Borne := Min(170.0, Max(10.0, LimiteTete))
-            for (J : Vivants, not EnMachine[J]?, Cible := Orientations[J], Perso := J.GetFortCharacter[], Perso.IsActive[]):
+            for (J : Vivants, not EnVictoire?, not EnMachine[J]?, Cible := Orientations[J], Perso := J.GetFortCharacter[], Perso.IsActive[]):
                 F := Perso.GetViewRotation().GetLocalForward()
                 Ecart := AngleCourt(ArcTan(F.Y, F.X) * 180.0 / PiFloat - Cible)
                 Retenu := if (Ecart > Borne) then Borne else if (Ecart < -Borne) then -Borne else Ecart
