@@ -1043,8 +1043,8 @@ hands_manager := class(creative_device):
                 if (Perso.TeleportTo[Ici, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
                 Perso.PutInStasis(stasis_args{AllowTurning := true, AllowFalling := true, AllowEmotes := false})
 
-    FaceSiBesoin(J : player, Lacet : float)<suspends> : void =
-        Sleep(0.4)
+    FaceSiBesoin(J : player, Lacet : float, Delai : float)<suspends> : void =
+        Sleep(Delai)
         if (Perso := J.GetFortCharacter[], Perso.IsActive[], not EnMachine[J]?):
             F := Perso.GetTransform().Rotation.GetLocalForward()
             Actuel := ArcTan(F.Y, F.X) * 180.0 / PiFloat
@@ -1313,6 +1313,9 @@ hands_manager := class(creative_device):
                 Dt := Duree / (Pas * 1.0)
                 Depart := LacetMachine
                 SonRotation.Play()
+                # la machine tourne : tous les joueurs de la table regardent la table (seulement ceux tournes ailleurs)
+                for (JT : Table, ALaTable(JT)?, Vue := Orientations[JT]):
+                    spawn{ FaceSiBesoin(JT, Vue, 0.0) }
                 for (K := 1..Pas):
                     Frac := (K * 1.0) / (Pas * 1.0)
                     # vitesse constante, et elle s'arrete d'un coup (roulette comprise)
@@ -1965,9 +1968,9 @@ hands_manager := class(creative_device):
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
         # ecran a la souris : s'il ne regarde PAS la table (plus de 25 degres d'ecart), il est remis face a la table,
-        # UNE seule fois, un peu apres l'ouverture de l'ecran (pas deux teleportations collees a l'ouverture)
+        # UNE seule fois, 1 seconde apres l'ouverture de l'ecran (pas deux teleportations collees a l'ouverture)
         if (Souris?, not EnMachine[J]?, Vue := Orientations[J]):
-            spawn{ FaceSiBesoin(J, Vue) }
+            spawn{ FaceSiBesoin(J, Vue, 1.0) }
         if (IU := GetPlayerUI[J]):
             C := canvas{Slots := S}
             if (Souris?):
