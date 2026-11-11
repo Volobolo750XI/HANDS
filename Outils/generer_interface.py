@@ -48,14 +48,14 @@ def coin(d,x,y,sx,sy,t=70):
     clou(d,x+sx*14,y+sy*14,7); clou(d,x+sx*52,y+sy*12,6); clou(d,x+sx*12,y+sy*52,6)
 
 # 1. FOND DE LA BOUTIQUE
-W,H=1600,900
-im=bois(W,H,(150,92,48,255),(110,62,30,255),(176,115,64,255),9,46)
+W,H=2048,1024
+im=bois(W,H,(150,92,48,255),(110,62,30,255),(176,115,64,255),10,52)
 d=ImageDraw.Draw(im)
 # zone interieure sombre pour le contenu
-rr(d,(70,150,W-70,H-60),26,fill=(28,18,12,235),outline=CONT,width=7)
-rr(d,(78,158,W-78,H-68),22,outline=(80,52,30,255),width=3)
+rr(d,(80,160,W-80,H-64),26,fill=(28,18,12,235),outline=CONT,width=7)
+rr(d,(88,168,W-88,H-72),22,outline=(80,52,30,255),width=3)
 for (x,y,sx,sy) in [(14,14,1,1),(W-14,14,-1,1),(14,H-14,1,-1),(W-14,H-14,-1,-1)]: coin(d,x,y,sx,sy)
-for x in range(160,W-150,180): clou(d,x,40,7); clou(d,x,H-32,7)
+for x in range(170,W-160,200): clou(d,x,44,8); clou(d,x,H-34,8)
 fin(im,'Fond_Boutique')
 
 # 2. BANNIERE (ruban rouge)
@@ -72,24 +72,25 @@ d.line([(150*S,30*S),((W-150)*S,30*S),((W-150)*S,190*S),(150*S,190*S),(150*S,30*
 fin(im,'Banniere')
 
 # 3. CARTE D'OBJET
-W,H=512,640
+W,H=512,512
 im=canvas(W,H); d=ImageDraw.Draw(im)
-rr(d,(4,4,W-4,H-4),40,fill=CONT)
-rr(d,(14,14,W-14,H-14),32,fill=(214,160,96,255))
-rr(d,(14,14,W-14,60),32,fill=(238,190,124,255))
-rr(d,(40,40,W-40,H-40),24,fill=(40,28,22,255),outline=CONT,width=6)
-rr(d,(48,48,W-48,130),18,fill=(64,46,34,255))
-for (x,y) in [(28,28),(W-28,28),(28,H-28),(W-28,H-28)]: clou(d,x,y,8)
+x0,x1=51,461
+rr(d,(x0+3,3,x1-3,H-3),34,fill=CONT)
+rr(d,(x0+12,12,x1-12,H-12),28,fill=(214,160,96,255))
+rr(d,(x0+12,12,x1-12,52),28,fill=(238,190,124,255))
+rr(d,(x0+34,34,x1-34,H-34),20,fill=(40,28,22,255),outline=CONT,width=5)
+rr(d,(x0+41,41,x1-41,108),16,fill=(64,46,34,255))
+for (x,y) in [(x0+23,23),(x1-23,23),(x0+23,H-23),(x1-23,H-23)]: clou(d,x,y,7)
 fin(im,'Carte_Objet')
 
 # 4. ONGLETS
 def onglet(nom,base,clair):
-    W,H=512,160
+    W,H=512,128
     im=canvas(W,H); d=ImageDraw.Draw(im)
-    rr(d,(4,4,W-4,H-4),48,fill=CONT)
-    rr(d,(14,14,W-14,H-14),40,fill=base)
-    rr(d,(26,20,W-26,64),26,fill=clair)
-    d.line([40*S,(H-30)*S,(W-40)*S,(H-30)*S],fill=tuple(max(0,v-40) for v in base[:3])+(255,),width=6*S)
+    rr(d,(4,4,W-4,H-4),40,fill=CONT)
+    rr(d,(13,13,W-13,H-13),33,fill=base)
+    rr(d,(24,18,W-24,52),20,fill=clair)
+    d.line([40*S,(H-26)*S,(W-40)*S,(H-26)*S],fill=tuple(max(0,v-40) for v in base[:3])+(255,),width=6*S)
     fin(im,nom)
 onglet('Onglet',(140,88,46,255),(176,118,66,255))
 onglet('Onglet_Actif',(255,196,40,255),(255,234,140,255))
@@ -107,10 +108,10 @@ for a,b,c,e in [(80,80,176,176),(176,80,80,176)]:
 fin(im,'Bouton_Fermer')
 
 # 6. CADRE DES DENTS (en haut a droite)
-W,H=512,140
+W,H=512,128
 im=canvas(W,H); d=ImageDraw.Draw(im)
-rr(d,(4,4,W-4,H-4),60,fill=CONT)
-rr(d,(14,14,W-14,H-14),52,fill=(40,28,22,240))
-rr(d,(24,20,W-24,52),24,fill=(70,52,40,255))
+rr(d,(4,4,W-4,H-4),56,fill=CONT)
+rr(d,(14,14,W-14,H-14),48,fill=(40,28,22,240))
+rr(d,(24,20,W-24,50),22,fill=(70,52,40,255))
 fin(im,'Cadre_Dents')
 print('ok')

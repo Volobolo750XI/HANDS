@@ -1700,7 +1700,7 @@ hands_manager := class(creative_device):
                     if (set TextesHud[J] = Cle) {}
                     if (Ancien := Huds[J]):
                         IU.RemoveWidget(Ancien)
-                    var S : []canvas_slot = array{PlaceZ(ImgH(Interface.Cadre_Dents, 300.0, 82.0), 1.0, 0.0, -330.0, 45.0, 0)}
+                    var S : []canvas_slot = array{PlaceZ(ImgH(Interface.Cadre_Dents, 320.0, 80.0), 1.0, 0.0, -330.0, 45.0, 0)}
                     set S += array{IconeDent(1.0, 0.0, -440.0, 45.0, 56.0)}
                     set S += TexteGauche("{A.Dents}", 1.0, 0.0, -405.0, 45.0, 40.0)
                     set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -430.0, 95.0, 34.0)
@@ -1780,13 +1780,13 @@ hands_manager := class(creative_device):
     # dans des cartes (icone, nom, prix avec la dent, bouton BUY / EQUIP), croix rouge pour fermer
     DessinerMenu(J : player, Casier : logic, Onglet : int, Ev : event(int), FinM : event()) : []canvas_slot =
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
-        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1600.0, 900.0), 0.5, 0.5, 0.0, 20.0, 0)}
+        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1800.0, 900.0), 0.5, 0.5, 0.0, 20.0, 0)}
         # la banniere et le titre
         set S += array{PlaceZ(ImgH(Interface.Banniere, 640.0, 160.0), 0.5, 0.5, 0.0, -395.0, 0)}
         set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -405.0, 70.0)
         # ses Dents, en haut a gauche du panneau
         TexteDents := "{StatsDe(J).Dents}"
-        set S += array{PlaceZ(ImgH(Interface.Cadre_Dents, 300.0, 82.0), 0.5, 0.5, -560.0, -385.0, 0)}
+        set S += array{PlaceZ(ImgH(Interface.Cadre_Dents, 320.0, 80.0), 0.5, 0.5, -560.0, -385.0, 0)}
         set S += array{IconeDent(0.5, 0.5, -650.0, -385.0, 58.0)}
         set S += TexteGauche(TexteDents, 0.5, 0.5, -610.0, -385.0, 40.0)
         # la croix rouge
@@ -1794,12 +1794,12 @@ hands_manager := class(creative_device):
         ZoneFermer := TEST1{}
         CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
         spawn{ CF.Suivre() }
-        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 725.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 725.0, -385.0, 90.0, 90.0)}
+        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 815.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 815.0, -385.0, 90.0, 90.0)}
         # les onglets en bois (jaune = celui qui est ouvert)
         Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
             FondO := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet
-            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{Interface.Onglet_Actif}, ?Ratio := 3.2)
+            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{Interface.Onglet_Actif}, ?Ratio := 4.0)
         # les objets : des cartes, 4 par rangee
         var Liste : []int = array{}
         if (Casier?, Onglet = 0):
@@ -1813,7 +1813,7 @@ hands_manager := class(creative_device):
             Rangee := if (Q := Floor[(K * 1.0) / 4.0]) then Q else 0
             X := (Col * 1.0 - 1.5) * 300.0
             Y := -60.0 + Rangee * 320.0
-            set S += array{PlaceZ(ImgH(Interface.Carte_Objet, 240.0, 300.0), 0.5, 0.5, X, Y, 0)}
+            set S += array{PlaceZ(ImgH(Interface.Carte_Objet, 300.0, 300.0), 0.5, 0.5, X, Y, 0)}
             if (Icone := IconeObjet(Id)?):
                 set S += array{PlaceZ(ImgH(Icone, 150.0, 150.0), 0.5, 0.5, X, Y - 55.0, 0)}
             Nom := if (Id = 199) then "NO HAT" else if (Id = 499) then "NORMAL" else NomObjet(Id)
