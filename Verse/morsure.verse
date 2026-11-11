@@ -1683,19 +1683,72 @@ hands_manager := class(creative_device):
     # --- LE COFFRE DU JOUR (lobby) : 50 a 300 Dents, une fois par jour
     QuandCoffre(Agent : agent) : void =
         if (J := player[Agent]):
-            Jour := JourActuel()
-            A := StatsDe(J)
-            if (A.DernierJourCoffre <> Jour):
-                Gain := GetRandomInt(50, 300)
-                if:
-                    set Stats[J] = stats_joueur:
-                        Dents := A.Dents + Gain
-                        DernierJourCoffre := Jour
-                        CopieStats<constructor>(A)
-                SonBouton.Play()
-                spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST!", ?AvecDent := true) }
-            else:
-                Avertir(J, "COME BACK TOMORROW FOR A NEW CHEST!")
+            spawn{ OuvrirCoffre(J) }
+
+    # LA FENETRE DU COFFRE DU JOUR (meme style que la boutique) : le coffre en grand, OPEN s'il est pret,
+    # sinon le temps avant le prochain (il change chaque seconde)
+    OuvrirCoffre(J : player)<suspends> : void =
+        if (Contient(MenusOuverts, J)?):
+            return
+        set MenusOuverts += array{J}
+        loop:
+            if (not EstLa(J)?):
+                break
+            Ev := event(int){}
+            FinM := event(){}
+            C := canvas{Slots := DessinerCoffre(J, Ev, FinM)}
+            if (IU := GetPlayerUI[J]):
+                IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+            Code := race:
+                Ev.Await()
+                block:
+                    Sleep(1.0)
+                    -1
+            FinM.Signal()
+            if (IU := GetPlayerUI[J]):
+                IU.RemoveWidget(C)
+            if (Code = 999):
+                break
+            if (Code = 3001):
+                Jour := JourActuel()
+                A := StatsDe(J)
+                if (A.DernierJourCoffre <> Jour):
+                    Gain := GetRandomInt(50, 300)
+                    if:
+                        set Stats[J] = stats_joueur:
+                            Dents := A.Dents + Gain
+                            DernierJourCoffre := Jour
+                            CopieStats<constructor>(A)
+                    spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST!", ?AvecDent := true) }
+        set MenusOuverts = for (X : MenusOuverts, X <> J) do X
+
+    DessinerCoffre(J : player, Ev : event(int), FinM : event()) : []canvas_slot =
+        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
+        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1200.0, 600.0), 0.5, 0.5, 0.0, 20.0, 0)}
+        set S += array{PlaceZ(ImgH(Interface.Banniere, 640.0, 160.0), 0.5, 0.5, 0.0, -255.0, 0)}
+        set S += TexteEcrit("DAILY CHEST", 0.5, 0.5, 0.0, -265.0, 58.0)
+        ImgFermer := ImgH(Interface.Bouton_Fermer, 80.0, 80.0)
+        ZoneFermer := TEST1{}
+        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 80.0, Zone := ZoneFermer, Son := SonBouton}
+        spawn{ CF.Suivre() }
+        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 530.0, -240.0), PlaceH(ZoneFermer, 0.5, 0.5, 530.0, -240.0, 80.0, 80.0)}
+        set S += array{PlaceZ(ImgH(Interface.Icone_Coffre, 260.0, 260.0), 0.5, 0.5, 0.0, -20.0, 1)}
+        Aujourdhui := JourActuel()
+        if (StatsDe(J).DernierJourCoffre <> Aujourdhui):
+            set S += TexteEcrit("FREE TEETH EVERY DAY!", 0.5, 0.5, 0.0, 140.0, 34.0)
+            set S += BoutonTexteAvec(Ev, FinM, "OPEN", 0.5, 0.5, 0.0, 215.0, 50.0, 3001)
+        else:
+            # temps avant minuit (heure universelle) : le prochain coffre
+            Reste := (Aujourdhui + 1) * 86400.0 - GetSecondsSinceEpoch()
+            Total := if (V := Ceil[Reste]) then V else 0
+            H := if (V := Floor[(Total * 1.0) / 3600.0]) then V else 0
+            Mi := if (V := Floor[((Total - H * 3600) * 1.0) / 60.0]) then V else 0
+            Se := Total - H * 3600 - Mi * 60
+            set S += TexteEcrit("NEXT CHEST IN", 0.5, 0.5, 0.0, 140.0, 34.0)
+            set S += TexteEcrit("{H}:{DeuxChiffres(Mi)}:{DeuxChiffres(Se)}", 0.5, 0.5, 0.0, 205.0, 56.0)
+        S
+
+    DeuxChiffres(N : int) : string = if (N < 10) then "0{N}" else "{N}"
 
     # un gros texte qui surgit, pour UN joueur
     AnimerPour(J : player, Gros : string, Ligne : string, ?AvecDent : logic = false)<suspends> : void =
@@ -1742,6 +1795,7 @@ hands_manager := class(creative_device):
                     set S += array{canvas_slot{Widget := ImgH(Interface.Jauge_Remplissage, Remplie, 22.0), Anchors := anchors{Minimum := vector2{X := 1.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 0.0}},
                         Alignment := vector2{X := 0.0, Y := 0.5}, Offsets := margin{Left := -394.0, Top := 132.0, Right := Remplie, Bottom := 22.0}, SizeToContent := false, ZOrder := 1}}
                     set S += TexteGauche(Defi, 1.0, 0.0, -440.0, 172.0, 20.0)
+                    set S += array{PlaceH(ImgH(Interface.EverythingSaves, 300.0, 150.0), 1.0, 0.0, -230.0, 255.0, 300.0, 150.0)}
                     C := canvas{Slots := S}
                     IU.AddWidget(C)
                     if (set Huds[J] = C) {}
