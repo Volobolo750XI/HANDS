@@ -779,7 +779,7 @@ hands_manager := class(creative_device):
     @editable ChapeauxAPorter : []creative_prop_asset = array{}
     @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
     # compensation du retard quand il court (secondes d'avance) : 0 = aucune ; s'il est EN AVANCE, baisse ; en retard, monte
-    @editable AvanceChapeau : float = 0.08
+    @editable AvanceChapeau : float = 0.1
     # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, verte, bleue, rouge, violette
     @editable LampesTable : []customizable_light_device = array{}
     # Son de la MONTEE DE RANG (Lecteur audio, lecture auto NON)
@@ -1521,6 +1521,8 @@ hands_manager := class(creative_device):
             if (set PlaceDe[J] = P) {}
         set Assis = Liste
         set Vivants = Liste
+        if (Premier := Liste[0]):
+            HabillerMachine(Premier)
         EnleverCameras()
         set Paquets = map{}
         set Penalites = map{}
@@ -1592,6 +1594,8 @@ hands_manager := class(creative_device):
                 Sleep(4.0)
         Bandeau("")
         EnleverCameras()
+        if (Premier := Assis[0]):
+            HabillerMachine(Premier, ?Retirer := true)
         # LES RECOMPENSES : Dents, points de rang, victoires, defi du jour
         if (not TestSolo?):
             Recompenser()
@@ -2095,6 +2099,33 @@ hands_manager := class(creative_device):
     # le chapeau est replace A CHAQUE IMAGE, un peu en avant dans le sens ou le joueur bouge (sa vitesse) : il
     # compense le petit retard du reseau et reste colle a la tete, meme en courant
     var PosPrecedente : [player]vector3 = map{}
+    var GenChapeau : [player]int = map{}
+    # le chapeau GLISSE vers la tete toutes les 0,1 s (MoveTo : le mouvement est lisse chez chaque joueur), avec une
+    # petite avance dans le sens de la course (AvanceChapeau s) pour compenser le retard ; s'arrete si le chapeau change
+    SuivreChapeau(J : player, Chapeau : creative_prop, Gen : int)<suspends> : void =
+        var Avant : vector3 = vector3{}
+        var Premier : logic = true
+        var T0 : float = GetSimulationElapsedTime()
+        loop:
+            if (G := GenChapeau[J], G <> Gen):
+                break
+            if (not EstLa(J)?):
+                break
+            if (Perso := J.GetFortCharacter[], Perso.IsActive[]):
+                Ici := Perso.GetTransform().Translation
+                Maintenant := GetSimulationElapsedTime()
+                DtC := Maintenant - T0
+                set T0 = Maintenant
+                Bouge := if (Premier?) then vector3{} else Ici - Avant
+                set Premier = false
+                set Avant = Ici
+                Avance := if (DtC > 0.001, Bouge.Length() < 300.0) then Bouge * (AvanceChapeau / DtC) else vector3{}
+                F := Perso.GetViewRotation().GetLocalForward()
+                Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+                Chapeau.MoveTo(Ici + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0), 0.1)
+            else:
+                Sleep(0.1)
+
     ChapeauxEnBoucle()<suspends> : void =
         var TempsPrecedent : float = GetSimulationElapsedTime()
         loop:
@@ -2107,6 +2138,9 @@ hands_manager := class(creative_device):
                 Voulu := StatsDe(J).ChapeauEquipe
                 Actuel := if (A := ChapeauxIds[J]) then A else -1
                 if (Voulu <> Actuel):
+                    # nouvelle "generation" : la tache qui faisait suivre l'ancien chapeau s'arrete
+                    Gen := (if (G := GenChapeau[J]) then G else 0) + 1
+                    if (set GenChapeau[J] = Gen) {}
                     if (Ancien := ChapeauxPortes[J]):
                         Ancien.Dispose()
                     var Reste : [player]creative_prop = map{}
@@ -2118,20 +2152,12 @@ hands_manager := class(creative_device):
                         Resultat := SpawnProp(Modele, Perso.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, IdentityRotation())
                         if (Nouveau := Resultat(0)?):
                             if (set ChapeauxPortes[J] = Nouveau) {}
+                            spawn{ SuivreChapeau(J, Nouveau, Gen) }
                 if (Chapeau := ChapeauxPortes[J], Perso := J.GetFortCharacter[]):
                     if (Contient(Caches, J)? or not Perso.IsActive[]):
                         Chapeau.Hide()
                     else:
                         Chapeau.Show()
-                        F := Perso.GetViewRotation().GetLocalForward()
-                        Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
-                        # sa vitesse = son deplacement depuis l'image d'avant (pas d'avance apres une teleportation)
-                        Ici := Perso.GetTransform().Translation
-                        Avant := if (P := PosPrecedente[J]) then P else Ici
-                        Bouge := Ici - Avant
-                        Avance := if (Dt > 0.001, Bouge.Length() < 200.0) then Bouge * (AvanceChapeau / Dt) else vector3{}
-                        if (set PosPrecedente[J] = Ici) {}
-                        if (Chapeau.TeleportTo[Ici + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
             # joueurs partis : leur chapeau disparait
             var Garde : [player]creative_prop = map{}
             for (X -> P : ChapeauxPortes):
@@ -2178,9 +2204,15 @@ hands_manager := class(creative_device):
     # Les dents (M_Crocs_Rouges) ne changent que pour l'arc-en-ciel ; la gencive (M_Gencive_Rouge) ne change jamais.
     var SkinActuel : int = 0                     # 0 = machine normale, 401 demon, 402 doree, 403 arc-en-ciel
 
+    # si UN des joueurs de la table a une machine equipee, la machine la porte pendant TOUTE la manche, pour tout
+    # le monde (plusieurs : arc-en-ciel > doree > demon). Retirer : fin de manche, la machine normale revient.
     HabillerMachine(J : player, ?Retirer : logic = false) : void =
-        Id := StatsDe(J).MachineEquipee
-        Voulu := if (Retirer?) then 0 else if (Id >= 401, Id <= 403, Possede(J, Id)?) then Id else 0
+        var Meilleur : int = 0
+        for (X : Assis, EstLa(X)?):
+            Id := StatsDe(X).MachineEquipee
+            if (Id >= 401, Id <= 403, Possede(X, Id)?, Id > Meilleur):
+                set Meilleur = Id
+        Voulu := if (Retirer?) then 0 else Meilleur
         if (Voulu <> SkinActuel):
             set SkinActuel = Voulu
             AppliquerSkin(Voulu)
@@ -2612,7 +2644,6 @@ hands_manager := class(creative_device):
         Verdir(-1)
         FermerEcrans()
         FinLampe.Signal()
-        HabillerMachine(J, ?Retirer := true)
         Elimine
 
     # mordu : le personnage meurt ; quand il reapparait, il est assis sur le siege numero K (au loin)
