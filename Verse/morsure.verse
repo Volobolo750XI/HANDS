@@ -70,40 +70,48 @@ var Invisibles : weak_map(session, []player) = map{}
 
 # --- LA BOUTIQUE -------------------------------------------------------------------------------------------
 #  100-106 CHAPEAUX (Dents), 107 COURONNE DE FEU (V-Bucks)
-#  200-206 LAMPES (200 blanche gratuite, 206 arc-en-ciel), 207 STROBOSCOPE (V-Bucks)
-#  300-304 SONS DES BOUTONS (300 clic gratuit)
-#  401 MACHINE DOREE, 402 MACHINE DEMONIAQUE, 403 MACHINE DE NOEL (V-Bucks)
+#  200 lampe BLANCHE (celle de base, pas dans la boutique), 202-206 LAMPES (verte, bleue, rouge, violette, arc-en-ciel)
+#  401 MACHINE DEMONIAQUE, 402 MACHINE DOREE, 403 MACHINE ARC-EN-CIEL (V-Bucks)
+#  Icones : dossier Boutique (Icone_100.png ...)
 NomObjet(Id : int) : string =
     if (Id = 100) then "BEANIE" else if (Id = 101) then "CAP" else if (Id = 102) then "STRAW HAT" else if (Id = 103) then "MINER HELMET"
     else if (Id = 104) then "TOP HAT" else if (Id = 105) then "WITCH HAT" else if (Id = 106) then "CROWN" else if (Id = 107) then "FIRE CROWN"
-    else if (Id = 200) then "WHITE" else if (Id = 201) then "YELLOW" else if (Id = 202) then "GREEN" else if (Id = 203) then "BLUE"
-    else if (Id = 204) then "RED" else if (Id = 205) then "PURPLE" else if (Id = 206) then "RAINBOW" else if (Id = 207) then "STROBE"
-    else if (Id = 300) then "CLICK" else if (Id = 301) then "BELL" else if (Id = 302) then "BONE CRACK" else if (Id = 303) then "PIG SCREAM"
-    else if (Id = 304) then "HORN" else if (Id = 401) then "GOLDEN MACHINE" else if (Id = 402) then "DEMON MACHINE" else if (Id = 403) then "XMAS MACHINE"
+    else if (Id = 200) then "WHITE" else if (Id = 202) then "GREEN" else if (Id = 203) then "BLUE"
+    else if (Id = 204) then "RED" else if (Id = 205) then "PURPLE" else if (Id = 206) then "RAINBOW"
+    else if (Id = 401) then "DEMON MACHINE" else if (Id = 402) then "GOLDEN MACHINE" else if (Id = 403) then "RAINBOW MACHINE"
     else "?"
+
+IconeObjet(Id : int)<transacts> : ?texture =
+    if (Id = 100) then option{Boutique.Icone_100} else if (Id = 101) then option{Boutique.Icone_101}
+    else if (Id = 102) then option{Boutique.Icone_102} else if (Id = 103) then option{Boutique.Icone_103}
+    else if (Id = 104) then option{Boutique.Icone_104} else if (Id = 105) then option{Boutique.Icone_105}
+    else if (Id = 106) then option{Boutique.Icone_106} else if (Id = 107) then option{Boutique.Icone_107}
+    else if (Id = 202) then option{Boutique.Icone_202} else if (Id = 203) then option{Boutique.Icone_203}
+    else if (Id = 204) then option{Boutique.Icone_204} else if (Id = 205) then option{Boutique.Icone_205}
+    else if (Id = 206) then option{Boutique.Icone_206} else if (Id = 401) then option{Boutique.Icone_401}
+    else if (Id = 402) then option{Boutique.Icone_402} else if (Id = 403) then option{Boutique.Icone_403}
+    else false
 
 # prix en DENTS (0 = gratuit) ; les objets V-Bucks ne s'achetent pas en Dents (-1)
 PrixDents(Id : int)<transacts> : int =
     if (Id = 100) then 200 else if (Id = 101) then 400 else if (Id = 102) then 600 else if (Id = 103) then 900
     else if (Id = 104) then 1200 else if (Id = 105) then 1600 else if (Id = 106) then 2000
-    else if (Id = 200) then 0 else if (Id = 201) then 200 else if (Id = 202) then 400 else if (Id = 203) then 700
+    else if (Id = 200) then 0 else if (Id = 202) then 400 else if (Id = 203) then 700
     else if (Id = 204) then 1000 else if (Id = 205) then 1500 else if (Id = 206) then 2000
-    else if (Id = 300) then 0 else if (Id = 301) then 300 else if (Id = 302) then 600 else if (Id = 303) then 1000 else if (Id = 304) then 1500
     else -1
 
 PrixVBucks(Id : int)<transacts> : int =
-    if (Id = 401) then 800 else if (Id = 402) then 1000 else if (Id = 403) then 600 else if (Id = 107) then 600 else if (Id = 207) then 400 else 0
+    if (Id = 401) then 600 else if (Id = 402) then 800 else if (Id = 403) then 1000 else if (Id = 107) then 600 else 0
 
-# les objets de chaque onglet : 0 CHAPEAUX, 1 LAMPES, 2 SONS, 3 PREMIUM (V-Bucks) / MACHINES (casier)
+# les objets de chaque onglet : 0 CHAPEAUX, 1 LAMPES, 2 PREMIUM (V-Bucks) / MACHINES (casier)
 ObjetsOnglet(Onglet : int, Casier : logic)<transacts> : []int =
     if (Onglet = 0) then (if (Casier?) then array{100, 101, 102, 103, 104, 105, 106, 107} else array{100, 101, 102, 103, 104, 105, 106})
-    else if (Onglet = 1) then (if (Casier?) then array{200, 201, 202, 203, 204, 205, 206, 207} else array{200, 201, 202, 203, 204, 205, 206})
-    else if (Onglet = 2) then array{300, 301, 302, 303, 304}
+    else if (Onglet = 1) then (if (Casier?) then array{200, 202, 203, 204, 205, 206} else array{202, 203, 204, 205, 206})
     else if (Casier?) then array{401, 402, 403}
-    else array{401, 402, 403, 107, 207}
+    else array{401, 402, 403, 107}
 
 Gratuit(Id : int)<transacts> : logic =
-    if (Id = 200 or Id = 300) then true else false
+    if (Id = 200) then true else false
 
 Possede(J : player, Id : int)<transacts> : logic =
     if (Gratuit(Id)?) then true else Dedans(StatsDe(J).Possedes, Id)
@@ -134,16 +142,6 @@ PlancherRang(PointsMax : int)<transacts> : int =
 # le numero du jour (change a minuit UTC)
 JourActuel() : int =
     if (D := Floor[GetSecondsSinceEpoch() / 86400.0]) then D else 0
-
-# le mois (1 a 12) d'un numero de jour
-MoisDu(Jour : int)<transacts> : int =
-    Z := Jour + 719468
-    Era := if (Q := Floor[(Z * 1.0) / 146097.0]) then Q else 0
-    Doe := Z - Era * 146097
-    Yoe := if (Q := Floor[((Doe - (if (A := Floor[(Doe * 1.0) / 1460.0]) then A else 0) + (if (B := Floor[(Doe * 1.0) / 36524.0]) then B else 0) - (if (C := Floor[(Doe * 1.0) / 146096.0]) then C else 0)) * 1.0) / 365.0]) then Q else 0
-    Doy := Doe - (365 * Yoe + (if (A := Floor[(Yoe * 1.0) / 4.0]) then A else 0) - (if (B := Floor[(Yoe * 1.0) / 100.0]) then B else 0))
-    Mp := if (Q := Floor[((5 * Doy + 2) * 1.0) / 153.0]) then Q else 0
-    if (Mp < 10) then Mp + 3 else Mp - 9
 
 # --- LE DEFI DU JOUR : 0 SURVIVE 10 BUTTONS, 1 WIN 1 GAME, 2 PLAY 3 GAMES (+100 Dents) ------------------------
 TypeDefi(Jour : int)<transacts> : int =
@@ -739,11 +737,8 @@ hands_manager := class(creative_device):
     # casque de mineur, haut-de-forme, chapeau de sorciere, couronne, couronne de feu
     @editable ModelesChapeaux : []creative_prop_asset = array{}
     @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
-    # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, jaune, verte, bleue, rouge, violette
+    # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, verte, bleue, rouge, violette
     @editable LampesTable : []customizable_light_device = array{}
-    # Les SONS DES BOUTONS (Lecteur audio, lecture auto NON), DANS L'ORDRE : cloche, os qui craque, cri de cochon, klaxon
-    # (le clic gratuit = SonClic)
-    @editable SonsBoutons : []audio_player_device = array{}
     # Son de la MONTEE DE RANG (Lecteur audio, lecture auto NON)
     @editable SonRang : audio_player_device = audio_player_device{}
     # ANALYTICS : un appareil Analytique par etape
@@ -1636,22 +1631,19 @@ hands_manager := class(creative_device):
     Equiper(J : player, Id : int) : void =
         A := StatsDe(J)
         Chapeau := if (Id >= 100, Id <= 107) then Id else if (Id = 199) then -1 else A.ChapeauEquipe
-        Lampe := if (Id >= 200, Id <= 207) then Id else A.LampeEquipee
-        SonB := if (Id >= 300, Id <= 304) then Id else A.SonEquipe
+        Lampe := if (Id >= 200, Id <= 206) then Id else A.LampeEquipee
         Machine := if (Id >= 401, Id <= 403) then Id else if (Id = 499) then -1 else A.MachineEquipee
         if:
             set Stats[J] = stats_joueur:
                 CopieStats<constructor>(A)
                 ChapeauEquipe := Chapeau
                 LampeEquipee := Lampe
-                SonEquipe := SonB
                 MachineEquipee := Machine
 
     Equipe(J : player, Id : int)<transacts> : logic =
         A := StatsDe(J)
         Lampe := if (A.LampeEquipee >= 200) then A.LampeEquipee else 200
-        Son := if (A.SonEquipe >= 300) then A.SonEquipe else 300
-        if (A.ChapeauEquipe = Id or Lampe = Id or Son = Id or A.MachineEquipee = Id) then true else false
+        if (A.ChapeauEquipe = Id or Lampe = Id or A.MachineEquipee = Id) then true else false
 
     # --- LE COFFRE DU JOUR (lobby) : 50 a 300 Dents, une fois par jour
     QuandCoffre(Agent : agent) : void =
@@ -1743,7 +1735,7 @@ hands_manager := class(creative_device):
                 IU.RemoveWidget(C)
             if (Code = 999):
                 break
-            if (Code >= 900, Code <= 903):
+            if (Code >= 900, Code <= 902):
                 set Onglet = Code - 900
             else if (Code >= 2000):
                 Equiper(J, Code - 2000)
@@ -1758,10 +1750,7 @@ hands_manager := class(creative_device):
         Prix := PrixDents(Id)
         if (Prix < 0):
             # V-Bucks (Machine de Noel : seulement en decembre)
-            Mois := MoisDu(JourActuel())
-            if (Id = 403, Mois <> 12):
-                Avertir(J, "ONLY IN DECEMBER!")
-            else if (V := Vendeurs[GetSession()]):
+            if (V := Vendeurs[GetSession()]):
                 Ok := V.Acheter(J, Id)
                 if (Ok?):
                     AjouterObjet(J, Id)
@@ -1782,17 +1771,19 @@ hands_manager := class(creative_device):
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.02, G := 0.02, B := 0.02}, DefaultOpacity := 0.8}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
         set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -420.0, 90.0)
         set S += TexteEcrit("{StatsDe(J).Dents} TEETH", 0.5, 0.5, 0.0, -345.0, 40.0)
-        Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "SOUNDS", "MACHINES"} else array{"HATS", "LAMPS", "SOUNDS", "PREMIUM"}
+        Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
-            set S += BoutonTexteAvec(Ev, FinM, if (I = Onglet) then "> {Nom} <" else Nom, 0.5, 0.5, (I * 1.0 - 1.5) * 330.0, -265.0, 36.0, 900 + I)
+            set S += BoutonTexteAvec(Ev, FinM, if (I = Onglet) then "> {Nom} <" else Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 380.0, -265.0, 36.0, 900 + I)
         var Ligne : float = -175.0
         # casier : enlever son chapeau / sa machine
-        if (Casier?, Onglet = 0 or Onglet = 3):
+        if (Casier?, Onglet = 0 or Onglet = 2):
             Aucun := if (Onglet = 0) then 199 else 499
             set S += TexteGauche(if (Onglet = 0) then "NO HAT" else "NORMAL MACHINE", 0.5, 0.5, -560.0, Ligne, 34.0)
             set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Aucun)
             set Ligne += 68.0
         for (Id : ObjetsOnglet(Onglet, Casier), not Casier? or Possede(J, Id)?):
+            if (Icone := IconeObjet(Id)?):
+                set S += array{PlaceH(ImgH(Icone, 62.0, 62.0), 0.5, 0.5, -620.0, Ligne, 62.0, 62.0)}
             set S += TexteGauche(NomObjet(Id), 0.5, 0.5, -560.0, Ligne, 34.0)
             Etat := if (Equipe(J, Id)?) then "EQUIPPED" else if (Possede(J, Id)?) then "OWNED"
                 else if (PrixDents(Id) = 0) then "FREE" else if (PrixDents(Id) > 0) then "{PrixDents(Id)} TEETH" else "{PrixVBucks(Id)} V-BUCKS"
@@ -1860,18 +1851,11 @@ hands_manager := class(creative_device):
                 if (Id = 206):
                     # arc-en-ciel : les couleurs defilent
                     loop:
-                        for (K := 1..5):
+                        for (K := 1..4):
                             AllumerSeule(K)
                             Sleep(0.35)
-                else if (Id = 207):
-                    # stroboscope : la lampe clignote (sans son)
-                    loop:
-                        AllumerSeule(0)
-                        Sleep(0.1)
-                        AllumerSeule(-1)
-                        Sleep(0.1)
                 else:
-                    AllumerSeule(if (Id >= 201, Id <= 205) then Id - 200 else 0)
+                    AllumerSeule(if (Id >= 202, Id <= 205) then Id - 201 else 0)
                     loop:
                         Sleep(10.0)
         AllumerSeule(0)
@@ -1882,7 +1866,7 @@ hands_manager := class(creative_device):
             if (I = K) then L.TurnOn() else L.TurnOff()
 
     # --- LA MACHINE du casier : pendant son tour, la machine prend sa matiere ; apres, elle reprend la normale.
-    # Les materiaux (doree, demoniaque, Noel) sont fournis plus tard : MateriauMachine les donnera.
+    # Les materiaux (demoniaque, doree, arc-en-ciel) sont fournis plus tard : MateriauMachine les donnera.
     HabillerMachine(J : player, ?Retirer : logic = false) : void =
         Id := StatsDe(J).MachineEquipee
         if (Retirer?):
@@ -2562,11 +2546,7 @@ hands_manager := class(creative_device):
             B := Tournee(B0, LacetMachine)
             spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
         Sleep(0.1)
-        SonEquipe := StatsDe(J).SonEquipe
-        if (SonEquipe >= 301, Son := SonsBoutons[SonEquipe - 301]):
-            Son.Play()
-        else:
-            SonClic.Play()
+        SonClic.Play()
         Sleep(0.4)
 
     # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
