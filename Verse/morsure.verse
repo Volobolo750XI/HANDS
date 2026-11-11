@@ -754,6 +754,8 @@ hands_manager := class(creative_device):
     @editable Gueule : creative_prop = creative_prop{}
     @editable Touches : []creative_prop = array{}
     @editable Plaque : creative_prop = creative_prop{}
+    # SKINS : la machoire du BAS (MachineMachoireBas), seulement pour changer ses materiaux (elle tourne avec le socle)
+    @editable MachoireBas : creative_prop = creative_prop{}
     # COULEURS DES BOUTONS : 2 materiaux dans un dossier Teintes du Tiroir a contenu :
     #   T_Clair (le bouton vise, blanc), T_Sur (le bouton sur du PEEK, vert) ; sinon le bouton reprend M_Touches
     # Numero de l'emplacement de materiau du bouton (0 en general)
@@ -2155,7 +2157,7 @@ hands_manager := class(creative_device):
             Gueule.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
         # la machoire du bas : 0 Sale_v3, 1 Acier_Poli, 2 Acier_Noir, (3 gencive), 4 Crocs
         for (I -> B : array{0, 3, 2, -1, 5}, B >= 0):
-            Plaque.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
+            MachoireBas.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
         # les 24 boutons (le blanc / vert du jeu reste prioritaire)
         for (K -> T : Touches):
             Peindre(K)
