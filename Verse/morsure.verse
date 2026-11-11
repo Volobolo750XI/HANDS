@@ -778,6 +778,8 @@ hands_manager := class(creative_device):
     # casque de mineur, haut-de-forme, chapeau de sorciere, couronne
     @editable ChapeauxAPorter : []creative_prop_asset = array{}
     @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
+    # compensation du retard quand il court (secondes d'avance) : 0 = aucune ; s'il est EN AVANCE, baisse ; en retard, monte
+    @editable AvanceChapeau : float = 0.08
     # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, verte, bleue, rouge, violette
     @editable LampesTable : []customizable_light_device = array{}
     # Son de la MONTEE DE RANG (Lecteur audio, lecture auto NON)
@@ -2090,9 +2092,11 @@ hands_manager := class(creative_device):
         S
 
     # --- LES CHAPEAUX : un accessoire par joueur, colle a sa tete (partout : lobby, table, victoire)
+    # le chapeau est replace A CHAQUE IMAGE, un peu en avant dans le sens ou le joueur bouge (sa vitesse) : il
+    # compense le petit retard du reseau et reste colle a la tete, meme en courant
     ChapeauxEnBoucle()<suspends> : void =
         loop:
-            Sleep(0.05)
+            Sleep(0.0)
             Caches := if (L := Invisibles[GetSession()]) then L else array{}
             for (J : GetPlayspace().GetPlayers()):
                 Voulu := StatsDe(J).ChapeauEquipe
@@ -2116,7 +2120,8 @@ hands_manager := class(creative_device):
                         Chapeau.Show()
                         F := Perso.GetViewRotation().GetLocalForward()
                         Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
-                        if (Chapeau.TeleportTo[Perso.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                        Avance := Perso.GetVelocity() * AvanceChapeau
+                        if (Chapeau.TeleportTo[Perso.GetTransform().Translation + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
             # joueurs partis : leur chapeau disparait
             var Garde : [player]creative_prop = map{}
             for (X -> P : ChapeauxPortes):
