@@ -9,7 +9,7 @@
 #  La boutique du jeu (onglet PREMIUM) l'utilise toute seule.
 # ============================================================================
 using { /Fortnite.com/Devices }
-using { /Fortnite.com/Marketplace }
+using { /UnrealEngine.com/Marketplace }
 using { /Verse.org/Assets }
 using { /Verse.org/Simulation }
 
