@@ -87,7 +87,7 @@ NomObjet(Id : int) : string =
 
 # la DENT (la monnaie) : son icone, posee a gauche d'un nombre ecrit au pinceau
 IconeDent(AX : float, AY : float, X : float, Y : float, Taille : float) : canvas_slot =
-    PlaceH(ImgH(Boutique.Icone_Dent, Taille, Taille), AX, AY, X, Y, Taille, Taille)
+    PlaceZ(ImgH(Boutique.Icone_Dent, Taille, Taille), AX, AY, X, Y, 1)
 
 IconeObjet(Id : int)<transacts> : ?texture =
     if (Id = 100) then option{Boutique.Icone_100} else if (Id = 101) then option{Boutique.Icone_101}
@@ -457,7 +457,7 @@ TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : fl
         L := LargeurGlyphe(C) * Taille
         if (T := GlypheNormal(C)?):
             Img := ImgH(T, Taille, Taille)
-            set Slots += array{if (Dessus?) then PlaceZ(Img, AX, AY, Cx + L * 0.5, Y, 6) else PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y)}
+            set Slots += array{if (Dessus?) then PlaceZ(Img, AX, AY, Cx + L * 0.5, Y, 6) else PlaceZ(Img, AX, AY, Cx + L * 0.5, Y, 1)}
         set Cx += L + Taille * 0.06
     Slots
 
@@ -1823,7 +1823,7 @@ hands_manager := class(creative_device):
         ZoneFermer := TEST1{}
         CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
         spawn{ CF.Suivre() }
-        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 815.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 815.0, -385.0, 90.0, 90.0)}
+        set S += array{PlaceZ(ImgFermer, 0.5, 0.5, 815.0, -385.0, 1), canvas_slot{Widget := ZoneFermer, Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.5}, Maximum := vector2{X := 0.5, Y := 0.5}}, Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 815.0, Top := -385.0, Right := 90.0, Bottom := 90.0}, SizeToContent := false, ZOrder := 2}}
         E := EcouleCadeau(J)
         for (K -> N : ProchainsCadeaux(J)):
             P := PosCadeau(K)
@@ -1899,7 +1899,7 @@ hands_manager := class(creative_device):
                     var S : []canvas_slot = array{PlaceZ(ImgH(Interface.Cadre_Dents, 320.0, 80.0), 1.0, 0.0, -330.0, 45.0, 0)}
                     set S += array{IconeDent(1.0, 0.0, -440.0, 45.0, 56.0)}
                     set S += TexteGauche("{A.Dents}", 1.0, 0.0, -405.0, 45.0, 40.0)
-                    set S += array{PlaceH(ImgH(IconeRang(A.PointsRang), 64.0, 64.0), 1.0, 0.0, -440.0, 112.0, 64.0, 64.0)}
+                    set S += array{PlaceZ(ImgH(IconeRang(A.PointsRang), 64.0, 64.0), 1.0, 0.0, -440.0, 112.0, 1)}
                     set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -400.0, 98.0, 30.0)
                     # la jauge vers la division suivante
                     set S += array{PlaceZ(ImgH(Interface.Jauge_Cadre, 260.0, 32.0), 1.0, 0.0, -270.0, 132.0, 0)}
@@ -2044,7 +2044,7 @@ hands_manager := class(creative_device):
         ZoneFermer := TEST1{}
         CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
         spawn{ CF.Suivre() }
-        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 815.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 815.0, -385.0, 90.0, 90.0)}
+        set S += array{PlaceZ(ImgFermer, 0.5, 0.5, 815.0, -385.0, 1), canvas_slot{Widget := ZoneFermer, Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.5}, Maximum := vector2{X := 0.5, Y := 0.5}}, Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 815.0, Top := -385.0, Right := 90.0, Bottom := 90.0}, SizeToContent := false, ZOrder := 2}}
         # les onglets en bois (jaune = celui qui est ouvert)
         Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
@@ -2067,7 +2067,7 @@ hands_manager := class(creative_device):
             Y := -60.0 + Rangee * 320.0
             set S += array{PlaceZ(ImgH(Interface.Carte_Objet, 300.0, 300.0), 0.5, 0.5, X, Y, 0)}
             if (Icone := IconeObjet(Id)?):
-                set S += array{PlaceZ(ImgH(Icone, 150.0, 150.0), 0.5, 0.5, X, Y - 55.0, 0)}
+                set S += array{PlaceZ(ImgH(Icone, 150.0, 150.0), 0.5, 0.5, X, Y - 55.0, 1)}
             Nom := if (Id = 199) then "NO HAT" else if (Id = 499) then "NORMAL" else NomObjet(Id)
             set S += TexteEcrit(Nom, 0.5, 0.5, X, Y + 40.0, Min(26.0, 190.0 / Max(1.0, LargeurTexte(Nom, 1.0))))
             DejaEquipe := if (Id = 199) then (if (StatsDe(J).ChapeauEquipe < 100) then true else false)
