@@ -1598,7 +1598,6 @@ hands_manager := class(creative_device):
                 set Bonus += 100 * (NouvelleDiv - AncienneDiv)
             if:
                 set Stats[J] = stats_joueur:
-                    CopieStats<constructor>(A)
                     Dents := A.Dents + GainDents + Bonus
                     PointsRang := NouveauxPoints
                     PointsMax := NouveauMax
@@ -1608,6 +1607,7 @@ hands_manager := class(creative_device):
                     JourDefi := Jour
                     ProgresDefi := Progres
                     DefiFini := Fini
+                    CopieStats<constructor>(A)
             Delta := NouveauxPoints - A.PointsRang
             Signe := if (Delta >= 0) then "+" else ""
             Avertir(J, "+{GainDents + Bonus} TEETH   {Signe}{Delta} RANK POINTS")
@@ -1620,16 +1620,16 @@ hands_manager := class(creative_device):
         A := StatsDe(J)
         if:
             set Stats[J] = stats_joueur:
-                CopieStats<constructor>(A)
                 Dents := Max(0, A.Dents + N)
+                CopieStats<constructor>(A)
 
     AjouterObjet(J : player, Id : int) : void =
         A := StatsDe(J)
         if (not Dedans(A.Possedes, Id)?):
             if:
                 set Stats[J] = stats_joueur:
-                    CopieStats<constructor>(A)
                     Possedes := A.Possedes + array{Id}
+                    CopieStats<constructor>(A)
 
     # equipe un objet (chapeau -1 = aucun, machine -1 = normale)
     Equiper(J : player, Id : int) : void =
@@ -1639,10 +1639,10 @@ hands_manager := class(creative_device):
         Machine := if (Id >= 401, Id <= 403) then Id else if (Id = 499) then -1 else A.MachineEquipee
         if:
             set Stats[J] = stats_joueur:
-                CopieStats<constructor>(A)
                 ChapeauEquipe := Chapeau
                 LampeEquipee := Lampe
                 MachineEquipee := Machine
+                CopieStats<constructor>(A)
 
     Equipe(J : player, Id : int)<transacts> : logic =
         A := StatsDe(J)
@@ -1658,9 +1658,9 @@ hands_manager := class(creative_device):
                 Gain := GetRandomInt(50, 300)
                 if:
                     set Stats[J] = stats_joueur:
-                        CopieStats<constructor>(A)
                         Dents := A.Dents + Gain
                         DernierJourCoffre := Jour
+                        CopieStats<constructor>(A)
                 SonBouton.Play()
                 spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST!", ?AvecDent := true) }
             else:
@@ -2831,8 +2831,8 @@ hands_manager := class(creative_device):
             Ancien := StatsDe(J)
             if:
                 set Stats[J] = stats_joueur:
-                    CopieStats<constructor>(Ancien)
                     DejaVuRegles := true
+                    CopieStats<constructor>(Ancien)
             Chrono := NouveauChrono()
             var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.75}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
             set S += TexteEcrit("HOW TO PLAY", 0.5, 0.5, 0.0, -260.0, 100.0)
