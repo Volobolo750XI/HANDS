@@ -2098,26 +2098,67 @@ hands_manager := class(creative_device):
         for (I -> L : LampesTable):
             if (I = K) then L.TurnOn() else L.TurnOff()
 
-    # --- LA MACHINE du casier : pendant son tour, la machine prend sa matiere ; apres, elle reprend la normale.
-    # Les materiaux (demoniaque, doree, arc-en-ciel) sont fournis plus tard : MateriauMachine les donnera.
+    # --- LA MACHINE du casier (skins) : pendant le tour d'un joueur qui a une machine equipee, chaque morceau de la
+    # machine de CETTE table prend la version du skin de chaque materiau ; a la fin de son tour, les originaux.
+    # Materiaux : Content/Skins_Machine/Demon, Doree, ArcEnCiel (<materiau d'origine>_<Skin>).
+    # Les dents (M_Crocs_Rouges) ne changent que pour l'arc-en-ciel ; la gencive (M_Gencive_Rouge) ne change jamais.
+    var SkinActuel : int = 0                     # 0 = machine normale, 401 demon, 402 doree, 403 arc-en-ciel
+
     HabillerMachine(J : player, ?Retirer : logic = false) : void =
         Id := StatsDe(J).MachineEquipee
-        if (Retirer?):
-            if (Id >= 401, M := MateriauNormal[]):
-                for (P : array{Centre, Gueule, Plaque}):
-                    P.SetMaterial(M)
-        else if (Id >= 401, Possede(J, Id)?, M := MateriauMachine[Id]):
-            for (P : array{Centre, Gueule, Plaque}):
-                P.SetMaterial(M)
+        Voulu := if (Retirer?) then 0 else if (Id >= 401, Id <= 403, Possede(J, Id)?) then Id else 0
+        if (Voulu <> SkinActuel):
+            set SkinActuel = Voulu
+            AppliquerSkin(Voulu)
 
-    # A COMPLETER quand les materiaux existent (dossier et noms donnes par l'autre Claude)
-    MateriauMachine(Id : int)<decides><transacts> : material =
-        false?
-        Salle_Porcherie.Materials.M_Touches{}
+    # B = le materiau d'origine : 0 Sale_v3, 1 Sombre_Sale_v3, 2 Acier_Noir, 3 Acier_Poli, 4 Bronze_Use,
+    # 5 Crocs_Rouges, 6 Metal_Rouille, 7 Touches
+    MateriauSkin(Skin : int, B : int)<transacts> : material =
+        if (Skin = 401, B = 0) then Skins_Machine.Demon.M_Acier_Machine_Sale_v3_Demon{}
+        else if (Skin = 401, B = 1) then Skins_Machine.Demon.M_Acier_Machine_Sombre_Sale_v3_Demon{}
+        else if (Skin = 401, B = 2) then Skins_Machine.Demon.M_Acier_Noir_Demon{}
+        else if (Skin = 401, B = 3) then Skins_Machine.Demon.M_Acier_Poli_Demon{}
+        else if (Skin = 401, B = 4) then Skins_Machine.Demon.M_Bronze_Use_Demon{}
+        else if (Skin = 401, B = 6) then Skins_Machine.Demon.M_Metal_Rouille_Demon{}
+        else if (Skin = 401, B = 7) then Skins_Machine.Demon.M_Touches_Demon{}
+        else if (Skin = 402, B = 0) then Skins_Machine.Doree.M_Acier_Machine_Sale_v3_Doree{}
+        else if (Skin = 402, B = 1) then Skins_Machine.Doree.M_Acier_Machine_Sombre_Sale_v3_Doree{}
+        else if (Skin = 402, B = 2) then Skins_Machine.Doree.M_Acier_Noir_Doree{}
+        else if (Skin = 402, B = 3) then Skins_Machine.Doree.M_Acier_Poli_Doree{}
+        else if (Skin = 402, B = 4) then Skins_Machine.Doree.M_Bronze_Use_Doree{}
+        else if (Skin = 402, B = 6) then Skins_Machine.Doree.M_Metal_Rouille_Doree{}
+        else if (Skin = 402, B = 7) then Skins_Machine.Doree.M_Touches_Doree{}
+        else if (Skin = 403, B = 0) then Skins_Machine.ArcEnCiel.M_Acier_Machine_Sale_v3_ArcEnCiel{}
+        else if (Skin = 403, B = 1) then Skins_Machine.ArcEnCiel.M_Acier_Machine_Sombre_Sale_v3_ArcEnCiel{}
+        else if (Skin = 403, B = 2) then Skins_Machine.ArcEnCiel.M_Acier_Noir_ArcEnCiel{}
+        else if (Skin = 403, B = 3) then Skins_Machine.ArcEnCiel.M_Acier_Poli_ArcEnCiel{}
+        else if (Skin = 403, B = 4) then Skins_Machine.ArcEnCiel.M_Bronze_Use_ArcEnCiel{}
+        else if (Skin = 403, B = 5) then Skins_Machine.ArcEnCiel.M_Crocs_Rouges_ArcEnCiel{}
+        else if (Skin = 403, B = 6) then Skins_Machine.ArcEnCiel.M_Metal_Rouille_ArcEnCiel{}
+        else if (Skin = 403, B = 7) then Skins_Machine.ArcEnCiel.M_Touches_ArcEnCiel{}
+        else if (B = 0) then Salle_Porcherie.Materials.M_Acier_Machine_Sale_v3{}
+        else if (B = 1) then Salle_Porcherie.Materials.M_Acier_Machine_Sombre_Sale_v3{}
+        else if (B = 2) then Salle_Porcherie.Materials.M_Acier_Noir{}
+        else if (B = 3) then Salle_Porcherie.Materials.M_Acier_Poli{}
+        else if (B = 4) then Salle_Porcherie.Materials.M_Bronze_Use{}
+        else if (B = 5) then Salle_Porcherie.Materials.M_Crocs_Rouges{}
+        else if (B = 6) then Salle_Porcherie.Materials.M_Metal_Rouille{}
+        else if (B = 7) then Salle_Porcherie.Materials.M_Touches{}
+        else Salle_Porcherie.Materials.M_Touches{}
 
-    MateriauNormal()<decides><transacts> : material =
-        false?
-        Salle_Porcherie.Materials.M_Touches{}
+    AppliquerSkin(Skin : int) : void =
+        # le socle : 0 Sombre_Sale_v3, 1 Bronze_Use, 2 Acier_Poli, 3 Sale_v3, 4 Acier_Noir
+        for (I -> B : array{1, 4, 3, 0, 2}):
+            Centre.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
+        # la machoire du haut : 0 Sale_v3, 1 Acier_Noir, 2 Acier_Poli, (3 gencive), 4 Crocs, 5 Metal_Rouille, 6 Sombre_Sale_v3
+        for (I -> B : array{0, 2, 3, -1, 5, 6, 1}, B >= 0):
+            Gueule.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
+        # la machoire du bas : 0 Sale_v3, 1 Acier_Poli, 2 Acier_Noir, (3 gencive), 4 Crocs
+        for (I -> B : array{0, 3, 2, -1, 5}, B >= 0):
+            Plaque.SetMaterial(MateriauSkin(Skin, B), ?Index := I)
+        # les 24 boutons (le blanc / vert du jeu reste prioritaire)
+        for (K -> T : Touches):
+            Peindre(K)
 
     # les joueurs partis du serveur quittent le jeu ; le tour reste sur le bon joueur
     RetirerAbsents() : void =
@@ -2366,8 +2407,8 @@ hands_manager := class(creative_device):
         else if (K = BoutonVert):
             T.SetMaterial(Teintes.T_Sur{}, ?Index := IndexMateriau)
         else:
-            # le materiau D'ORIGINE des boutons de la nouvelle machine (Salle_Porcherie/Materials/M_Touches)
-            T.SetMaterial(Salle_Porcherie.Materials.M_Touches{}, ?Index := IndexMateriau)
+            # le materiau normal des boutons : celui du skin du joueur en cours, sinon l'original (M_Touches)
+            T.SetMaterial(MateriauSkin(SkinActuel, 7), ?Index := IndexMateriau)
 
     # le bouton vise devient blanc (-1 = aucun) ; l'ancien reprend sa couleur
     Surligner(K : int) : void =
