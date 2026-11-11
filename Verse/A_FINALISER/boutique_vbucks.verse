@@ -105,7 +105,15 @@ vendeur_vbucks := class(vendeur_premium):
 
 # l'appareil a poser dans la carte : il branche le vendeur sur la boutique du jeu
 boutique_vbucks := class(creative_device):
+    CacherAppareil()<suspends> : void =
+        Depart := Self.GetTransform()
+        Dessous := Depart.Translation - vector3{X := 0.0, Y := 0.0, Z := 5000.0}
+        for (Essai := 1..10):
+            if (Self.TeleportTo[Dessous, Depart.Rotation]):
+                return
+            Sleep(0.5)
     OnBegin<override>()<suspends> : void =
-        # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
-        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
+        # l'appareil se cache tout seul : il descend 50 m SOUS L'ENDROIT OU IL EST (pas trop loin : une
+        # teleportation hors des limites du monde est refusee) ; plusieurs essais au demarrage
+        spawn{ CacherAppareil() }
         if (set Vendeurs[GetSession()] = vendeur_vbucks{}) {}

@@ -46,9 +46,18 @@ cochons_manager := class(creative_device):
     var Reserves : []int = array{}
     var SpawnsPris : []int = array{}
 
+    # l'appareil descend 50 m sous l'endroit ou il est : jamais visible en jeu (plusieurs essais au demarrage)
+    CacherAppareil()<suspends> : void =
+        Depart := Self.GetTransform()
+        Dessous := Depart.Translation - vector3{X := 0.0, Y := 0.0, Z := 5000.0}
+        for (Essai := 1..10):
+            if (Self.TeleportTo[Dessous, Depart.Rotation]):
+                return
+            Sleep(0.5)
+
     OnBegin<override>()<suspends> : void =
         # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
-        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
+        spawn{ CacherAppareil() }
         # SECURITE : les points de passage / d'apparition sont invisibles et sans collision, les grognements ne
         # jouent pas tout seuls au lancement
         for (P : PointsCochons):

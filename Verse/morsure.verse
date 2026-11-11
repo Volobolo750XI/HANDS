@@ -920,9 +920,18 @@ hands_manager := class(creative_device):
     var ChapeauxIds : [player]int = map{}
     FinLampe : event() = event(){}
 
+    # l'appareil descend 50 m sous l'endroit ou il est : jamais visible en jeu (plusieurs essais au demarrage)
+    CacherAppareil()<suspends> : void =
+        Depart := Self.GetTransform()
+        Dessous := Depart.Translation - vector3{X := 0.0, Y := 0.0, Z := 5000.0}
+        for (Essai := 1..10):
+            if (Self.TeleportTo[Dessous, Depart.Rotation]):
+                return
+            Sleep(0.5)
+
     OnBegin<override>()<suspends> : void =
         # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
-        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
+        spawn{ CacherAppareil() }
         set BaseTouches = for (T : Touches) do T.GetTransform()
         set BaseGueule = Gueule.GetTransform()
         set BaseCentre = Centre.GetTransform()
