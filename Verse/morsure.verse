@@ -41,6 +41,8 @@ stats_joueur := class<final><persistable>:
     ProgresDefi : int = 0
     DefiFini : logic = false
     PointsMax : int = 0                 # le plus haut score de rang atteint (on ne retombe jamais sous son rang)
+    CadeauDebut : float = 0.0           # FREE GIFTS : premiere arrivee sur la map (secondes depuis 1970)
+    CadeauxOuverts : []int = array{}    # FREE GIFTS deja ouverts
 
 CopieStats<constructor>(A : stats_joueur)<transacts> := stats_joueur:
     Dents := A.Dents
@@ -59,6 +61,8 @@ CopieStats<constructor>(A : stats_joueur)<transacts> := stats_joueur:
     ProgresDefi := A.ProgresDefi
     DefiFini := A.DefiFini
     PointsMax := A.PointsMax
+    CadeauDebut := A.CadeauDebut
+    CadeauxOuverts := A.CadeauxOuverts
 
 var Stats : weak_map(player, stats_joueur) = map{}
 
@@ -1682,13 +1686,11 @@ hands_manager := class(creative_device):
 
     # --- LE COFFRE DU JOUR (lobby) : 50 a 300 Dents, une fois par jour
     # =========================================================================
-    #  FREE GIFTS (comme Football Pillars) : les temps partent de l'arrivee du joueur sur la map et tournent tous
+    #  FREE GIFTS (comme Football Pillars) : les temps partent de la PREMIERE arrivee du joueur (sauvegardee) et tournent tous
     #  en meme temps. GIFT 1 a 5 min, 2 a 15, 3 a 30, 4 a 50, 5 a 1h20, 6 a 2h, 7 a 3h, puis un toutes les heures.
     #  21 cadeaux a l'ecran (3 lignes de 7). Pret : bouton vert OPEN. Sinon : son temps qui descend.
     # =========================================================================
     DelaisCadeaux : []float = array{5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0}
-    var ArriveeCadeaux : [player]float = map{}
-    var CadeauxOuverts : [player][]int = map{}
 
     QuandCoffre(Agent : agent) : void =
         if (J := player[Agent]):
@@ -1711,12 +1713,12 @@ hands_manager := class(creative_device):
 
     EcouleCadeau(J : player) : float =
         Maintenant := GetSecondsSinceEpoch()
-        Debut := if (D := ArriveeCadeaux[J]) then D else Maintenant
+        Debut := if (StatsDe(J).CadeauDebut > 0.0) then StatsDe(J).CadeauDebut else Maintenant
         Maintenant - Debut
 
     # les 21 prochains cadeaux pas encore ouverts
     ProchainsCadeaux(J : player)<transacts> : []int =
-        Ouverts := if (O := CadeauxOuverts[J]) then O else array{}
+        Ouverts := StatsDe(J).CadeauxOuverts
         var Liste : []int = array{}
         var N : int = 1
         loop:
@@ -1735,11 +1737,15 @@ hands_manager := class(creative_device):
         Prets
 
     OuvrirCadeau(J : player, N : int) : void =
-        Ouverts := if (O := CadeauxOuverts[J]) then O else array{}
+        A := StatsDe(J)
         E := EcouleCadeau(J)
-        if (DeblocageCadeau(N) <= E, not Dedans(Ouverts, N)?):
-            if (set CadeauxOuverts[J] = Ouverts + array{N}) {}
-            AjouterDents(J, GainCadeau(N))
+        if (DeblocageCadeau(N) <= E, not Dedans(A.CadeauxOuverts, N)?):
+            # ouvert ET Dents en une seule sauvegarde
+            if:
+                set Stats[J] = stats_joueur:
+                    CadeauxOuverts := A.CadeauxOuverts + array{N}
+                    Dents := A.Dents + GainCadeau(N)
+                    CopieStats<constructor>(A)
             spawn{ AnimerPour(J, "+{GainCadeau(N)}", "GIFT {N}!", ?AvecDent := true) }
 
     DureeTexte(Secondes : float) : string =
@@ -1777,7 +1783,8 @@ hands_manager := class(creative_device):
                     block:
                         Sleep(1.0)
                         -1
-                if (Code <> -1 or CadeauxPrets(J) <> Prets or not EstLa(J)?):
+                PretsMaintenant := CadeauxPrets(J)
+                if (Code <> -1 or PretsMaintenant <> Prets or not EstLa(J)?):
                     break
                 for (W : Temps):
                     C.RemoveWidget(W)
@@ -1849,8 +1856,14 @@ hands_manager := class(creative_device):
         loop:
             Jour := JourActuel()
             for (J : GetPlayspace().GetPlayers(), IU := GetPlayerUI[J]):
-                if (not ArriveeCadeaux[J]):
-                    if (set ArriveeCadeaux[J] = GetSecondsSinceEpoch()) {}
+                # FREE GIFTS : la premiere arrivee est gardee pour toujours (sauvegarde)
+                if (StatsDe(J).CadeauDebut <= 0.0):
+                    StatsAvant := StatsDe(J)
+                    Arrivee := GetSecondsSinceEpoch()
+                    if:
+                        set Stats[J] = stats_joueur:
+                            CadeauDebut := Arrivee
+                            CopieStats<constructor>(StatsAvant)
                 # le prochain cadeau : READY! ou son temps
                 var ResteCadeau : float = 999999.0
                 E := EcouleCadeau(J)
