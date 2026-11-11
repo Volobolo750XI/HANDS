@@ -1829,14 +1829,16 @@ hands_manager := class(creative_device):
         # la croix rouge
         ImgFermer := ImgH(Interface.Bouton_Fermer, 90.0, 90.0)
         ZoneFermer := TEST1{}
-        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
+        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
         spawn{ CF.Suivre() }
         set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 815.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 815.0, -385.0, 90.0, 90.0)}
         # les onglets en bois (jaune = celui qui est ouvert)
         Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
+            # survol : l'onglet s'eclaircit et grossit (l'onglet ouvert reste jaune)
             FondO := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet
-            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{Interface.Onglet_Actif}, ?Ratio := 4.0)
+            FondOS := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet_Survol
+            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{FondOS}, ?Ratio := 4.0)
         # les objets : des cartes, 4 par rangee
         var Liste : []int = array{}
         if (Casier?, Onglet = 0):

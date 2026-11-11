@@ -94,18 +94,22 @@ def onglet(nom,base,clair):
     fin(im,nom)
 onglet('Onglet',(140,88,46,255),(176,118,66,255))
 onglet('Onglet_Actif',(255,196,40,255),(255,234,140,255))
+onglet('Onglet_Survol',(186,126,70,255),(222,170,110,255))
 
-# 5. BOUTON FERMER
-W=256
-im=canvas(W,W); d=ImageDraw.Draw(im)
-d.ellipse([6*S,6*S,(W-6)*S,(W-6)*S],fill=CONT)
-d.ellipse([18*S,18*S,(W-18)*S,(W-18)*S],fill=(220,44,44,255))
-d.ellipse([40*S,28*S,(W-60)*S,110*S],fill=(246,120,112,255))
-for a,b,c,e in [(80,80,176,176),(176,80,80,176)]:
-    d.line([a*S,b*S,c*S,e*S],fill=CONT,width=46*S)
-for a,b,c,e in [(80,80,176,176),(176,80,80,176)]:
-    d.line([a*S,b*S,c*S,e*S],fill=(255,255,255,255),width=28*S)
-fin(im,'Bouton_Fermer')
+# 5. BOUTON FERMER (carre arrondi rouge, croix blanche) + version SURVOL (plus clair)
+def fermer(nom,rouge,reflet):
+    W=256
+    im=canvas(W,W); d=ImageDraw.Draw(im)
+    rr(d,(6,6,W-6,W-6),44,fill=CONT)
+    rr(d,(18,18,W-18,W-18),34,fill=rouge)
+    rr(d,(34,28,W-34,96),26,fill=reflet)
+    for a,b,c,e in [(82,82,174,174),(174,82,82,174)]:
+        d.line([a*S,b*S,c*S,e*S],fill=CONT,width=46*S)
+    for a,b,c,e in [(82,82,174,174),(174,82,82,174)]:
+        d.line([a*S,b*S,c*S,e*S],fill=(255,255,255,255),width=28*S)
+    fin(im,nom)
+fermer('Bouton_Fermer',(214,40,40,255),(240,104,96,255))
+fermer('Bouton_Fermer_Survol',(255,80,70,255),(255,160,150,255))
 
 # 6. CADRE DES DENTS (en haut a droite)
 W,H=512,128
