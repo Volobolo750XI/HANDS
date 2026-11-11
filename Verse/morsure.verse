@@ -81,6 +81,10 @@ NomObjet(Id : int) : string =
     else if (Id = 401) then "DEMON MACHINE" else if (Id = 402) then "GOLDEN MACHINE" else if (Id = 403) then "RAINBOW MACHINE"
     else "?"
 
+# la DENT (la monnaie) : son icone, posee a gauche d'un nombre ecrit au pinceau
+IconeDent(AX : float, AY : float, X : float, Y : float, Taille : float) : canvas_slot =
+    PlaceH(ImgH(Boutique.Icone_Dent, Taille, Taille), AX, AY, X, Y, Taille, Taille)
+
 IconeObjet(Id : int)<transacts> : ?texture =
     if (Id = 100) then option{Boutique.Icone_100} else if (Id = 101) then option{Boutique.Icone_101}
     else if (Id = 102) then option{Boutique.Icone_102} else if (Id = 103) then option{Boutique.Icone_103}
@@ -1658,18 +1662,21 @@ hands_manager := class(creative_device):
                         Dents := A.Dents + Gain
                         DernierJourCoffre := Jour
                 SonBouton.Play()
-                spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST: +{Gain} TEETH!") }
+                spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST!", ?AvecDent := true) }
             else:
                 Avertir(J, "COME BACK TOMORROW FOR A NEW CHEST!")
 
     # un gros texte qui surgit, pour UN joueur
-    AnimerPour(J : player, Gros : string, Ligne : string)<suspends> : void =
+    AnimerPour(J : player, Gros : string, Ligne : string, ?AvecDent : logic = false)<suspends> : void =
         if (IU := GetPlayerUI[J]):
             var Actuel : ?canvas = false
             for (Taille : array{90.0, 190.0, 300.0, 250.0, 270.0}):
                 if (A := Actuel?):
                     IU.RemoveWidget(A)
-                C := canvas{Slots := TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille) + TexteEcrit(Ligne, 0.5, 0.5, 0.0, 120.0, 52.0)}
+                var S : []canvas_slot = TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille) + TexteEcrit(Ligne, 0.5, 0.5, 0.0, 120.0, 52.0)
+                if (AvecDent?):
+                    set S += array{IconeDent(0.5, 0.5, -LargeurTexte(Gros, Taille) * 0.5 - Taille * 0.45, -60.0, Taille * 0.9)}
+                C := canvas{Slots := S}
                 IU.AddWidget(C)
                 set Actuel = option{C}
                 Sleep(0.06)
@@ -1693,7 +1700,8 @@ hands_manager := class(creative_device):
                     if (set TextesHud[J] = Cle) {}
                     if (Ancien := Huds[J]):
                         IU.RemoveWidget(Ancien)
-                    var S : []canvas_slot = TexteGauche("{A.Dents} TEETH", 1.0, 0.0, -430.0, 45.0, 44.0)
+                    var S : []canvas_slot = array{IconeDent(1.0, 0.0, -455.0, 45.0, 56.0)}
+                    set S += TexteGauche("{A.Dents}", 1.0, 0.0, -420.0, 45.0, 44.0)
                     set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -430.0, 95.0, 34.0)
                     set S += TexteGauche(Defi, 1.0, 0.0, -430.0, 135.0, 20.0)
                     C := canvas{Slots := S}
@@ -1770,7 +1778,9 @@ hands_manager := class(creative_device):
     DessinerMenu(J : player, Casier : logic, Onglet : int, Ev : event(int), FinM : event()) : []canvas_slot =
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.02, G := 0.02, B := 0.02}, DefaultOpacity := 0.8}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
         set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -420.0, 90.0)
-        set S += TexteEcrit("{StatsDe(J).Dents} TEETH", 0.5, 0.5, 0.0, -345.0, 40.0)
+        TexteDents := "{StatsDe(J).Dents}"
+        set S += array{IconeDent(0.5, 0.5, -LargeurTexte(TexteDents, 44.0) * 0.5 - 34.0, -345.0, 54.0)}
+        set S += TexteEcrit(TexteDents, 0.5, 0.5, 0.0, -345.0, 44.0)
         Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
             set S += BoutonTexteAvec(Ev, FinM, if (I = Onglet) then "> {Nom} <" else Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 380.0, -265.0, 36.0, 900 + I)
@@ -1786,8 +1796,11 @@ hands_manager := class(creative_device):
                 set S += array{PlaceH(ImgH(Icone, 62.0, 62.0), 0.5, 0.5, -620.0, Ligne, 62.0, 62.0)}
             set S += TexteGauche(NomObjet(Id), 0.5, 0.5, -560.0, Ligne, 34.0)
             Etat := if (Equipe(J, Id)?) then "EQUIPPED" else if (Possede(J, Id)?) then "OWNED"
-                else if (PrixDents(Id) = 0) then "FREE" else if (PrixDents(Id) > 0) then "{PrixDents(Id)} TEETH" else "{PrixVBucks(Id)} V-BUCKS"
+                else if (PrixDents(Id) = 0) then "FREE" else if (PrixDents(Id) > 0) then "{PrixDents(Id)}" else "{PrixVBucks(Id)} V-BUCKS"
             set S += TexteEcrit(Etat, 0.5, 0.5, 80.0, Ligne, 28.0)
+            # un prix en Dents : la dent a gauche du nombre
+            if (not Possede(J, Id)?, PrixDents(Id) > 0):
+                set S += array{IconeDent(0.5, 0.5, 80.0 - LargeurTexte(Etat, 28.0) * 0.5 - 26.0, Ligne, 44.0)}
             if (not Equipe(J, Id)?):
                 if (Possede(J, Id)?):
                     set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Id)
