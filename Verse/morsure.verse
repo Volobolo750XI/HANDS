@@ -450,13 +450,14 @@ PlaceZ(W : widget, AX : float, AY : float, X : float, Y : float, Z : type{_X:int
 NomJoueur<localizes>(Agent : agent) : message = "{Agent}"
 
 # un TEXTE au pinceau (non cliquable), centre en (X, Y)
-TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : float) : []canvas_slot =
+TexteEcrit(S : string, AX : float, AY : float, X : float, Y : float, Taille : float, ?Dessus : logic = false) : []canvas_slot =
     var Slots : []canvas_slot = array{}
     var Cx : float = X - LargeurTexte(S, Taille) * 0.5
     for (C : S):
         L := LargeurGlyphe(C) * Taille
         if (T := GlypheNormal(C)?):
-            set Slots += array{PlaceLibre(ImgH(T, Taille, Taille), AX, AY, Cx + L * 0.5, Y)}
+            Img := ImgH(T, Taille, Taille)
+            set Slots += array{if (Dessus?) then PlaceZ(Img, AX, AY, Cx + L * 0.5, Y, 6) else PlaceLibre(Img, AX, AY, Cx + L * 0.5, Y)}
         set Cx += L + Taille * 0.06
     Slots
 
@@ -830,6 +831,9 @@ hands_manager := class(creative_device):
     # TEST : true = on peut jouer TOUT SEUL (la manche dure jusqu'a ce que tu tombes sur un piege ;
     # entre deux tours, la machine fait un tour complet et revient sur toi). Decoche avant de publier.
     @editable TestSolo : logic = false
+    # TEST BOUTIQUE : coche = achats en Dents GRATUITS (tes Dents ne baissent pas). DECOCHE AVANT DE PUBLIER.
+    # (sur le device de l'ENCLOS 1, celui qui gere la boutique)
+    @editable DentsInfiniesTest : logic = false
     # Coche si, dans l'editeur, tu as ATTACHE la machoire, la plaque et les 24 boutons au socle (Centre) :
     # seul le socle est alors tourne par le code, tout le reste suit d'un seul bloc (plus aucun decalage)
     @editable PiecesAttachees : logic = false
@@ -1768,15 +1772,22 @@ hands_manager := class(creative_device):
         if (Contient(MenusOuverts, J)?):
             return
         set MenusOuverts += array{J}
+        C := canvas{}
+        if (IU := GetPlayerUI[J]):
+            IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+        var Anciens : []widget = array{}
         loop:
             if (not EstLa(J)?):
                 break
             Ev := event(int){}
             FinM := event(){}
             Prets := CadeauxPrets(J)
-            C := canvas{Slots := DessinerCadeaux(J, Ev, FinM)}
-            if (IU := GetPlayerUI[J]):
-                IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+            Slots := DessinerCadeaux(J, Ev, FinM)
+            for (Sl : Slots):
+                C.AddWidget(Sl)
+            for (W : Anciens):
+                C.RemoveWidget(W)
+            set Anciens = for (Sl : Slots) do Sl.Widget
             var Temps : []widget = AjouterTemps(J, C)
             var Code : int = -1
             loop:
@@ -1792,12 +1803,14 @@ hands_manager := class(creative_device):
                     C.RemoveWidget(W)
                 set Temps = AjouterTemps(J, C)
             FinM.Signal()
-            if (IU := GetPlayerUI[J]):
-                IU.RemoveWidget(C)
+            for (W : Temps):
+                C.RemoveWidget(W)
             if (Code = 999):
                 break
             if (Code >= 4000):
                 OuvrirCadeau(J, Code - 4000)
+        if (IU := GetPlayerUI[J]):
+            IU.RemoveWidget(C)
         set MenusOuverts = for (X : MenusOuverts, X <> J) do X
 
     DessinerCadeaux(J : player, Ev : event(int), FinM : event()) : []canvas_slot =
@@ -1913,19 +1926,32 @@ hands_manager := class(creative_device):
             spawn{ OuvrirMenu(J, true) }
 
     # Casier = false : BOUTIQUE (onglets CHAPEAUX / LAMPES / SONS / PREMIUM) ; true : CASIER (equiper ce qu'on a)
+    # UN SEUL ECRAN pendant toute la visite : a chaque clic, son CONTENU est remplace (l'ecran n'est jamais
+    # retire puis remis : la souris ne saute plus au centre, pas de flash). BUY -> fenetre de confirmation.
     OuvrirMenu(J : player, Casier : logic)<suspends> : void =
         if (Contient(MenusOuverts, J)?):
             return
         set MenusOuverts += array{J}
         var Onglet : int = 0
+        var Confirmer : int = -1                     # objet a confirmer (-1 = aucun)
+        Ecran := canvas{}
+        if (IU := GetPlayerUI[J]):
+            IU.AddWidget(Ecran, player_ui_slot{InputMode := ui_input_mode.All})
+        var Anciens : []widget = array{}
         loop:
             if (not EstLa(J)?):
                 break
             Ev := event(int){}
             FinM := event(){}
-            C := canvas{Slots := DessinerMenu(J, Casier, Onglet, Ev, FinM)}
-            if (IU := GetPlayerUI[J]):
-                IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+            var Slots : []canvas_slot = DessinerMenu(J, Casier, Onglet, Ev, FinM)
+            if (Confirmer >= 0):
+                set Slots += DessinerConfirmation(J, Confirmer, Ev, FinM)
+            # le nouveau contenu d'abord, puis l'ancien est retire (jamais d'ecran vide)
+            for (Sl : Slots):
+                Ecran.AddWidget(Sl)
+            for (W : Anciens):
+                Ecran.RemoveWidget(W)
+            set Anciens = for (Sl : Slots) do Sl.Widget
             # (ferme tout seul apres 90 s sans clic)
             Code := race:
                 Ev.Await()
@@ -1933,17 +1959,47 @@ hands_manager := class(creative_device):
                     Sleep(90.0)
                     999
             FinM.Signal()
-            if (IU := GetPlayerUI[J]):
-                IU.RemoveWidget(C)
-            if (Code = 999):
+            if (Confirmer >= 0):
+                # fenetre de confirmation : seuls CONFIRM et CANCEL comptent
+                if (Code = 998 or Code = 999):
+                    set Confirmer = -1
+                else if (Code >= 5000):
+                    Acheter(J, Code - 5000)
+                    set Confirmer = -1
+            else if (Code = 999):
                 break
-            if (Code >= 900, Code <= 902):
+            else if (Code >= 900, Code <= 902):
                 set Onglet = Code - 900
             else if (Code >= 2000):
                 Equiper(J, Code - 2000)
             else if (Code >= 1000):
-                Acheter(J, Code - 1000)
+                if (Possede(J, Code - 1000)?):
+                    Equiper(J, Code - 1000)
+                else:
+                    set Confirmer = Code - 1000
+        if (IU := GetPlayerUI[J]):
+            IU.RemoveWidget(Ecran)
         set MenusOuverts = for (X : MenusOuverts, X <> J) do X
+
+    # "BUY BEANIE FOR 200 ?" / "BUY GOLDEN MACHINE FOR 800 V-BUCKS?" : CONFIRM (vert) / CANCEL (rouge), par-dessus
+    DessinerConfirmation(J : player, Id : int, Ev : event(int), FinM : event()) : []canvas_slot =
+        var S : []canvas_slot = array{canvas_slot{Widget := color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.6},
+            Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}, ZOrder := 4}}
+        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1000.0, 500.0), 0.5, 0.5, 0.0, 20.0, 5)}
+        set S += array{PlaceZ(ImgH(Interface.Banniere, 520.0, 130.0), 0.5, 0.5, 0.0, -210.0, 6)}
+        set S += TexteEcrit("BUY?", 0.5, 0.5, 0.0, -218.0, 54.0, ?Dessus := true)
+        if (Icone := IconeObjet(Id)?):
+            set S += array{PlaceZ(ImgH(Icone, 170.0, 170.0), 0.5, 0.5, 0.0, -40.0, 6)}
+        set S += TexteEcrit(NomObjet(Id), 0.5, 0.5, 0.0, 75.0, 40.0, ?Dessus := true)
+        if (PrixDents(Id) > 0):
+            TextePrix := "{PrixDents(Id)}"
+            set S += array{PlaceZ(ImgH(Boutique.Icone_Dent, 52.0, 52.0), 0.5, 0.5, -LargeurTexte(TextePrix, 40.0) * 0.5 - 30.0, 130.0, 6)}
+            set S += TexteEcrit(TextePrix, 0.5, 0.5, 10.0, 130.0, 40.0, ?Dessus := true)
+        else:
+            set S += TexteEcrit("{PrixVBucks(Id)} V-BUCKS", 0.5, 0.5, 0.0, 130.0, 40.0, ?Dessus := true)
+        set S += BoutonTexteAvec(Ev, FinM, "CONFIRM", 0.5, 0.5, -190.0, 215.0, 44.0, 5000 + Id, ?Dessus := true)
+        set S += BoutonTexteAvec(Ev, FinM, "CANCEL", 0.5, 0.5, 190.0, 215.0, 44.0, 998, ?Dessus := true)
+        S
 
     Acheter(J : player, Id : int)<suspends> : void =
         if (Possede(J, Id)?):
@@ -1951,7 +2007,7 @@ hands_manager := class(creative_device):
             return
         Prix := PrixDents(Id)
         if (Prix < 0):
-            # V-Bucks (Machine de Noel : seulement en decembre)
+            # V-Bucks : la vraie fenetre d'achat Epic (appareil boutique_vbucks)
             if (V := Vendeurs[GetSession()]):
                 Ok := V.Acheter(J, Id)
                 if (Ok?):
@@ -1960,8 +2016,9 @@ hands_manager := class(creative_device):
                     AnaAchat.Submit(J)
             else:
                 Avertir(J, "COMING SOON!")
-        else if (StatsDe(J).Dents >= Prix):
-            AjouterDents(J, -Prix)
+        else if (DentsInfiniesTest? or StatsDe(J).Dents >= Prix):
+            if (not DentsInfiniesTest?):
+                AjouterDents(J, -Prix)
             AjouterObjet(J, Id)
             Equiper(J, Id)
             AnaAchat.Submit(J)
@@ -2987,13 +3044,13 @@ hands_manager := class(creative_device):
 
     # (Fin : l'evenement qui arrete le bouton quand son ecran est retire)
     # (?Fond / ?FondSurvol : un autre fond que le vert / rouge, ex. les onglets en bois ; ?Ratio : largeur / hauteur)
-    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int, ?FondPerso : ?texture = false, ?FondPersoSurvol : ?texture = false, ?Ratio : float = 4.0) : []canvas_slot =
+    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int, ?FondPerso : ?texture = false, ?FondPersoSurvol : ?texture = false, ?Ratio : float = 4.0, ?Dessus : logic = false) : []canvas_slot =
         var Slots : []canvas_slot = array{}
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
         var Claires : []texture = array{}
         # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
-        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702 or Code = 999) then true else false
+        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702 or Code = 999 or Code = 998) then true else false
         FondN := if (F := FondPerso?) then F else if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
         FondS := if (F := FondPersoSurvol?) then F else if (F := FondPerso?) then F else if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
         HautB := Taille * 1.45
@@ -3003,7 +3060,7 @@ hands_manager := class(creative_device):
         T := if (Brut > LargB * 0.8) then Taille * LargB * 0.8 / Brut else Taille
         Fond := ImgH(FondN, LargB, HautB)
         # ORDRE D'AFFICHAGE FIXE : le fond derriere (0), les lettres devant (1), la zone de clic par-dessus (2)
-        set Slots += array{PlaceZ(Fond, AX, AY, X, Y, 0)}
+        set Slots += array{if (Dessus?) then PlaceZ(Fond, AX, AY, X, Y, 6) else PlaceZ(Fond, AX, AY, X, Y, 0)}
         Largeur := LargeurTexte(S, T)
         var Cx : float = X - Largeur * 0.5
         for (C : S):
@@ -3013,14 +3070,16 @@ hands_manager := class(creative_device):
                 set Lettres += array{Img}
                 set Normales += array{Gn}
                 set Claires += array{Gc}
-                set Slots += array{PlaceZ(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04, 1)}
+                set Slots += array{if (Dessus?) then PlaceZ(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04, 7) else PlaceZ(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04, 1)}
             set Cx += L + T * 0.06
         Zone := TEST1{}
         BT := bouton_texte{Ev := Ev, Fin := FinB, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
             Son := SonBouton, Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
         spawn{ BT.Suivre() }
-        Slots + array{canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
-            Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}, SizeToContent := false, ZOrder := 2}}
+        Ancre := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}}
+        Taille2 := margin{Left := X, Top := Y, Right := LargB, Bottom := HautB}
+        Slots + array{if (Dessus?) then canvas_slot{Widget := Zone, Anchors := Ancre, Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := Taille2, SizeToContent := false, ZOrder := 8}
+            else canvas_slot{Widget := Zone, Anchors := Ancre, Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := Taille2, SizeToContent := false, ZOrder := 2}}
 
     Montrer(J : player, S : []canvas_slot, Chrono : []texture_block, Souris : logic) : void =
         if (IU := GetPlayerUI[J]):
