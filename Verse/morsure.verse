@@ -69,13 +69,13 @@ StatsDe(J : player)<transacts> : stats_joueur =
 var Invisibles : weak_map(session, []player) = map{}
 
 # --- LA BOUTIQUE -------------------------------------------------------------------------------------------
-#  100-106 CHAPEAUX (Dents), 107 COURONNE DE FEU (V-Bucks)
+#  100-106 CHAPEAUX (Dents)
 #  200 lampe BLANCHE (celle de base, pas dans la boutique), 202-206 LAMPES (verte, bleue, rouge, violette, arc-en-ciel)
 #  401 MACHINE DEMONIAQUE, 402 MACHINE DOREE, 403 MACHINE ARC-EN-CIEL (V-Bucks)
 #  Icones : dossier Boutique (Icone_100.png ...)
 NomObjet(Id : int) : string =
     if (Id = 100) then "BEANIE" else if (Id = 101) then "CAP" else if (Id = 102) then "STRAW HAT" else if (Id = 103) then "MINER HELMET"
-    else if (Id = 104) then "TOP HAT" else if (Id = 105) then "WITCH HAT" else if (Id = 106) then "CROWN" else if (Id = 107) then "FIRE CROWN"
+    else if (Id = 104) then "TOP HAT" else if (Id = 105) then "WITCH HAT" else if (Id = 106) then "CROWN"
     else if (Id = 200) then "WHITE" else if (Id = 202) then "GREEN" else if (Id = 203) then "BLUE"
     else if (Id = 204) then "RED" else if (Id = 205) then "PURPLE" else if (Id = 206) then "RAINBOW"
     else if (Id = 401) then "DEMON MACHINE" else if (Id = 402) then "GOLDEN MACHINE" else if (Id = 403) then "RAINBOW MACHINE"
@@ -85,7 +85,7 @@ IconeObjet(Id : int)<transacts> : ?texture =
     if (Id = 100) then option{Boutique.Icone_100} else if (Id = 101) then option{Boutique.Icone_101}
     else if (Id = 102) then option{Boutique.Icone_102} else if (Id = 103) then option{Boutique.Icone_103}
     else if (Id = 104) then option{Boutique.Icone_104} else if (Id = 105) then option{Boutique.Icone_105}
-    else if (Id = 106) then option{Boutique.Icone_106} else if (Id = 107) then option{Boutique.Icone_107}
+    else if (Id = 106) then option{Boutique.Icone_106}
     else if (Id = 202) then option{Boutique.Icone_202} else if (Id = 203) then option{Boutique.Icone_203}
     else if (Id = 204) then option{Boutique.Icone_204} else if (Id = 205) then option{Boutique.Icone_205}
     else if (Id = 206) then option{Boutique.Icone_206} else if (Id = 401) then option{Boutique.Icone_401}
@@ -101,14 +101,14 @@ PrixDents(Id : int)<transacts> : int =
     else -1
 
 PrixVBucks(Id : int)<transacts> : int =
-    if (Id = 401) then 600 else if (Id = 402) then 800 else if (Id = 403) then 1000 else if (Id = 107) then 600 else 0
+    if (Id = 401) then 600 else if (Id = 402) then 800 else if (Id = 403) then 1000 else 0
 
 # les objets de chaque onglet : 0 CHAPEAUX, 1 LAMPES, 2 PREMIUM (V-Bucks) / MACHINES (casier)
 ObjetsOnglet(Onglet : int, Casier : logic)<transacts> : []int =
-    if (Onglet = 0) then (if (Casier?) then array{100, 101, 102, 103, 104, 105, 106, 107} else array{100, 101, 102, 103, 104, 105, 106})
+    if (Onglet = 0) then array{100, 101, 102, 103, 104, 105, 106}
     else if (Onglet = 1) then (if (Casier?) then array{200, 202, 203, 204, 205, 206} else array{202, 203, 204, 205, 206})
     else if (Casier?) then array{401, 402, 403}
-    else array{401, 402, 403, 107}
+    else array{401, 402, 403}
 
 Gratuit(Id : int)<transacts> : logic =
     if (Id = 200) then true else false
@@ -733,8 +733,8 @@ hands_manager := class(creative_device):
     @editable BoutonBoutique : button_device = button_device{}
     @editable BoutonCasier : button_device = button_device{}
     @editable BoutonCoffre : button_device = button_device{}
-    # Les CHAPEAUX : les 8 accessoires (Blueprint "Creative Prop") DANS L'ORDRE : bonnet, casquette, chapeau de paille,
-    # casque de mineur, haut-de-forme, chapeau de sorciere, couronne, couronne de feu
+    # Les CHAPEAUX : les 7 accessoires (Blueprint "Creative Prop") DANS L'ORDRE : bonnet, casquette, chapeau de paille,
+    # casque de mineur, haut-de-forme, chapeau de sorciere, couronne
     @editable ModelesChapeaux : []creative_prop_asset = array{}
     @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
     # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, verte, bleue, rouge, violette
@@ -1630,7 +1630,7 @@ hands_manager := class(creative_device):
     # equipe un objet (chapeau -1 = aucun, machine -1 = normale)
     Equiper(J : player, Id : int) : void =
         A := StatsDe(J)
-        Chapeau := if (Id >= 100, Id <= 107) then Id else if (Id = 199) then -1 else A.ChapeauEquipe
+        Chapeau := if (Id >= 100, Id <= 106) then Id else if (Id = 199) then -1 else A.ChapeauEquipe
         Lampe := if (Id >= 200, Id <= 206) then Id else A.LampeEquipee
         Machine := if (Id >= 401, Id <= 403) then Id else if (Id = 499) then -1 else A.MachineEquipee
         if:
