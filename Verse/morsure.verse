@@ -1752,7 +1752,7 @@ hands_manager := class(creative_device):
     PosCadeau(K : int) : vector2 =
         Col := if (V := Mod[K, 7]) then V else 0
         Lig := if (V := Floor[(K * 1.0) / 7.0]) then V else 0
-        vector2{X := 200.0 * Col - 600.0, Y := 215.0 * Lig - 125.0}
+        vector2{X := 200.0 * Col - 600.0, Y := 212.0 * Lig - 150.0}
 
     # LA FENETRE (meme style que la boutique). Les temps changent chaque seconde SANS redessiner les boutons
     # (les clics et les survols marchent toujours) ; elle n'est redessinee que si un cadeau devient pret.
