@@ -52,7 +52,7 @@ for f in glob.glob('Verse/*.verse'):
     connues = {'Sleep', 'SpawnProp', 'Shuffle', 'Max', 'Min', 'Abs', 'Floor', 'Ceil', 'Mod', 'ArcTan', 'Tan', 'Sin', 'Cos', 'Sqrt', 'DotProduct',
                'DegreesToRadians', 'MakeRotation', 'MakeRotationFromYawPitchRollDegrees', 'GetRandomInt', 'GetRandomFloat',
                'GetSimulationElapsedTime', 'GetSecondsSinceEpoch', 'GetPlayspace', 'GetPlayerUI', 'ToString', 'ConcatenateMaps',
-               'IdentityRotation', 'Distance', 'Lerp', 'TEST1'}
+               'IdentityRotation', 'Distance', 'Lerp', 'TEST1', 'GetSession', 'SpawnProp', 'BuyOffer'}
     for fn in sorted(appels - definies - variables - connues):
         print(f, '3506 fonction appelee mais introuvable :', fn)
     # += / -= sur un vector3 (ou une autre structure) : interdit en Verse (seulement int, float, tableaux)

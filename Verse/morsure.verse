@@ -36,6 +36,11 @@ stats_joueur := class<final><persistable>:
     LampeEquipee : int = 0
     SonEquipe : int = 0
     MachineEquipee : int = -1
+    DernierJourVictoire : int = 0       # jour de la derniere 1re victoire du jour (+50 Dents)
+    JourDefi : int = 0                  # jour du defi en cours
+    ProgresDefi : int = 0
+    DefiFini : logic = false
+    PointsMax : int = 0                 # le plus haut score de rang atteint (on ne retombe jamais sous son rang)
 
 CopieStats<constructor>(A : stats_joueur)<transacts> := stats_joueur:
     Dents := A.Dents
@@ -49,11 +54,112 @@ CopieStats<constructor>(A : stats_joueur)<transacts> := stats_joueur:
     LampeEquipee := A.LampeEquipee
     SonEquipe := A.SonEquipe
     MachineEquipee := A.MachineEquipee
+    DernierJourVictoire := A.DernierJourVictoire
+    JourDefi := A.JourDefi
+    ProgresDefi := A.ProgresDefi
+    DefiFini := A.DefiFini
+    PointsMax := A.PointsMax
 
 var Stats : weak_map(player, stats_joueur) = map{}
 
 StatsDe(J : player)<transacts> : stats_joueur =
     if (S := Stats[J]) then S else stats_joueur{}
+
+# les joueurs rendus INVISIBLES (mordus qui se promenent) : leur chapeau est cache aussi (partage entre les 3 tables)
+var Invisibles : weak_map(session, []player) = map{}
+
+# --- LA BOUTIQUE -------------------------------------------------------------------------------------------
+#  100-106 CHAPEAUX (Dents), 107 COURONNE DE FEU (V-Bucks)
+#  200-206 LAMPES (200 blanche gratuite, 206 arc-en-ciel), 207 STROBOSCOPE (V-Bucks)
+#  300-304 SONS DES BOUTONS (300 clic gratuit)
+#  401 MACHINE DOREE, 402 MACHINE DEMONIAQUE, 403 MACHINE DE NOEL (V-Bucks)
+NomObjet(Id : int) : string =
+    if (Id = 100) then "BEANIE" else if (Id = 101) then "CAP" else if (Id = 102) then "STRAW HAT" else if (Id = 103) then "MINER HELMET"
+    else if (Id = 104) then "TOP HAT" else if (Id = 105) then "WITCH HAT" else if (Id = 106) then "CROWN" else if (Id = 107) then "FIRE CROWN"
+    else if (Id = 200) then "WHITE" else if (Id = 201) then "YELLOW" else if (Id = 202) then "GREEN" else if (Id = 203) then "BLUE"
+    else if (Id = 204) then "RED" else if (Id = 205) then "PURPLE" else if (Id = 206) then "RAINBOW" else if (Id = 207) then "STROBE"
+    else if (Id = 300) then "CLICK" else if (Id = 301) then "BELL" else if (Id = 302) then "BONE CRACK" else if (Id = 303) then "PIG SCREAM"
+    else if (Id = 304) then "HORN" else if (Id = 401) then "GOLDEN MACHINE" else if (Id = 402) then "DEMON MACHINE" else if (Id = 403) then "XMAS MACHINE"
+    else "?"
+
+# prix en DENTS (0 = gratuit) ; les objets V-Bucks ne s'achetent pas en Dents (-1)
+PrixDents(Id : int)<transacts> : int =
+    if (Id = 100) then 200 else if (Id = 101) then 400 else if (Id = 102) then 600 else if (Id = 103) then 900
+    else if (Id = 104) then 1200 else if (Id = 105) then 1600 else if (Id = 106) then 2000
+    else if (Id = 200) then 0 else if (Id = 201) then 200 else if (Id = 202) then 400 else if (Id = 203) then 700
+    else if (Id = 204) then 1000 else if (Id = 205) then 1500 else if (Id = 206) then 2000
+    else if (Id = 300) then 0 else if (Id = 301) then 300 else if (Id = 302) then 600 else if (Id = 303) then 1000 else if (Id = 304) then 1500
+    else -1
+
+PrixVBucks(Id : int)<transacts> : int =
+    if (Id = 401) then 800 else if (Id = 402) then 1000 else if (Id = 403) then 600 else if (Id = 107) then 600 else if (Id = 207) then 400 else 0
+
+# les objets de chaque onglet : 0 CHAPEAUX, 1 LAMPES, 2 SONS, 3 PREMIUM (V-Bucks) / MACHINES (casier)
+ObjetsOnglet(Onglet : int, Casier : logic)<transacts> : []int =
+    if (Onglet = 0) then (if (Casier?) then array{100, 101, 102, 103, 104, 105, 106, 107} else array{100, 101, 102, 103, 104, 105, 106})
+    else if (Onglet = 1) then (if (Casier?) then array{200, 201, 202, 203, 204, 205, 206, 207} else array{200, 201, 202, 203, 204, 205, 206})
+    else if (Onglet = 2) then array{300, 301, 302, 303, 304}
+    else if (Casier?) then array{401, 402, 403}
+    else array{401, 402, 403, 107, 207}
+
+Gratuit(Id : int)<transacts> : logic =
+    if (Id = 200 or Id = 300) then true else false
+
+Possede(J : player, Id : int)<transacts> : logic =
+    if (Gratuit(Id)?) then true else Dedans(StatsDe(J).Possedes, Id)
+
+# --- LES RANGS : 100 points par division, 3 divisions par rang, puis UNREAL ----------------------------------
+NomsRangs : []string = array{"BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND", "ELITE", "CHAMPION"}
+
+DivisionDe(Points : int)<transacts> : int =
+    D := if (Q := Floor[(Max(0, Points) * 1.0) / 100.0]) then Q else 0
+    Min(21, D)
+
+NomRang(Points : int) : string =
+    D := DivisionDe(Points)
+    if (D >= 21):
+        return "UNREAL"
+    R := if (Q := Floor[(D * 1.0) / 3.0]) then Q else 0
+    Niveau := D - R * 3
+    Nom := if (N := NomsRangs[R]) then N else "BRONZE"
+    Chiffre := if (Niveau = 0) then "I" else if (Niveau = 1) then "II" else "III"
+    "{Nom} {Chiffre}"
+
+# le debut du rang le plus haut deja atteint : on ne retombe jamais en dessous
+PlancherRang(PointsMax : int)<transacts> : int =
+    D := DivisionDe(PointsMax)
+    if (D >= 21) then 2100 else (if (Q := Floor[(D * 1.0) / 3.0]) then Q * 300 else 0)
+
+# --- LES DATES ------------------------------------------------------------------------------------------------
+# le numero du jour (change a minuit UTC)
+JourActuel() : int =
+    if (D := Floor[GetSecondsSinceEpoch() / 86400.0]) then D else 0
+
+# le mois (1 a 12) d'un numero de jour
+MoisDu(Jour : int)<transacts> : int =
+    Z := Jour + 719468
+    Era := if (Q := Floor[(Z * 1.0) / 146097.0]) then Q else 0
+    Doe := Z - Era * 146097
+    Yoe := if (Q := Floor[((Doe - (if (A := Floor[(Doe * 1.0) / 1460.0]) then A else 0) + (if (B := Floor[(Doe * 1.0) / 36524.0]) then B else 0) - (if (C := Floor[(Doe * 1.0) / 146096.0]) then C else 0)) * 1.0) / 365.0]) then Q else 0
+    Doy := Doe - (365 * Yoe + (if (A := Floor[(Yoe * 1.0) / 4.0]) then A else 0) - (if (B := Floor[(Yoe * 1.0) / 100.0]) then B else 0))
+    Mp := if (Q := Floor[((5 * Doy + 2) * 1.0) / 153.0]) then Q else 0
+    if (Mp < 10) then Mp + 3 else Mp - 9
+
+# --- LE DEFI DU JOUR : 0 SURVIVE 10 BUTTONS, 1 WIN 1 GAME, 2 PLAY 3 GAMES (+100 Dents) ------------------------
+TypeDefi(Jour : int)<transacts> : int =
+    if (M := Mod[Jour, 3]) then M else 0
+
+TexteDefi(T : int) : string =
+    if (T = 0) then "SURVIVE 10 BUTTONS" else if (T = 1) then "WIN 1 GAME" else "PLAY 3 GAMES"
+
+ButDefi(T : int)<transacts> : int =
+    if (T = 0) then 10 else if (T = 1) then 1 else 3
+
+# --- LES ACHATS EN V-BUCKS : branches par le fichier boutique_vbucks.verse (s'il est dans le projet) ----------
+vendeur_premium := class<abstract>:
+    Acheter(J : player, Id : int)<suspends> : logic
+
+var Vendeurs : weak_map(session, vendeur_premium) = map{}
 
 # --- Les cartes (id) ---------------------------------------------------------
 #  0 DEFUSE  : si tu tombes sur un piege ce tour-ci, il ne mord pas
@@ -624,6 +730,30 @@ hands_manager := class(creative_device):
     @editable NumeroEnclos : int = 1
     # Le PANNEAU au-dessus de l'enclos (un Panneau d'affichage / Billboard) : PEN 1 - 2/4 WAITING, IN GAME, FULL...
     @editable PanneauEtat : billboard_device = billboard_device{}
+    # --- MISE A JOUR 2 (seul le device de l'ENCLOS 1 gere la boutique, le casier, le coffre, les Dents a l'ecran et les chapeaux)
+    # Boutons du lobby (appareils Bouton) : BOUTIQUE, CASIER, COFFRE DU JOUR
+    @editable BoutonBoutique : button_device = button_device{}
+    @editable BoutonCasier : button_device = button_device{}
+    @editable BoutonCoffre : button_device = button_device{}
+    # Les CHAPEAUX : les 8 accessoires (Blueprint "Creative Prop") DANS L'ORDRE : bonnet, casquette, chapeau de paille,
+    # casque de mineur, haut-de-forme, chapeau de sorciere, couronne, couronne de feu
+    @editable ModelesChapeaux : []creative_prop_asset = array{}
+    @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
+    # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, jaune, verte, bleue, rouge, violette
+    @editable LampesTable : []customizable_light_device = array{}
+    # Les SONS DES BOUTONS (Lecteur audio, lecture auto NON), DANS L'ORDRE : cloche, os qui craque, cri de cochon, klaxon
+    # (le clic gratuit = SonClic)
+    @editable SonsBoutons : []audio_player_device = array{}
+    # Son de la MONTEE DE RANG (Lecteur audio, lecture auto NON)
+    @editable SonRang : audio_player_device = audio_player_device{}
+    # ANALYTICS : un appareil Analytique par etape
+    @editable AnaEntreeZone : analytics_device = analytics_device{}
+    @editable AnaDebutPartie : analytics_device = analytics_device{}
+    @editable AnaRejoindre : analytics_device = analytics_device{}
+    @editable AnaElimination : analytics_device = analytics_device{}
+    @editable AnaRejouer : analytics_device = analytics_device{}
+    @editable AnaRetourLobby : analytics_device = analytics_device{}
+    @editable AnaAchat : analytics_device = analytics_device{}
     # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones).
     # VIDE = chacun revient la ou il est apparu.
     @editable RetourLobby : []creative_prop = array{}
@@ -738,6 +868,14 @@ hands_manager := class(creative_device):
     var PhaseJeu : logic = false                 # les tours ont commence : on peut REJOINDRE s'il reste une place
     var IndexTour : int = 0                      # place dans Vivants du joueur dont c'est le tour
     var ChoixFin : [player]int = map{}           # ecran de fin : 701 = PLAY AGAIN, 702 = BACK TO LOBBY
+    var BoutonsSurvecus : [player]int = map{}    # boutons surs appuyes pendant cette partie
+    var OrdreElimines : []player = array{}       # dans l'ordre ou ils se sont fait mordre
+    var MenusOuverts : []player = array{}        # boutique / casier ouverts
+    var Huds : [player]canvas = map{}            # les Dents et le rang en haut a droite
+    var TextesHud : [player]string = map{}
+    var ChapeauxPortes : [player]creative_prop = map{}
+    var ChapeauxIds : [player]int = map{}
+    FinLampe : event() = event(){}
 
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
@@ -769,6 +907,17 @@ hands_manager := class(creative_device):
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
         spawn{ PanneauEnBoucle() }
+        for (L : LampesTable):
+            L.TurnOff()
+        if (L0 := LampesTable[0]):
+            L0.TurnOn()
+        # le device de l'ENCLOS 1 gere tout ce qui est commun au lobby
+        if (NumeroEnclos = 1):
+            BoutonBoutique.InteractedWithEvent.Subscribe(QuandBoutique)
+            BoutonCasier.InteractedWithEvent.Subscribe(QuandCasier)
+            BoutonCoffre.InteractedWithEvent.Subscribe(QuandCoffre)
+            spawn{ HudEnBoucle() }
+            spawn{ ChapeauxEnBoucle() }
         loop:
             var Groupe : []player = Lobby()
             # PLAY AGAIN : tant qu'au moins 2 joueurs restent (avec ceux qui attendent dans la zone), on rejoue
@@ -811,6 +960,7 @@ hands_manager := class(creative_device):
         # (les joueurs de la partie en cours, inscrits dans le compteur, ne comptent pas pour une nouvelle partie)
         if (J := player[Agent], not Contient(DansZone, J)?, not Contient(Table, J)?):
             set DansZone += array{J}
+            AnaEntreeZone.Submit(J)
 
     SortZone(Agent : agent) : void =
         if (J := player[Agent]):
@@ -907,6 +1057,8 @@ hands_manager := class(creative_device):
             if (Perso := J.GetFortCharacter[]):
                 Perso.ReleaseFromStasis()
                 Perso.Show()
+            RendreVisible(J)
+            AnaRejoindre.Submit(J)
             Asseoir(J, P)
             spawn{ VerrouArrivee(J) }
             for (X : Table, ALaTable(X)?):
@@ -938,6 +1090,7 @@ hands_manager := class(creative_device):
         for (J : Liste, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             Perso.Show()
+            RendreVisible(J)
             var Pose : logic = false
             for (H : array{50.0, 100.0, 150.0}, not Pose?):
                 if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := H}, Perso.GetTransform().Rotation]):
@@ -987,12 +1140,14 @@ hands_manager := class(creative_device):
             loop:
                 C := Ev.Await()
                 if (C = 702):
+                    AnaRetourLobby.Submit(J)
                     if (set ChoixFin[J] = 702) {}
                     EnleverEcran(J)
                     RenvoyerAuLobby(array{J})
                     set DejaRentres += array{J}
                     break
                 else if (C = 701):
+                    AnaRejouer.Submit(J)
                     if (set ChoixFin[J] = 701) {}
                     EnleverEcran(J)
                     AfficherLobby(J, "READY!")
@@ -1106,6 +1261,7 @@ hands_manager := class(creative_device):
                 Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.0}, Maximum := vector2{X := 0.5, Y := 0.0}},
                 Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 345.0, Right := 600.0, Bottom := 60.0}, ZOrder := 1}}
         set S += TexteEcrit("WINNER", 0.5, 0.0, 0.0, 265.0, 110.0)
+        set S += TexteEcrit(NomRang(StatsDe(G).PointsRang), 0.5, 0.0, 0.0, 415.0, 40.0)
         canvas{Slots := S}
 
     # TEST : 5 s apres le debut, le premier joueur est mis a la table comme s'il venait d'etre mordu
@@ -1142,6 +1298,7 @@ hands_manager := class(creative_device):
     var DejaRentres : []player = array{}
     QuandRetourLobby(Agent : agent) : void =
         if (J := player[Agent], Contient(Assis, J)?, not Contient(Vivants, J)?, not Contient(DejaRentres, J)?):
+            AnaRetourLobby.Submit(J)
             RenvoyerAuLobby(array{J})
             set DejaRentres += array{J}
             # il ne fait plus partie de CETTE table : plus aucun message, ecran ni camera d'ici (il peut rejouer ailleurs)
@@ -1154,6 +1311,7 @@ hands_manager := class(creative_device):
         for (K -> J : Liste, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             Perso.Show()
+            RendreVisible(J)
             if (RetourLobby.Length = 0, P := PointSpawn[J]):
                 var PoseS : logic = false
                 for (H : array{0.0, 40.0, 80.0, 130.0}, not PoseS?):
@@ -1324,6 +1482,8 @@ hands_manager := class(creative_device):
         EnleverCameras()
         set Paquets = map{}
         set Penalites = map{}
+        set BoutonsSurvecus = map{}
+        set OrdreElimines = array{}
         set DefiEnCours = false
         set Sens = 1
         set Bloque = 0
@@ -1332,6 +1492,8 @@ hands_manager := class(creative_device):
             if (Perso := J.GetFortCharacter[]):
                 Perso.ReleaseFromStasis()
                 Perso.Show()
+            RendreVisible(J)
+            AnaDebutPartie.Submit(J)
             Asseoir(J, PlaceIndex(J))
             spawn{ VerrouArrivee(J) }
             if (set Paquets[J] = array{}) {}
@@ -1364,6 +1526,9 @@ hands_manager := class(creative_device):
                 # mordu, ou PARTI pendant son tour : il quitte le jeu, on passe tout de suite au suivant
                 if (Elimine? or not EstLa(J)?):
                     set Vivants = for (X : Vivants, X <> J) do X
+                    if (Elimine?):
+                        set OrdreElimines += array{J}
+                        AnaElimination.Submit(J)
                     if (Elimine?, EstLa(J)?):
                         # il reste dans la piece (libre), ou rentre au lobby avec BACK TO LOBBY
                         spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
@@ -1385,7 +1550,357 @@ hands_manager := class(creative_device):
                 Sleep(4.0)
         Bandeau("")
         EnleverCameras()
+        # LES RECOMPENSES : Dents, points de rang, victoires, defi du jour
+        if (not TestSolo?):
+            Recompenser()
         # (la suite : l'ecran PLAY AGAIN / BACK TO LOBBY, dans FinDePartie)
+
+    # =========================================================================
+    #  MISE A JOUR 2 : DENTS, RANGS, DEFI, BOUTIQUE, CASIER, COFFRE, CHAPEAUX, LAMPES
+    # =========================================================================
+    # FIN DE PARTIE : 1er +50 / +40 pts, 2e +25 / +15, 3e +15 / 0, 4e +10 / -10 ; +2 Dents et +3 pts par bouton survecu
+    Recompenser()<suspends> : void =
+        var Classement : []player = array{}
+        if (G := Vivants[0]):
+            set Classement += array{G}
+        for (K := 0..OrdreElimines.Length - 1, X := OrdreElimines[OrdreElimines.Length - 1 - K]):
+            set Classement += array{X}
+        Jour := JourActuel()
+        for (Place -> J : Classement, EstLa(J)?):
+            Survecus := if (N := BoutonsSurvecus[J]) then N else 0
+            GainDents := (if (Place = 0) then 50 else if (Place = 1) then 25 else if (Place = 2) then 15 else 10) + 2 * Survecus
+            GainPoints := (if (Place = 0) then 40 else if (Place = 1) then 15 else if (Place = 2) then 0 else -10) + 3 * Survecus
+            A := StatsDe(J)
+            # defi du jour (remis a zero chaque jour)
+            TypeD := TypeDefi(Jour)
+            var Progres : int = if (A.JourDefi = Jour) then A.ProgresDefi else 0
+            var Fini : logic = if (A.JourDefi = Jour, A.DefiFini?) then true else false
+            set Progres += (if (TypeD = 0) then Survecus else if (TypeD = 1) then (if (Place = 0) then 1 else 0) else 1)
+            var Bonus : int = 0
+            if (not Fini?, Progres >= ButDefi(TypeD)):
+                set Fini = true
+                set Bonus += 100
+                Avertir(J, "DAILY CHALLENGE COMPLETE! +100 TEETH")
+            # 1re victoire du jour
+            PremiereDuJour := if (Place = 0, A.DernierJourVictoire <> Jour) then true else false
+            if (PremiereDuJour?):
+                set Bonus += 50
+            # le rang : jamais sous le debut d'un rang deja atteint
+            NouveauxPoints := Max(PlancherRang(A.PointsMax), Max(0, A.PointsRang + GainPoints))
+            NouveauMax := Max(A.PointsMax, NouveauxPoints)
+            AncienneDiv := DivisionDe(A.PointsMax)
+            NouvelleDiv := DivisionDe(NouveauMax)
+            AncienRang := if (Q := Floor[(AncienneDiv * 1.0) / 3.0]) then Q else 0
+            NouveauRang := if (Q := Floor[(NouvelleDiv * 1.0) / 3.0]) then Q else 0
+            # montee (premiere fois seulement) : +100 par division, +500 pour un nouveau rang
+            if (NouveauRang > AncienRang):
+                set Bonus += 500
+            else if (NouvelleDiv > AncienneDiv):
+                set Bonus += 100 * (NouvelleDiv - AncienneDiv)
+            if:
+                set Stats[J] = stats_joueur:
+                    CopieStats<constructor>(A)
+                    Dents := A.Dents + GainDents + Bonus
+                    PointsRang := NouveauxPoints
+                    PointsMax := NouveauMax
+                    Parties := A.Parties + 1
+                    Victoires := A.Victoires + (if (Place = 0) then 1 else 0)
+                    DernierJourVictoire := if (PremiereDuJour?) then Jour else A.DernierJourVictoire
+                    JourDefi := Jour
+                    ProgresDefi := Progres
+                    DefiFini := Fini
+            Delta := NouveauxPoints - A.PointsRang
+            Signe := if (Delta >= 0) then "+" else ""
+            Avertir(J, "+{GainDents + Bonus} TEETH   {Signe}{Delta} RANK POINTS")
+            if (NouvelleDiv > AncienneDiv):
+                SonRang.Play()
+                AnimerPlus("RANK UP!", "P{NumeroDe(J)} IS NOW {NomRang(NouveauxPoints)}", "", J)
+
+    # Dents : + ou - (jamais sous 0)
+    AjouterDents(J : player, N : int) : void =
+        A := StatsDe(J)
+        if:
+            set Stats[J] = stats_joueur:
+                CopieStats<constructor>(A)
+                Dents := Max(0, A.Dents + N)
+
+    AjouterObjet(J : player, Id : int) : void =
+        A := StatsDe(J)
+        if (not Dedans(A.Possedes, Id)?):
+            if:
+                set Stats[J] = stats_joueur:
+                    CopieStats<constructor>(A)
+                    Possedes := A.Possedes + array{Id}
+
+    # equipe un objet (chapeau -1 = aucun, machine -1 = normale)
+    Equiper(J : player, Id : int) : void =
+        A := StatsDe(J)
+        Chapeau := if (Id >= 100, Id <= 107) then Id else if (Id = 199) then -1 else A.ChapeauEquipe
+        Lampe := if (Id >= 200, Id <= 207) then Id else A.LampeEquipee
+        SonB := if (Id >= 300, Id <= 304) then Id else A.SonEquipe
+        Machine := if (Id >= 401, Id <= 403) then Id else if (Id = 499) then -1 else A.MachineEquipee
+        if:
+            set Stats[J] = stats_joueur:
+                CopieStats<constructor>(A)
+                ChapeauEquipe := Chapeau
+                LampeEquipee := Lampe
+                SonEquipe := SonB
+                MachineEquipee := Machine
+
+    Equipe(J : player, Id : int)<transacts> : logic =
+        A := StatsDe(J)
+        Lampe := if (A.LampeEquipee >= 200) then A.LampeEquipee else 200
+        Son := if (A.SonEquipe >= 300) then A.SonEquipe else 300
+        if (A.ChapeauEquipe = Id or Lampe = Id or Son = Id or A.MachineEquipee = Id) then true else false
+
+    # --- LE COFFRE DU JOUR (lobby) : 50 a 300 Dents, une fois par jour
+    QuandCoffre(Agent : agent) : void =
+        if (J := player[Agent]):
+            Jour := JourActuel()
+            A := StatsDe(J)
+            if (A.DernierJourCoffre <> Jour):
+                Gain := GetRandomInt(50, 300)
+                if:
+                    set Stats[J] = stats_joueur:
+                        CopieStats<constructor>(A)
+                        Dents := A.Dents + Gain
+                        DernierJourCoffre := Jour
+                SonBouton.Play()
+                spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST: +{Gain} TEETH!") }
+            else:
+                Avertir(J, "COME BACK TOMORROW FOR A NEW CHEST!")
+
+    # un gros texte qui surgit, pour UN joueur
+    AnimerPour(J : player, Gros : string, Ligne : string)<suspends> : void =
+        if (IU := GetPlayerUI[J]):
+            var Actuel : ?canvas = false
+            for (Taille : array{90.0, 190.0, 300.0, 250.0, 270.0}):
+                if (A := Actuel?):
+                    IU.RemoveWidget(A)
+                C := canvas{Slots := TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille) + TexteEcrit(Ligne, 0.5, 0.5, 0.0, 120.0, 52.0)}
+                IU.AddWidget(C)
+                set Actuel = option{C}
+                Sleep(0.06)
+            Sleep(1.8)
+            if (A := Actuel?):
+                IU.RemoveWidget(A)
+
+    # --- LES DENTS, LE RANG et LE DEFI en haut a droite, en permanence (redessines seulement s'ils changent)
+    HudEnBoucle()<suspends> : void =
+        loop:
+            Jour := JourActuel()
+            for (J : GetPlayspace().GetPlayers(), IU := GetPlayerUI[J]):
+                A := StatsDe(J)
+                TypeD := TypeDefi(Jour)
+                Progres := if (A.JourDefi = Jour) then A.ProgresDefi else 0
+                Fini := if (A.JourDefi = Jour, A.DefiFini?) then true else false
+                Defi := if (Fini?) then "DAILY: DONE!" else "DAILY: {TexteDefi(TypeD)} {Min(Progres, ButDefi(TypeD))}/{ButDefi(TypeD)}"
+                Cle := "{A.Dents}|{NomRang(A.PointsRang)}|{Defi}"
+                Avant := if (T := TextesHud[J]) then T else ""
+                if (Avant <> Cle):
+                    if (set TextesHud[J] = Cle) {}
+                    if (Ancien := Huds[J]):
+                        IU.RemoveWidget(Ancien)
+                    var S : []canvas_slot = TexteGauche("{A.Dents} TEETH", 1.0, 0.0, -430.0, 45.0, 44.0)
+                    set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -430.0, 95.0, 34.0)
+                    set S += TexteGauche(Defi, 1.0, 0.0, -430.0, 135.0, 20.0)
+                    C := canvas{Slots := S}
+                    IU.AddWidget(C)
+                    if (set Huds[J] = C) {}
+            Sleep(1.0)
+
+    # --- LA BOUTIQUE et LE CASIER (lobby) : meme systeme de boutons que le jeu
+    QuandBoutique(Agent : agent) : void =
+        if (J := player[Agent]):
+            spawn{ OuvrirMenu(J, false) }
+
+    QuandCasier(Agent : agent) : void =
+        if (J := player[Agent]):
+            spawn{ OuvrirMenu(J, true) }
+
+    # Casier = false : BOUTIQUE (onglets CHAPEAUX / LAMPES / SONS / PREMIUM) ; true : CASIER (equiper ce qu'on a)
+    OuvrirMenu(J : player, Casier : logic)<suspends> : void =
+        if (Contient(MenusOuverts, J)?):
+            return
+        set MenusOuverts += array{J}
+        var Onglet : int = 0
+        loop:
+            if (not EstLa(J)?):
+                break
+            Ev := event(int){}
+            FinM := event(){}
+            C := canvas{Slots := DessinerMenu(J, Casier, Onglet, Ev, FinM)}
+            if (IU := GetPlayerUI[J]):
+                IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
+            # (ferme tout seul apres 90 s sans clic)
+            Code := race:
+                Ev.Await()
+                block:
+                    Sleep(90.0)
+                    999
+            FinM.Signal()
+            if (IU := GetPlayerUI[J]):
+                IU.RemoveWidget(C)
+            if (Code = 999):
+                break
+            if (Code >= 900, Code <= 903):
+                set Onglet = Code - 900
+            else if (Code >= 2000):
+                Equiper(J, Code - 2000)
+            else if (Code >= 1000):
+                Acheter(J, Code - 1000)
+        set MenusOuverts = for (X : MenusOuverts, X <> J) do X
+
+    Acheter(J : player, Id : int)<suspends> : void =
+        if (Possede(J, Id)?):
+            Equiper(J, Id)
+            return
+        Prix := PrixDents(Id)
+        if (Prix < 0):
+            # V-Bucks (Machine de Noel : seulement en decembre)
+            Mois := MoisDu(JourActuel())
+            if (Id = 403, Mois <> 12):
+                Avertir(J, "ONLY IN DECEMBER!")
+            else if (V := Vendeurs[GetSession()]):
+                Ok := V.Acheter(J, Id)
+                if (Ok?):
+                    AjouterObjet(J, Id)
+                    Equiper(J, Id)
+                    AnaAchat.Submit(J)
+            else:
+                Avertir(J, "COMING SOON!")
+        else if (StatsDe(J).Dents >= Prix):
+            AjouterDents(J, -Prix)
+            AjouterObjet(J, Id)
+            Equiper(J, Id)
+            AnaAchat.Submit(J)
+            Avertir(J, "{NomObjet(Id)} UNLOCKED!")
+        else:
+            Avertir(J, "NOT ENOUGH TEETH")
+
+    DessinerMenu(J : player, Casier : logic, Onglet : int, Ev : event(int), FinM : event()) : []canvas_slot =
+        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.02, G := 0.02, B := 0.02}, DefaultOpacity := 0.8}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
+        set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -420.0, 90.0)
+        set S += TexteEcrit("{StatsDe(J).Dents} TEETH", 0.5, 0.5, 0.0, -345.0, 40.0)
+        Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "SOUNDS", "MACHINES"} else array{"HATS", "LAMPS", "SOUNDS", "PREMIUM"}
+        for (I -> Nom : Noms):
+            set S += BoutonTexteAvec(Ev, FinM, if (I = Onglet) then "> {Nom} <" else Nom, 0.5, 0.5, (I * 1.0 - 1.5) * 330.0, -265.0, 36.0, 900 + I)
+        var Ligne : float = -175.0
+        # casier : enlever son chapeau / sa machine
+        if (Casier?, Onglet = 0 or Onglet = 3):
+            Aucun := if (Onglet = 0) then 199 else 499
+            set S += TexteGauche(if (Onglet = 0) then "NO HAT" else "NORMAL MACHINE", 0.5, 0.5, -560.0, Ligne, 34.0)
+            set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Aucun)
+            set Ligne += 68.0
+        for (Id : ObjetsOnglet(Onglet, Casier), not Casier? or Possede(J, Id)?):
+            set S += TexteGauche(NomObjet(Id), 0.5, 0.5, -560.0, Ligne, 34.0)
+            Etat := if (Equipe(J, Id)?) then "EQUIPPED" else if (Possede(J, Id)?) then "OWNED"
+                else if (PrixDents(Id) = 0) then "FREE" else if (PrixDents(Id) > 0) then "{PrixDents(Id)} TEETH" else "{PrixVBucks(Id)} V-BUCKS"
+            set S += TexteEcrit(Etat, 0.5, 0.5, 80.0, Ligne, 28.0)
+            if (not Equipe(J, Id)?):
+                if (Possede(J, Id)?):
+                    set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Id)
+                else:
+                    set S += BoutonTexteAvec(Ev, FinM, "BUY", 0.5, 0.5, 400.0, Ligne, 32.0, 1000 + Id)
+            set Ligne += 68.0
+        set S += BoutonTexteAvec(Ev, FinM, "CLOSE", 0.5, 1.0, 0.0, -80.0, 44.0, 999)
+        S
+
+    # --- LES CHAPEAUX : un accessoire par joueur, colle a sa tete (partout : lobby, table, victoire)
+    ChapeauxEnBoucle()<suspends> : void =
+        loop:
+            Sleep(0.05)
+            Caches := if (L := Invisibles[GetSession()]) then L else array{}
+            for (J : GetPlayspace().GetPlayers()):
+                Voulu := StatsDe(J).ChapeauEquipe
+                Actuel := if (A := ChapeauxIds[J]) then A else -1
+                if (Voulu <> Actuel):
+                    if (Ancien := ChapeauxPortes[J]):
+                        Ancien.Dispose()
+                    var Reste : [player]creative_prop = map{}
+                    for (X -> P : ChapeauxPortes, X <> J):
+                        if (set Reste[X] = P) {}
+                    set ChapeauxPortes = Reste
+                    if (set ChapeauxIds[J] = Voulu) {}
+                    if (Voulu >= 100, Modele := ModelesChapeaux[Voulu - 100], Perso := J.GetFortCharacter[]):
+                        Resultat := SpawnProp(Modele, Perso.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, IdentityRotation())
+                        if (Nouveau := Resultat(0)?):
+                            if (set ChapeauxPortes[J] = Nouveau) {}
+                if (Chapeau := ChapeauxPortes[J], Perso := J.GetFortCharacter[]):
+                    if (Contient(Caches, J)? or not Perso.IsActive[]):
+                        Chapeau.Hide()
+                    else:
+                        Chapeau.Show()
+                        F := Perso.GetViewRotation().GetLocalForward()
+                        Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+                        if (Chapeau.TeleportTo[Perso.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+            # joueurs partis : leur chapeau disparait
+            var Garde : [player]creative_prop = map{}
+            for (X -> P : ChapeauxPortes):
+                if (EstLa(X)?):
+                    if (set Garde[X] = P) {}
+                else:
+                    P.Dispose()
+            set ChapeauxPortes = Garde
+
+    RendreInvisible(J : player) : void =
+        L := if (A := Invisibles[GetSession()]) then A else array{}
+        if (not Contient(L, J)?, set Invisibles[GetSession()] = L + array{J}) {}
+
+    RendreVisible(J : player) : void =
+        L := if (A := Invisibles[GetSession()]) then A else array{}
+        if (set Invisibles[GetSession()] = for (X : L, X <> J) do X) {}
+
+    # --- LA LAMPE au-dessus de la table : la couleur du joueur PENDANT SON TOUR (blanche sinon)
+    LampeDuTour(J : player)<suspends> : void =
+        Id := StatsDe(J).LampeEquipee
+        race:
+            FinLampe.Await()
+            block:
+                if (Id = 206):
+                    # arc-en-ciel : les couleurs defilent
+                    loop:
+                        for (K := 1..5):
+                            AllumerSeule(K)
+                            Sleep(0.35)
+                else if (Id = 207):
+                    # stroboscope : la lampe clignote (sans son)
+                    loop:
+                        AllumerSeule(0)
+                        Sleep(0.1)
+                        AllumerSeule(-1)
+                        Sleep(0.1)
+                else:
+                    AllumerSeule(if (Id >= 201, Id <= 205) then Id - 200 else 0)
+                    loop:
+                        Sleep(10.0)
+        AllumerSeule(0)
+
+    # allume la lampe numero K (0 = blanche), eteint les autres (-1 = toutes eteintes)
+    AllumerSeule(K : int) : void =
+        for (I -> L : LampesTable):
+            if (I = K) then L.TurnOn() else L.TurnOff()
+
+    # --- LA MACHINE du casier : pendant son tour, la machine prend sa matiere ; apres, elle reprend la normale.
+    # Les materiaux (doree, demoniaque, Noel) sont fournis plus tard : MateriauMachine les donnera.
+    HabillerMachine(J : player, ?Retirer : logic = false) : void =
+        Id := StatsDe(J).MachineEquipee
+        if (Retirer?):
+            if (Id >= 401, M := MateriauNormal[]):
+                for (P : array{Centre, Gueule, Plaque}):
+                    P.SetMaterial(M)
+        else if (Id >= 401, Possede(J, Id)?, M := MateriauMachine[Id]):
+            for (P : array{Centre, Gueule, Plaque}):
+                P.SetMaterial(M)
+
+    # A COMPLETER quand les materiaux existent (dossier et noms donnes par l'autre Claude)
+    MateriauMachine(Id : int)<decides><transacts> : material =
+        false?
+        Salle_Porcherie.Materials.M_Touches{}
+
+    MateriauNormal()<decides><transacts> : material =
+        false?
+        Salle_Porcherie.Materials.M_Touches{}
 
     # les joueurs partis du serveur quittent le jeu ; le tour reste sur le bon joueur
     RetirerAbsents() : void =
@@ -1661,6 +2176,9 @@ hands_manager := class(creative_device):
         if (not EstLa(J)?):
             return false
         TournerVers(J)
+        # SA LAMPE et SA MACHINE (casier) pendant son tour
+        spawn{ LampeDuTour(J) }
+        HabillerMachine(J)
         Penalite := if (P := Penalites[J]) then P else 0
         if (set Penalites[J] = 0) {}
         # JAM CUMULES : les boutons en plus qui lui arrivent dessus. S'il joue un JAM a son tour, il les PASSE au
@@ -1749,6 +2267,8 @@ hands_manager := class(creative_device):
                     else:
                         Feinte()
                         set Requis -= 1
+                        Avant := if (N := BoutonsSurvecus[J]) then N else 0
+                        if (set BoutonsSurvecus[J] = Avant + 1) {}
             if (not Elimine?):
                 # retour a sa place SANS temps mort : ecran noir tres court, on le re-pose (comme au debut de la
                 # manche) PENDANT qu'il voit encore la camera du clavier, on enleve la camera, on corrige tout de suite
@@ -1759,6 +2279,8 @@ hands_manager := class(creative_device):
         Surligner(-1)
         Verdir(-1)
         FermerEcrans()
+        FinLampe.Signal()
+        HabillerMachine(J, ?Retirer := true)
         Elimine
 
     # mordu : le personnage meurt ; quand il reapparait, il est assis sur le siege numero K (au loin)
@@ -1769,8 +2291,9 @@ hands_manager := class(creative_device):
         if (Perso := J.GetFortCharacter[]):
             Perso.ReleaseFromStasis()
             # INVISIBLE pour les autres : en se promenant, il ne peut pas cacher la machine aux joueurs encore en jeu
-            # (il redevient visible en rentrant au lobby)
+            # (il redevient visible en rentrant au lobby) ; son chapeau est cache aussi
             Perso.Hide()
+            RendreInvisible(J)
             # il est envoye a un point de la piece (le K-ieme mordu va au K-ieme point), tourne vers la table
             if (Ix := Mod[K, Max(1, PointsElimines.Length)], Pl := PointsElimines[Ix]):
                 Ici := Pl.GetTransform().Translation
@@ -2039,7 +2562,11 @@ hands_manager := class(creative_device):
             B := Tournee(B0, LacetMachine)
             spawn{ Bouger(T, transform{Translation := B.Translation - vector3{X := 0.0, Y := 0.0, Z := Enfoncement}, Rotation := B.Rotation, Scale := B.Scale}, 0.1) }
         Sleep(0.1)
-        SonClic.Play()
+        SonEquipe := StatsDe(J).SonEquipe
+        if (SonEquipe >= 301, Son := SonsBoutons[SonEquipe - 301]):
+            Son.Play()
+        else:
+            SonClic.Play()
         Sleep(0.4)
 
     # piege : la machoire claque (fermee completement), jumpscare pour la victime, puis elle se rouvre
@@ -2144,11 +2671,12 @@ hands_manager := class(creative_device):
         for (I -> Chiffre : Chrono):
             set S += array{PlaceLibre(Chiffre, 0.5, 0.0, -20.0 + I * 40.0, 165.0)}
         set S += TexteEcrit("DANGER {Risque}%", 0.5, 0.0, 0.0, 215.0, 42.0)
-        set S += TexteGauche("YOU ARE P{NumeroDe(J)}", 0.0, 0.0, 110.0, 50.0, 48.0)
+        set S += TexteGauche("YOU ARE P{NumeroDe(J)} - {NomRang(StatsDe(J).PointsRang)}", 0.0, 0.0, 110.0, 50.0, 48.0)
         # les autres joueurs : leur numero et leurs cartes en DOS DE CARTE (on voit tout de suite qui en a combien)
         var Ligne : float = 125.0
         for (I -> X : Assis, X <> J, Contient(Vivants, X)?):
             set S += TexteGauche("P{I + 1}", 0.0, 0.0, 110.0, Ligne, 40.0)
+            set S += TexteGauche(NomRang(StatsDe(X).PointsRang), 0.0, 0.0, 380.0, Ligne, 24.0)
             N := NombreDe(X)
             if (N = 0):
                 set S += TexteGauche("NO CARD", 0.0, 0.0, 175.0, Ligne, 28.0)
@@ -2196,12 +2724,16 @@ hands_manager := class(creative_device):
         BoutonTexteSur(Choix, S, AX, AY, X, Y, Taille, Code)
 
     BoutonTexteSur(Ev : event(int), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
+        BoutonTexteAvec(Ev, FinEcran, S, AX, AY, X, Y, Taille, Code)
+
+    # (Fin : l'evenement qui arrete le bouton quand son ecran est retire)
+    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
         var Slots : []canvas_slot = array{}
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
         var Claires : []texture = array{}
         # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
-        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702) then true else false
+        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702 or Code = 999) then true else false
         FondN := if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
         FondS := if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
         HautB := Taille * 1.45
@@ -2224,7 +2756,7 @@ hands_manager := class(creative_device):
                 set Slots += array{PlaceZ(Img, AX, AY, Cx + L * 0.5, Y - T * 0.04, 1)}
             set Cx += L + T * 0.06
         Zone := TEST1{}
-        BT := bouton_texte{Ev := Ev, Fin := FinEcran, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
+        BT := bouton_texte{Ev := Ev, Fin := FinB, Code := Code, Lettres := Lettres, Normales := Normales, Claires := Claires, Taille := T, Zone := Zone,
             Son := SonBouton, Fond := Fond, FondNormal := FondN, FondSurvol := FondS, LargFond := LargB, HautFond := HautB}
         spawn{ BT.Suivre() }
         Slots + array{canvas_slot{Widget := Zone, Anchors := anchors{Minimum := vector2{X := AX, Y := AY}, Maximum := vector2{X := AX, Y := AY}},
