@@ -969,7 +969,7 @@ hands_manager := class(creative_device):
         if (NumeroEnclos = 1):
             BoutonBoutique.InteractedWithEvent.Subscribe(QuandBoutique)
             BoutonCasier.InteractedWithEvent.Subscribe(QuandCasier)
-            BoutonCoffre.InteractedWithEvent.Subscribe(QuandCoffre)
+            BoutonCoffre.Disable()                       # FREE GIFTS retires
             spawn{ HudEnBoucle() }
             spawn{ ChapeauxEnBoucle() }
         loop:
@@ -1721,9 +1721,8 @@ hands_manager := class(creative_device):
     # =========================================================================
     DelaisCadeaux : []float = array{5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0}
 
-    QuandCoffre(Agent : agent) : void =
-        if (J := player[Agent]):
-            spawn{ OuvrirCadeaux(J) }
+    # FREE GIFTS retires : le bouton du cadeau ne fait plus rien (il est aussi desactive au demarrage)
+    QuandCoffre(Agent : agent) : void = {}
 
     DelaiCadeau(N : int)<transacts> : float =
         Minutes := if (D := DelaisCadeaux[N - 1]) then D else if (D := DelaisCadeaux[DelaisCadeaux.Length - 1]) then D else 60.0
@@ -1932,9 +1931,7 @@ hands_manager := class(creative_device):
                         Alignment := vector2{X := 0.0, Y := 0.5}, Offsets := margin{Left := -394.0, Top := 132.0, Right := Remplie, Bottom := 22.0}, SizeToContent := false, ZOrder := 1}}
                     set S += TexteGauche(Defi, 1.0, 0.0, -440.0, 172.0, 20.0)
                     set S += array{PlaceH(ImgH(Interface.EverythingSaves, 300.0, 150.0), 1.0, 0.0, -230.0, 255.0, 300.0, 150.0)}
-                    # FREE GIFTS : le cadeau et son temps (ou READY!)
-                    set S += array{PlaceH(ImgH(Interface.Icone_Cadeau, 90.0, 90.0), 1.0, 0.0, -340.0, 375.0, 90.0, 90.0)}
-                    set S += TexteGauche(TexteCadeau, 1.0, 0.0, -285.0, 375.0, 34.0)
+                    # (FREE GIFTS retires : plus de cadeau ni de temps a l'ecran)
                     C := canvas{Slots := S}
                     IU.AddWidget(C)
                     if (set Huds[J] = C) {}
