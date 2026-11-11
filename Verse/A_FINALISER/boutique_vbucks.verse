@@ -12,6 +12,7 @@ using { /Fortnite.com/Devices }
 using { /UnrealEngine.com/Marketplace }
 using { /Verse.org/Assets }
 using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/SpatialMath }
 
 # --- LES TEXTES (noms et descriptions affiches par Epic) -----------------------------------------
 InfosHands<public> := module:
@@ -105,4 +106,6 @@ vendeur_vbucks := class(vendeur_premium):
 # l'appareil a poser dans la carte : il branche le vendeur sur la boutique du jeu
 boutique_vbucks := class(creative_device):
     OnBegin<override>()<suspends> : void =
+        # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
+        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
         if (set Vendeurs[GetSession()] = vendeur_vbucks{}) {}

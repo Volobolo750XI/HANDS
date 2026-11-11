@@ -47,6 +47,8 @@ cochons_manager := class(creative_device):
     var SpawnsPris : []int = array{}
 
     OnBegin<override>()<suspends> : void =
+        # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
+        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
         # SECURITE : les points de passage / d'apparition sont invisibles et sans collision, les grognements ne
         # jouent pas tout seuls au lancement
         for (P : PointsCochons):

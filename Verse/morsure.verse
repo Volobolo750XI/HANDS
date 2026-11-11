@@ -919,6 +919,8 @@ hands_manager := class(creative_device):
     FinLampe : event() = event(){}
 
     OnBegin<override>()<suspends> : void =
+        # l'appareil se cache tout seul (loin sous la carte) : jamais visible en jeu, meme si "Visible en jeu" est coche
+        if (Self.TeleportTo[vector3{X := 0.0, Y := 0.0, Z := -200000.0}, IdentityRotation()]) {}
         set BaseTouches = for (T : Touches) do T.GetTransform()
         set BaseGueule = Gueule.GetTransform()
         set BaseCentre = Centre.GetTransform()
