@@ -961,10 +961,10 @@ hands_manager := class(creative_device):
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
         spawn{ PanneauEnBoucle() }
+        # de base AUCUNE lampe : ton eclairage de la carte suffit ; une lampe ne s'allume que pendant le tour
+        # d'un joueur qui en a achete une (verte, bleue, rouge, violette ou arc-en-ciel)
         for (L : LampesTable):
             L.TurnOff()
-        if (L0 := LampesTable[0]):
-            L0.TurnOn()
         # le device de l'ENCLOS 1 gere tout ce qui est commun au lobby
         if (NumeroEnclos = 1):
             BoutonBoutique.InteractedWithEvent.Subscribe(QuandBoutique)
@@ -2208,10 +2208,11 @@ hands_manager := class(creative_device):
                             AllumerSeule(K)
                             Sleep(0.35)
                 else:
-                    AllumerSeule(if (Id >= 202, Id <= 205) then Id - 201 else 0)
+                    # lampe achetee : sa couleur ; lampe de base (ou aucune) : tout reste eteint
+                    AllumerSeule(if (Id >= 202, Id <= 205) then Id - 201 else -1)
                     loop:
                         Sleep(10.0)
-        AllumerSeule(0)
+        AllumerSeule(-1)
 
     # allume la lampe numero K (0 = blanche), eteint les autres (-1 = toutes eteintes)
     AllumerSeule(K : int) : void =
