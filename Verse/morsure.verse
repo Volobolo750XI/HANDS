@@ -785,6 +785,8 @@ hands_manager := class(creative_device):
     # Son de la MONTEE DE RANG (Lecteur audio, lecture auto NON)
     @editable SonRang : audio_player_device = audio_player_device{}
     # ANALYTICS : un appareil Analytique par etape
+    # STATISTIQUES (appareils Analytics) : false = aucun envoi, donc plus aucun message "evenement" a l'ecran en test
+    @editable Statistiques : logic = false
     @editable AnaEntreeZone : analytics_device = analytics_device{}
     @editable AnaDebutPartie : analytics_device = analytics_device{}
     @editable AnaRejoindre : analytics_device = analytics_device{}
@@ -1003,7 +1005,7 @@ hands_manager := class(creative_device):
         # (les joueurs de la partie en cours, inscrits dans le compteur, ne comptent pas pour une nouvelle partie)
         if (J := player[Agent], not Contient(DansZone, J)?, not Contient(Table, J)?):
             set DansZone += array{J}
-            AnaEntreeZone.Submit(J)
+            Stat(AnaEntreeZone, J)
 
     SortZone(Agent : agent) : void =
         if (J := player[Agent]):
@@ -1101,7 +1103,7 @@ hands_manager := class(creative_device):
                 Perso.ReleaseFromStasis()
                 Perso.Show()
             RendreVisible(J)
-            AnaRejoindre.Submit(J)
+            Stat(AnaRejoindre, J)
             Asseoir(J, P)
             spawn{ VerrouArrivee(J) }
             for (X : Table, ALaTable(X)?):
@@ -1183,14 +1185,14 @@ hands_manager := class(creative_device):
             loop:
                 C := Ev.Await()
                 if (C = 702):
-                    AnaRetourLobby.Submit(J)
+                    Stat(AnaRetourLobby, J)
                     if (set ChoixFin[J] = 702) {}
                     EnleverEcran(J)
                     RenvoyerAuLobby(array{J})
                     set DejaRentres += array{J}
                     break
                 else if (C = 701):
-                    AnaRejouer.Submit(J)
+                    Stat(AnaRejouer, J)
                     if (set ChoixFin[J] = 701) {}
                     EnleverEcran(J)
                     AfficherLobby(J, "READY!")
@@ -1342,7 +1344,7 @@ hands_manager := class(creative_device):
     var DejaRentres : []player = array{}
     QuandRetourLobby(Agent : agent) : void =
         if (J := player[Agent], Contient(Assis, J)?, not Contient(Vivants, J)?, not Contient(DejaRentres, J)?):
-            AnaRetourLobby.Submit(J)
+            Stat(AnaRetourLobby, J)
             RenvoyerAuLobby(array{J})
             set DejaRentres += array{J}
             # il ne fait plus partie de CETTE table : plus aucun message, ecran ni camera d'ici (il peut rejouer ailleurs)
@@ -1539,7 +1541,7 @@ hands_manager := class(creative_device):
                 Perso.ReleaseFromStasis()
                 Perso.Show()
             RendreVisible(J)
-            AnaDebutPartie.Submit(J)
+            Stat(AnaDebutPartie, J)
             Asseoir(J, PlaceIndex(J))
             spawn{ VerrouArrivee(J) }
             if (set Paquets[J] = array{}) {}
@@ -1574,7 +1576,7 @@ hands_manager := class(creative_device):
                     set Vivants = for (X : Vivants, X <> J) do X
                     if (Elimine?):
                         set OrdreElimines += array{J}
-                        AnaElimination.Submit(J)
+                        Stat(AnaElimination, J)
                     if (Elimine?, EstLa(J)?):
                         # il reste dans la piece (libre), ou rentre au lobby avec BACK TO LOBBY
                         spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
@@ -1606,6 +1608,10 @@ hands_manager := class(creative_device):
     # =========================================================================
     #  MISE A JOUR 2 : DENTS, RANGS, DEFI, BOUTIQUE, CASIER, COFFRE, CHAPEAUX, LAMPES
     # =========================================================================
+    Stat(A : analytics_device, J : agent) : void =
+        if (Statistiques?):
+            A.Submit(J)
+
     # FIN DE PARTIE : 1er +50 / +40 pts, 2e +25 / +15, 3e +15 / 0, 4e +10 / -10 ; +2 Dents et +3 pts par bouton survecu
     Recompenser()<suspends> : void =
         var Classement : []player = array{}
@@ -2021,7 +2027,7 @@ hands_manager := class(creative_device):
                 if (Ok?):
                     AjouterObjet(J, Id)
                     Equiper(J, Id)
-                    AnaAchat.Submit(J)
+                    Stat(AnaAchat, J)
             else:
                 Avertir(J, "COMING SOON!")
         else if (DentsInfiniesTest? or StatsDe(J).Dents >= Prix):
@@ -2029,7 +2035,7 @@ hands_manager := class(creative_device):
                 AjouterDents(J, -Prix)
             AjouterObjet(J, Id)
             Equiper(J, Id)
-            AnaAchat.Submit(J)
+            Stat(AnaAchat, J)
             Avertir(J, "{NomObjet(Id)} UNLOCKED!")
         else:
             Avertir(J, "NOT ENOUGH TEETH")
@@ -2124,7 +2130,11 @@ hands_manager := class(creative_device):
                 Avance := if (DtC > 0.001, Bouge.Length() < 300.0) then Bouge * (AvanceChapeau / DtC) else vector3{}
                 F := Perso.GetViewRotation().GetLocalForward()
                 Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
+                Debut := GetSimulationElapsedTime()
                 Chapeau.MoveTo(Ici + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0), 0.1)
+                # chapeau cache ou supprime : MoveTo rend la main tout de suite -> on attend quand meme (sinon boucle infinie)
+                if (GetSimulationElapsedTime() - Debut < 0.05):
+                    Sleep(0.1)
             else:
                 Sleep(0.1)
 
