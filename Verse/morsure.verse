@@ -763,7 +763,7 @@ hands_manager := class(creative_device):
     # Le PANNEAU au-dessus de l'enclos (un Panneau d'affichage / Billboard) : PEN 1 - 2/4 WAITING, IN GAME, FULL...
     @editable PanneauEtat : billboard_device = billboard_device{}
     # --- MISE A JOUR 2 (seul le device de l'ENCLOS 1 gere la boutique, le casier, le coffre, les Dents a l'ecran et les chapeaux)
-    # Boutons du lobby (appareils Bouton) : BOUTIQUE, CASIER, COFFRE DU JOUR
+    # Boutons du lobby (appareils Bouton) : BOUTIQUE, CASIER, FREE GIFTS (BoutonCoffre : le cadeau du lobby)
     @editable BoutonBoutique : button_device = button_device{}
     @editable BoutonCasier : button_device = button_device{}
     @editable BoutonCoffre : button_device = button_device{}
@@ -1681,13 +1681,82 @@ hands_manager := class(creative_device):
         if (A.ChapeauEquipe = Id or Lampe = Id or A.MachineEquipee = Id) then true else false
 
     # --- LE COFFRE DU JOUR (lobby) : 50 a 300 Dents, une fois par jour
+    # =========================================================================
+    #  FREE GIFTS (comme Football Pillars) : les temps partent de l'arrivee du joueur sur la map et tournent tous
+    #  en meme temps. GIFT 1 a 5 min, 2 a 15, 3 a 30, 4 a 50, 5 a 1h20, 6 a 2h, 7 a 3h, puis un toutes les heures.
+    #  21 cadeaux a l'ecran (3 lignes de 7). Pret : bouton vert OPEN. Sinon : son temps qui descend.
+    # =========================================================================
+    DelaisCadeaux : []float = array{5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0}
+    var ArriveeCadeaux : [player]float = map{}
+    var CadeauxOuverts : [player][]int = map{}
+
     QuandCoffre(Agent : agent) : void =
         if (J := player[Agent]):
-            spawn{ OuvrirCoffre(J) }
+            spawn{ OuvrirCadeaux(J) }
 
-    # LA FENETRE DU COFFRE DU JOUR (meme style que la boutique) : le coffre en grand, OPEN s'il est pret,
-    # sinon le temps avant le prochain (il change chaque seconde)
-    OuvrirCoffre(J : player)<suspends> : void =
+    DelaiCadeau(N : int)<transacts> : float =
+        Minutes := if (D := DelaisCadeaux[N - 1]) then D else if (D := DelaisCadeaux[DelaisCadeaux.Length - 1]) then D else 60.0
+        Minutes * 60.0
+
+    DeblocageCadeau(N : int)<transacts> : float =
+        var Total : float = 0.0
+        for (I := 1..N):
+            set Total += DelaiCadeau(I)
+        Total
+
+    # Dents de chaque cadeau : 1 : 50, 2 : 75, 3 : 100, 4 : 150, 5 : 200, 6 : 300, 7 : 500, puis 200
+    GainCadeau(N : int)<transacts> : int =
+        if (N = 1) then 50 else if (N = 2) then 75 else if (N = 3) then 100 else if (N = 4) then 150
+        else if (N = 5) then 200 else if (N = 6) then 300 else if (N = 7) then 500 else 200
+
+    EcouleCadeau(J : player) : float =
+        Maintenant := GetSecondsSinceEpoch()
+        Debut := if (D := ArriveeCadeaux[J]) then D else Maintenant
+        Maintenant - Debut
+
+    # les 21 prochains cadeaux pas encore ouverts
+    ProchainsCadeaux(J : player)<transacts> : []int =
+        Ouverts := if (O := CadeauxOuverts[J]) then O else array{}
+        var Liste : []int = array{}
+        var N : int = 1
+        loop:
+            if (Liste.Length >= 21 or N > 500):
+                break
+            if (not Dedans(Ouverts, N)?):
+                set Liste += array{N}
+            set N += 1
+        Liste
+
+    CadeauxPrets(J : player) : int =
+        E := EcouleCadeau(J)
+        var Prets : int = 0
+        for (N : ProchainsCadeaux(J), DeblocageCadeau(N) <= E):
+            set Prets += 1
+        Prets
+
+    OuvrirCadeau(J : player, N : int) : void =
+        Ouverts := if (O := CadeauxOuverts[J]) then O else array{}
+        E := EcouleCadeau(J)
+        if (DeblocageCadeau(N) <= E, not Dedans(Ouverts, N)?):
+            if (set CadeauxOuverts[J] = Ouverts + array{N}) {}
+            AjouterDents(J, GainCadeau(N))
+            spawn{ AnimerPour(J, "+{GainCadeau(N)}", "GIFT {N}!", ?AvecDent := true) }
+
+    DureeTexte(Secondes : float) : string =
+        Total := if (V := Ceil[Secondes]) then Max(0, V) else 0
+        H := if (V := Floor[(Total * 1.0) / 3600.0]) then V else 0
+        Mi := if (V := Floor[((Total - H * 3600) * 1.0) / 60.0]) then V else 0
+        Se := Total - H * 3600 - Mi * 60
+        if (H > 0) then "{H}:{DeuxChiffres(Mi)}:{DeuxChiffres(Se)}" else "{DeuxChiffres(Mi)}:{DeuxChiffres(Se)}"
+
+    PosCadeau(K : int) : vector2 =
+        Col := if (V := Mod[K, 7]) then V else 0
+        Lig := if (V := Floor[(K * 1.0) / 7.0]) then V else 0
+        vector2{X := 200.0 * Col - 600.0, Y := 215.0 * Lig - 125.0}
+
+    # LA FENETRE (meme style que la boutique). Les temps changent chaque seconde SANS redessiner les boutons
+    # (les clics et les survols marchent toujours) ; elle n'est redessinee que si un cadeau devient pret.
+    OuvrirCadeaux(J : player)<suspends> : void =
         if (Contient(MenusOuverts, J)?):
             return
         set MenusOuverts += array{J}
@@ -1696,57 +1765,64 @@ hands_manager := class(creative_device):
                 break
             Ev := event(int){}
             FinM := event(){}
-            C := canvas{Slots := DessinerCoffre(J, Ev, FinM)}
+            Prets := CadeauxPrets(J)
+            C := canvas{Slots := DessinerCadeaux(J, Ev, FinM)}
             if (IU := GetPlayerUI[J]):
                 IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
-            Code := race:
-                Ev.Await()
-                block:
-                    Sleep(1.0)
-                    -1
+            var Temps : []widget = AjouterTemps(J, C)
+            var Code : int = -1
+            loop:
+                set Code = race:
+                    Ev.Await()
+                    block:
+                        Sleep(1.0)
+                        -1
+                if (Code <> -1 or CadeauxPrets(J) <> Prets or not EstLa(J)?):
+                    break
+                for (W : Temps):
+                    C.RemoveWidget(W)
+                set Temps = AjouterTemps(J, C)
             FinM.Signal()
             if (IU := GetPlayerUI[J]):
                 IU.RemoveWidget(C)
             if (Code = 999):
                 break
-            if (Code = 3001):
-                Jour := JourActuel()
-                A := StatsDe(J)
-                if (A.DernierJourCoffre <> Jour):
-                    Gain := GetRandomInt(50, 300)
-                    if:
-                        set Stats[J] = stats_joueur:
-                            Dents := A.Dents + Gain
-                            DernierJourCoffre := Jour
-                            CopieStats<constructor>(A)
-                    spawn{ AnimerPour(J, "+{Gain}", "DAILY CHEST!", ?AvecDent := true) }
+            if (Code >= 4000):
+                OuvrirCadeau(J, Code - 4000)
         set MenusOuverts = for (X : MenusOuverts, X <> J) do X
 
-    DessinerCoffre(J : player, Ev : event(int), FinM : event()) : []canvas_slot =
+    DessinerCadeaux(J : player, Ev : event(int), FinM : event()) : []canvas_slot =
         var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
-        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1200.0, 600.0), 0.5, 0.5, 0.0, 20.0, 0)}
-        set S += array{PlaceZ(ImgH(Interface.Banniere, 640.0, 160.0), 0.5, 0.5, 0.0, -255.0, 0)}
-        set S += TexteEcrit("DAILY CHEST", 0.5, 0.5, 0.0, -265.0, 58.0)
-        ImgFermer := ImgH(Interface.Bouton_Fermer, 80.0, 80.0)
+        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1800.0, 900.0), 0.5, 0.5, 0.0, 20.0, 0)}
+        set S += array{PlaceZ(ImgH(Interface.Banniere, 640.0, 160.0), 0.5, 0.5, 0.0, -395.0, 0)}
+        set S += array{PlaceZ(ImgH(Interface.Icone_Cadeau, 90.0, 90.0), 0.5, 0.5, -230.0, -405.0, 1)}
+        set S += TexteEcrit("FREE GIFTS", 0.5, 0.5, 40.0, -405.0, 62.0)
+        ImgFermer := ImgH(Interface.Bouton_Fermer, 90.0, 90.0)
         ZoneFermer := TEST1{}
-        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 80.0, Zone := ZoneFermer, Son := SonBouton}
+        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer_Survol, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
         spawn{ CF.Suivre() }
-        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 530.0, -240.0), PlaceH(ZoneFermer, 0.5, 0.5, 530.0, -240.0, 80.0, 80.0)}
-        set S += array{PlaceZ(ImgH(Interface.Icone_Coffre, 260.0, 260.0), 0.5, 0.5, 0.0, -20.0, 1)}
-        Aujourdhui := JourActuel()
-        if (StatsDe(J).DernierJourCoffre <> Aujourdhui):
-            set S += TexteEcrit("FREE TEETH EVERY DAY!", 0.5, 0.5, 0.0, 140.0, 34.0)
-            set S += BoutonTexteAvec(Ev, FinM, "OPEN", 0.5, 0.5, 0.0, 215.0, 50.0, 3001)
-        else:
-            # temps avant minuit (heure universelle) : le prochain coffre
-            Reste := (Aujourdhui + 1) * 86400.0 - GetSecondsSinceEpoch()
-            Total := if (V := Ceil[Reste]) then V else 0
-            H := if (V := Floor[(Total * 1.0) / 3600.0]) then V else 0
-            Mi := if (V := Floor[((Total - H * 3600) * 1.0) / 60.0]) then V else 0
-            Se := Total - H * 3600 - Mi * 60
-            set S += TexteEcrit("NEXT CHEST IN", 0.5, 0.5, 0.0, 140.0, 34.0)
-            set S += TexteEcrit("{H}:{DeuxChiffres(Mi)}:{DeuxChiffres(Se)}", 0.5, 0.5, 0.0, 205.0, 56.0)
+        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 815.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 815.0, -385.0, 90.0, 90.0)}
+        E := EcouleCadeau(J)
+        for (K -> N : ProchainsCadeaux(J)):
+            P := PosCadeau(K)
+            set S += array{PlaceZ(ImgH(Interface.Carte_Objet, 210.0, 210.0), 0.5, 0.5, P.X, P.Y, 0)}
+            set S += TexteEcrit("GIFT {N}", 0.5, 0.5, P.X, P.Y - 70.0, 22.0)
+            set S += array{PlaceZ(ImgH(Interface.Icone_Cadeau, 80.0, 80.0), 0.5, 0.5, P.X, P.Y - 10.0, 1)}
+            if (DeblocageCadeau(N) <= E):
+                set S += BoutonTexteAvec(Ev, FinM, "OPEN", 0.5, 0.5, P.X, P.Y + 60.0, 26.0, 4000 + N)
         S
+
+    # les temps des cadeaux pas encore prets (ajoutes a la fenetre, remplaces chaque seconde)
+    AjouterTemps(J : player, C : canvas) : []widget =
+        var Ws : []widget = array{}
+        E := EcouleCadeau(J)
+        for (K -> N : ProchainsCadeaux(J), Reste := DeblocageCadeau(N) - E, Reste > 0.0):
+            P := PosCadeau(K)
+            Morceaux := TexteEcrit(DureeTexte(Reste), 0.5, 0.5, P.X, P.Y + 60.0, 24.0)
+            for (Sl : Morceaux):
+                C.AddWidget(Sl)
+                set Ws += array{Sl.Widget}
+        Ws
 
     DeuxChiffres(N : int) : string = if (N < 10) then "0{N}" else "{N}"
 
@@ -1773,12 +1849,20 @@ hands_manager := class(creative_device):
         loop:
             Jour := JourActuel()
             for (J : GetPlayspace().GetPlayers(), IU := GetPlayerUI[J]):
+                if (not ArriveeCadeaux[J]):
+                    if (set ArriveeCadeaux[J] = GetSecondsSinceEpoch()) {}
+                # le prochain cadeau : READY! ou son temps
+                var ResteCadeau : float = 999999.0
+                E := EcouleCadeau(J)
+                for (N : ProchainsCadeaux(J)):
+                    set ResteCadeau = Min(ResteCadeau, DeblocageCadeau(N) - E)
+                TexteCadeau := if (ResteCadeau <= 0.0) then "READY!" else DureeTexte(ResteCadeau)
                 A := StatsDe(J)
                 TypeD := TypeDefi(Jour)
                 Progres := if (A.JourDefi = Jour) then A.ProgresDefi else 0
                 Fini := if (A.JourDefi = Jour, A.DefiFini?) then true else false
                 Defi := if (Fini?) then "DAILY: DONE!" else "DAILY: {TexteDefi(TypeD)} {Min(Progres, ButDefi(TypeD))}/{ButDefi(TypeD)}"
-                Cle := "{A.Dents}|{NomRang(A.PointsRang)}|{Defi}"
+                Cle := "{A.Dents}|{NomRang(A.PointsRang)}|{Defi}|{TexteCadeau}"
                 Avant := if (T := TextesHud[J]) then T else ""
                 if (Avant <> Cle):
                     if (set TextesHud[J] = Cle) {}
@@ -1796,6 +1880,9 @@ hands_manager := class(creative_device):
                         Alignment := vector2{X := 0.0, Y := 0.5}, Offsets := margin{Left := -394.0, Top := 132.0, Right := Remplie, Bottom := 22.0}, SizeToContent := false, ZOrder := 1}}
                     set S += TexteGauche(Defi, 1.0, 0.0, -440.0, 172.0, 20.0)
                     set S += array{PlaceH(ImgH(Interface.EverythingSaves, 300.0, 150.0), 1.0, 0.0, -230.0, 255.0, 300.0, 150.0)}
+                    # FREE GIFTS : le cadeau et son temps (ou READY!)
+                    set S += array{PlaceH(ImgH(Interface.Icone_Cadeau, 90.0, 90.0), 1.0, 0.0, -340.0, 375.0, 90.0, 90.0)}
+                    set S += TexteGauche(TexteCadeau, 1.0, 0.0, -285.0, 375.0, 34.0)
                     C := canvas{Slots := S}
                     IU.AddWidget(C)
                     if (set Huds[J] = C) {}
