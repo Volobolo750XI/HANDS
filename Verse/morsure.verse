@@ -773,7 +773,7 @@ hands_manager := class(creative_device):
     @editable BoutonCoffre : button_device = button_device{}
     # Les CHAPEAUX : les 7 accessoires (Blueprint "Creative Prop") DANS L'ORDRE : bonnet, casquette, chapeau de paille,
     # casque de mineur, haut-de-forme, chapeau de sorciere, couronne
-    @editable ModelesChapeaux : []creative_prop_asset = array{}
+    @editable ChapeauxAPorter : []creative_prop_asset = array{}
     @editable HauteurChapeau : float = 85.0      # cm au-dessus du centre du personnage
     # Les LAMPES au-dessus de CETTE table (Lumiere personnalisable), DANS L'ORDRE : blanche, verte, bleue, rouge, violette
     @editable LampesTable : []customizable_light_device = array{}
@@ -2046,7 +2046,7 @@ hands_manager := class(creative_device):
                         if (set Reste[X] = P) {}
                     set ChapeauxPortes = Reste
                     if (set ChapeauxIds[J] = Voulu) {}
-                    if (Voulu >= 100, Modele := ModelesChapeaux[Voulu - 100], Perso := J.GetFortCharacter[]):
+                    if (Voulu >= 100, Modele := ChapeauxAPorter[Voulu - 100], Perso := J.GetFortCharacter[]):
                         Resultat := SpawnProp(Modele, Perso.GetTransform().Translation + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, IdentityRotation())
                         if (Nouveau := Resultat(0)?):
                             if (set ChapeauxPortes[J] = Nouveau) {}
