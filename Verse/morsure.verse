@@ -1700,8 +1700,9 @@ hands_manager := class(creative_device):
                     if (set TextesHud[J] = Cle) {}
                     if (Ancien := Huds[J]):
                         IU.RemoveWidget(Ancien)
-                    var S : []canvas_slot = array{IconeDent(1.0, 0.0, -455.0, 45.0, 56.0)}
-                    set S += TexteGauche("{A.Dents}", 1.0, 0.0, -420.0, 45.0, 44.0)
+                    var S : []canvas_slot = array{PlaceZ(ImgH(Interface.Cadre_Dents, 300.0, 82.0), 1.0, 0.0, -330.0, 45.0, 0)}
+                    set S += array{IconeDent(1.0, 0.0, -440.0, 45.0, 56.0)}
+                    set S += TexteGauche("{A.Dents}", 1.0, 0.0, -405.0, 45.0, 40.0)
                     set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -430.0, 95.0, 34.0)
                     set S += TexteGauche(Defi, 1.0, 0.0, -430.0, 135.0, 20.0)
                     C := canvas{Slots := S}
@@ -1775,39 +1776,65 @@ hands_manager := class(creative_device):
         else:
             Avertir(J, "NOT ENOUGH TEETH")
 
+    # LA BOUTIQUE / LE CASIER, style cartoon : grand panneau de bois, banniere rouge, onglets en bois, les objets
+    # dans des cartes (icone, nom, prix avec la dent, bouton BUY / EQUIP), croix rouge pour fermer
     DessinerMenu(J : player, Casier : logic, Onglet : int, Ev : event(int), FinM : event()) : []canvas_slot =
-        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.02, G := 0.02, B := 0.02}, DefaultOpacity := 0.8}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
-        set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -420.0, 90.0)
+        var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
+        set S += array{PlaceZ(ImgH(Interface.Fond_Boutique, 1600.0, 900.0), 0.5, 0.5, 0.0, 20.0, 0)}
+        # la banniere et le titre
+        set S += array{PlaceZ(ImgH(Interface.Banniere, 640.0, 160.0), 0.5, 0.5, 0.0, -395.0, 0)}
+        set S += TexteEcrit(if (Casier?) then "LOCKER" else "SHOP", 0.5, 0.5, 0.0, -405.0, 70.0)
+        # ses Dents, en haut a gauche du panneau
         TexteDents := "{StatsDe(J).Dents}"
-        set S += array{IconeDent(0.5, 0.5, -LargeurTexte(TexteDents, 44.0) * 0.5 - 34.0, -345.0, 54.0)}
-        set S += TexteEcrit(TexteDents, 0.5, 0.5, 0.0, -345.0, 44.0)
+        set S += array{PlaceZ(ImgH(Interface.Cadre_Dents, 300.0, 82.0), 0.5, 0.5, -560.0, -385.0, 0)}
+        set S += array{IconeDent(0.5, 0.5, -650.0, -385.0, 58.0)}
+        set S += TexteGauche(TexteDents, 0.5, 0.5, -610.0, -385.0, 40.0)
+        # la croix rouge
+        ImgFermer := ImgH(Interface.Bouton_Fermer, 90.0, 90.0)
+        ZoneFermer := TEST1{}
+        CF := carte_main{Ev := Ev, Fin := FinM, Code := 999, Image := ImgFermer, Normale := Interface.Bouton_Fermer, Lueur := Interface.Bouton_Fermer, Taille := 90.0, Zone := ZoneFermer, Son := SonBouton}
+        spawn{ CF.Suivre() }
+        set S += array{PlaceLibre(ImgFermer, 0.5, 0.5, 725.0, -385.0), PlaceH(ZoneFermer, 0.5, 0.5, 725.0, -385.0, 90.0, 90.0)}
+        # les onglets en bois (jaune = celui qui est ouvert)
         Noms : []string = if (Casier?) then array{"HATS", "LAMPS", "MACHINES"} else array{"HATS", "LAMPS", "PREMIUM"}
         for (I -> Nom : Noms):
-            set S += BoutonTexteAvec(Ev, FinM, if (I = Onglet) then "> {Nom} <" else Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 380.0, -265.0, 36.0, 900 + I)
-        var Ligne : float = -175.0
-        # casier : enlever son chapeau / sa machine
-        if (Casier?, Onglet = 0 or Onglet = 2):
-            Aucun := if (Onglet = 0) then 199 else 499
-            set S += TexteGauche(if (Onglet = 0) then "NO HAT" else "NORMAL MACHINE", 0.5, 0.5, -560.0, Ligne, 34.0)
-            set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Aucun)
-            set Ligne += 68.0
+            FondO := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet
+            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{Interface.Onglet_Actif}, ?Ratio := 3.2)
+        # les objets : des cartes, 4 par rangee
+        var Liste : []int = array{}
+        if (Casier?, Onglet = 0):
+            set Liste += array{199}
+        if (Casier?, Onglet = 2):
+            set Liste += array{499}
         for (Id : ObjetsOnglet(Onglet, Casier), not Casier? or Possede(J, Id)?):
+            set Liste += array{Id}
+        for (K -> Id : Liste):
+            Col := if (M := Mod[K, 4]) then M else 0
+            Rangee := if (Q := Floor[(K * 1.0) / 4.0]) then Q else 0
+            X := (Col * 1.0 - 1.5) * 300.0
+            Y := -60.0 + Rangee * 320.0
+            set S += array{PlaceZ(ImgH(Interface.Carte_Objet, 240.0, 300.0), 0.5, 0.5, X, Y, 0)}
             if (Icone := IconeObjet(Id)?):
-                set S += array{PlaceH(ImgH(Icone, 62.0, 62.0), 0.5, 0.5, -620.0, Ligne, 62.0, 62.0)}
-            set S += TexteGauche(NomObjet(Id), 0.5, 0.5, -560.0, Ligne, 34.0)
-            Etat := if (Equipe(J, Id)?) then "EQUIPPED" else if (Possede(J, Id)?) then "OWNED"
-                else if (PrixDents(Id) = 0) then "FREE" else if (PrixDents(Id) > 0) then "{PrixDents(Id)}" else "{PrixVBucks(Id)} V-BUCKS"
-            set S += TexteEcrit(Etat, 0.5, 0.5, 80.0, Ligne, 28.0)
-            # un prix en Dents : la dent a gauche du nombre
-            if (not Possede(J, Id)?, PrixDents(Id) > 0):
-                set S += array{IconeDent(0.5, 0.5, 80.0 - LargeurTexte(Etat, 28.0) * 0.5 - 26.0, Ligne, 44.0)}
-            if (not Equipe(J, Id)?):
-                if (Possede(J, Id)?):
-                    set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, 400.0, Ligne, 32.0, 2000 + Id)
+                set S += array{PlaceZ(ImgH(Icone, 150.0, 150.0), 0.5, 0.5, X, Y - 55.0, 0)}
+            Nom := if (Id = 199) then "NO HAT" else if (Id = 499) then "NORMAL" else NomObjet(Id)
+            set S += TexteEcrit(Nom, 0.5, 0.5, X, Y + 40.0, Min(26.0, 190.0 / Max(1.0, LargeurTexte(Nom, 1.0))))
+            DejaEquipe := if (Id = 199) then (if (StatsDe(J).ChapeauEquipe < 100) then true else false)
+                else if (Id = 499) then (if (StatsDe(J).MachineEquipee < 401) then true else false)
+                else Equipe(J, Id)
+            Libre := if (Id = 199 or Id = 499) then true else Possede(J, Id)
+            if (DejaEquipe?):
+                set S += TexteEcrit("EQUIPPED", 0.5, 0.5, X, Y + 108.0, 26.0)
+            else if (Libre?):
+                set S += BoutonTexteAvec(Ev, FinM, "EQUIP", 0.5, 0.5, X, Y + 108.0, 28.0, 2000 + Id)
+            else:
+                # le prix : la dent + le nombre, ou les V-Bucks
+                if (PrixDents(Id) > 0):
+                    TextePrix := "{PrixDents(Id)}"
+                    set S += array{IconeDent(0.5, 0.5, X - LargeurTexte(TextePrix, 26.0) * 0.5 - 20.0, Y + 74.0, 34.0)}
+                    set S += TexteEcrit(TextePrix, 0.5, 0.5, X + 10.0, Y + 74.0, 26.0)
                 else:
-                    set S += BoutonTexteAvec(Ev, FinM, "BUY", 0.5, 0.5, 400.0, Ligne, 32.0, 1000 + Id)
-            set Ligne += 68.0
-        set S += BoutonTexteAvec(Ev, FinM, "CLOSE", 0.5, 1.0, 0.0, -80.0, 44.0, 999)
+                    set S += TexteEcrit("{PrixVBucks(Id)} V-BUCKS", 0.5, 0.5, X, Y + 74.0, 22.0)
+                set S += BoutonTexteAvec(Ev, FinM, "BUY", 0.5, 0.5, X, Y + 112.0, 26.0, 1000 + Id)
         S
 
     # --- LES CHAPEAUX : un accessoire par joueur, colle a sa tete (partout : lobby, table, victoire)
@@ -2720,17 +2747,18 @@ hands_manager := class(creative_device):
         BoutonTexteAvec(Ev, FinEcran, S, AX, AY, X, Y, Taille, Code)
 
     # (Fin : l'evenement qui arrete le bouton quand son ecran est retire)
-    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int) : []canvas_slot =
+    # (?Fond / ?FondSurvol : un autre fond que le vert / rouge, ex. les onglets en bois ; ?Ratio : largeur / hauteur)
+    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int, ?Fond : ?texture = false, ?FondSurvol : ?texture = false, ?Ratio : float = 4.0) : []canvas_slot =
         var Slots : []canvas_slot = array{}
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
         var Claires : []texture = array{}
         # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
         Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702 or Code = 999) then true else false
-        FondN := if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
-        FondS := if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
+        FondN := if (F := Fond?) then F else if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
+        FondS := if (F := FondSurvol?) then F else if (F := Fond?) then F else if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
         HautB := Taille * 1.45
-        LargB := HautB * 4.0
+        LargB := HautB * Ratio
         # le texte tient dans le bouton (il est reduit s'il est trop long)
         Brut := LargeurTexte(S, Taille)
         T := if (Brut > LargB * 0.8) then Taille * LargB * 0.8 / Brut else Taille
