@@ -137,6 +137,36 @@ NomRang(Points : int) : string =
     Chiffre := if (Niveau = 0) then "I" else if (Niveau = 1) then "II" else "III"
     "{Nom} {Chiffre}"
 
+# l'EMBLEME du rang (dossier Rangs : Rang_<rang>_<niveau>, 0 = bronze ... 7 = unreal)
+IconeRang(Points : int)<transacts> : texture =
+    D := DivisionDe(Points)
+    if (D = 0) then Rangs.Rang_0_1
+    else if (D = 1) then Rangs.Rang_0_2
+    else if (D = 2) then Rangs.Rang_0_3
+    else if (D = 3) then Rangs.Rang_1_1
+    else if (D = 4) then Rangs.Rang_1_2
+    else if (D = 5) then Rangs.Rang_1_3
+    else if (D = 6) then Rangs.Rang_2_1
+    else if (D = 7) then Rangs.Rang_2_2
+    else if (D = 8) then Rangs.Rang_2_3
+    else if (D = 9) then Rangs.Rang_3_1
+    else if (D = 10) then Rangs.Rang_3_2
+    else if (D = 11) then Rangs.Rang_3_3
+    else if (D = 12) then Rangs.Rang_4_1
+    else if (D = 13) then Rangs.Rang_4_2
+    else if (D = 14) then Rangs.Rang_4_3
+    else if (D = 15) then Rangs.Rang_5_1
+    else if (D = 16) then Rangs.Rang_5_2
+    else if (D = 17) then Rangs.Rang_5_3
+    else if (D = 18) then Rangs.Rang_6_1
+    else if (D = 19) then Rangs.Rang_6_2
+    else if (D = 20) then Rangs.Rang_6_3
+    else Rangs.Rang_7_1
+
+# la progression dans la division (0.0 a 1.0) ; UNREAL = pleine
+ProgresRang(Points : int)<transacts> : float =
+    if (DivisionDe(Points) >= 21) then 1.0 else (if (M := Mod[Max(0, Points), 100]) then M * 0.01 else 0.0)
+
 # le debut du rang le plus haut deja atteint : on ne retombe jamais en dessous
 PlancherRang(PointsMax : int)<transacts> : int =
     D := DivisionDe(PointsMax)
@@ -1260,6 +1290,7 @@ hands_manager := class(creative_device):
                 Anchors := anchors{Minimum := vector2{X := 0.5, Y := 0.0}, Maximum := vector2{X := 0.5, Y := 0.0}},
                 Alignment := vector2{X := 0.5, Y := 0.5}, Offsets := margin{Left := 0.0, Top := 345.0, Right := 600.0, Bottom := 60.0}, ZOrder := 1}}
         set S += TexteEcrit("WINNER", 0.5, 0.0, 0.0, 265.0, 110.0)
+        set S += array{PlaceH(ImgH(IconeRang(StatsDe(G).PointsRang), 90.0, 90.0), 0.5, 0.0, -LargeurTexte(NomRang(StatsDe(G).PointsRang), 40.0) * 0.5 - 55.0, 415.0, 90.0, 90.0)}
         set S += TexteEcrit(NomRang(StatsDe(G).PointsRang), 0.5, 0.0, 0.0, 415.0, 40.0)
         canvas{Slots := S}
 
@@ -1613,7 +1644,7 @@ hands_manager := class(creative_device):
             Avertir(J, "+{GainDents + Bonus} TEETH   {Signe}{Delta} RANK POINTS")
             if (NouvelleDiv > AncienneDiv):
                 SonRang.Play()
-                AnimerPlus("RANK UP!", "P{NumeroDe(J)} IS NOW {NomRang(NouveauxPoints)}", "", J)
+                AnimerPlus("RANK UP!", "P{NumeroDe(J)} IS NOW {NomRang(NouveauxPoints)}", "", J, ?Image := option{IconeRang(NouveauxPoints)})
 
     # Dents : + ou - (jamais sous 0)
     AjouterDents(J : player, N : int) : void =
@@ -1703,8 +1734,14 @@ hands_manager := class(creative_device):
                     var S : []canvas_slot = array{PlaceZ(ImgH(Interface.Cadre_Dents, 320.0, 80.0), 1.0, 0.0, -330.0, 45.0, 0)}
                     set S += array{IconeDent(1.0, 0.0, -440.0, 45.0, 56.0)}
                     set S += TexteGauche("{A.Dents}", 1.0, 0.0, -405.0, 45.0, 40.0)
-                    set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -430.0, 95.0, 34.0)
-                    set S += TexteGauche(Defi, 1.0, 0.0, -430.0, 135.0, 20.0)
+                    set S += array{PlaceH(ImgH(IconeRang(A.PointsRang), 64.0, 64.0), 1.0, 0.0, -440.0, 112.0, 64.0, 64.0)}
+                    set S += TexteGauche(NomRang(A.PointsRang), 1.0, 0.0, -400.0, 98.0, 30.0)
+                    # la jauge vers la division suivante
+                    set S += array{PlaceZ(ImgH(Interface.Jauge_Cadre, 260.0, 32.0), 1.0, 0.0, -270.0, 132.0, 0)}
+                    Remplie := Max(18.0, 248.0 * ProgresRang(A.PointsRang))
+                    set S += array{canvas_slot{Widget := ImgH(Interface.Jauge_Remplissage, Remplie, 22.0), Anchors := anchors{Minimum := vector2{X := 1.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 0.0}},
+                        Alignment := vector2{X := 0.0, Y := 0.5}, Offsets := margin{Left := -394.0, Top := 132.0, Right := Remplie, Bottom := 22.0}, SizeToContent := false, ZOrder := 1}}
+                    set S += TexteGauche(Defi, 1.0, 0.0, -440.0, 172.0, 20.0)
                     C := canvas{Slots := S}
                     IU.AddWidget(C)
                     if (set Huds[J] = C) {}
@@ -2437,13 +2474,15 @@ hands_manager := class(creative_device):
         Action
 
     # "+2", "+3"... en GROS au milieu de l'ecran de tout le monde, qui surgit (comme un +2 d'Uno)
-    AnimerPlus(Gros : string, Ligne1 : string, Ligne2 : string, Qui : player)<suspends> : void =
+    AnimerPlus(Gros : string, Ligne1 : string, Ligne2 : string, Qui : player, ?Image : ?texture = false)<suspends> : void =
         var Calques : [player]canvas = map{}
         for (Taille : array{90.0, 190.0, 300.0, 250.0, 270.0}):
             for (X : Assis, ALaTable(X)?, IU := GetPlayerUI[X]):
                 if (Ancien := Calques[X]):
                     IU.RemoveWidget(Ancien)
                 var S : []canvas_slot = TexteEcrit(Gros, 0.5, 0.5, 0.0, -60.0, Taille)
+                if (Im := Image?):
+                    set S += array{PlaceH(ImgH(Im, Taille * 0.9, Taille * 0.9), 0.5, 0.5, 0.0, -60.0 - Taille * 0.95, Taille * 0.9, Taille * 0.9)}
                 set S += TexteEcrit(Ligne1, 0.5, 0.5, 0.0, 120.0, 52.0)
                 if (X = Qui):
                     set S += TexteEcrit(Ligne2, 0.5, 0.5, 0.0, 190.0, 44.0)
@@ -2696,7 +2735,8 @@ hands_manager := class(creative_device):
         var Ligne : float = 125.0
         for (I -> X : Assis, X <> J, Contient(Vivants, X)?):
             set S += TexteGauche("P{I + 1}", 0.0, 0.0, 110.0, Ligne, 40.0)
-            set S += TexteGauche(NomRang(StatsDe(X).PointsRang), 0.0, 0.0, 380.0, Ligne, 24.0)
+            set S += array{PlaceH(ImgH(IconeRang(StatsDe(X).PointsRang), 36.0, 36.0), 0.0, 0.0, 395.0, Ligne, 36.0, 36.0)}
+            set S += TexteGauche(NomRang(StatsDe(X).PointsRang), 0.0, 0.0, 420.0, Ligne, 24.0)
             N := NombreDe(X)
             if (N = 0):
                 set S += TexteGauche("NO CARD", 0.0, 0.0, 175.0, Ligne, 28.0)
