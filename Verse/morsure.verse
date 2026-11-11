@@ -22,6 +22,39 @@ using { BOUTON }          # TEST1 : la zone de clic UMG (copiee de Football Pill
 
 TexteJeu<localizes>(S : string) : message = "{S}"
 
+# --- LA SAUVEGARDE de chaque joueur (gardee d'une session a l'autre) ------------------------------------------
+# ATTENTION : une fois l'ile publiee, on ne peut plus retirer ni changer un champ (seulement en ajouter).
+stats_joueur := class<final><persistable>:
+    Dents : int = 0
+    PointsRang : int = 0
+    Victoires : int = 0
+    Parties : int = 0
+    DejaVuRegles : logic = false
+    DernierJourCoffre : int = 0
+    Possedes : []int = array{}          # ids des objets achetes
+    ChapeauEquipe : int = -1
+    LampeEquipee : int = 0
+    SonEquipe : int = 0
+    MachineEquipee : int = -1
+
+CopieStats<constructor>(A : stats_joueur)<transacts> := stats_joueur:
+    Dents := A.Dents
+    PointsRang := A.PointsRang
+    Victoires := A.Victoires
+    Parties := A.Parties
+    DejaVuRegles := A.DejaVuRegles
+    DernierJourCoffre := A.DernierJourCoffre
+    Possedes := A.Possedes
+    ChapeauEquipe := A.ChapeauEquipe
+    LampeEquipee := A.LampeEquipee
+    SonEquipe := A.SonEquipe
+    MachineEquipee := A.MachineEquipee
+
+var Stats : weak_map(player, stats_joueur) = map{}
+
+StatsDe(J : player)<transacts> : stats_joueur =
+    if (S := Stats[J]) then S else stats_joueur{}
+
 # --- Les cartes (id) ---------------------------------------------------------
 #  0 DEFUSE  : si tu tombes sur un piege ce tour-ci, il ne mord pas
 #  1 PEEK    : un bouton SUR devient VERT sur la machine jusqu'a la fin de ton tour
@@ -584,14 +617,18 @@ hands_manager := class(creative_device):
     # Numero de l'emplacement de materiau du bouton (0 en general)
     @editable IndexMateriau : int = 0
     # LE LOBBY : un Compteur de joueurs (Player Counter, "Utiliser la zone" coche) = l'enclos de CETTE table. Les joueurs entrent dans la zone ; des
-    # qu'ils sont au moins 2 (4 maximum), un compte a rebours de 10 s demarre ; sortir de la zone retire le joueur.
+    # qu'ils sont au moins 2 (4 maximum), un compte a rebours (AttenteLobby) demarre ; sortir de la zone retire le joueur.
     # A 0, les joueurs de la zone vont a la table. 3 tables = 3 appareils hands_manager, chacun avec SA zone.
     @editable ZoneLobby : player_counter_device = player_counter_device{}
+    # Le NUMERO de cet enclos (1, 2 ou 3). Avec moins de 5 joueurs sur le serveur, seul l'enclos 1 est ouvert.
+    @editable NumeroEnclos : int = 1
+    # Le PANNEAU au-dessus de l'enclos (un Panneau d'affichage / Billboard) : PEN 1 - 2/4 WAITING, IN GAME, FULL...
+    @editable PanneauEtat : billboard_device = billboard_device{}
     # Ou les joueurs sont renvoyes a la fin de la partie (un accessoire invisible SANS collision, pres des zones).
     # VIDE = chacun revient la ou il est apparu.
     @editable RetourLobby : []creative_prop = array{}
     # Secondes a passer dans la zone avant le depart
-    @editable AttenteLobby : float = 10.0
+    @editable AttenteLobby : float = 5.0
     # Distance max (cm) entre le regard et le centre d'un bouton pour qu'il soit vise
     # Son de rotation (Audio Player en BOUCLE, lecture automatique NON) : il joue tant que la machine tourne
     @editable SonRotation : audio_player_device = audio_player_device{}
@@ -658,9 +695,9 @@ hands_manager := class(creative_device):
     @editable PiegesParGrille : int = 2
     # a la table : on peut tourner la tete de ce nombre de degres a gauche et a droite de la machine, pas plus
     @editable LimiteTete : float = 70.0
-    @editable DureeTour : float = 25.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
-    @editable DureeChoixDepart : float = 30.0    # debut de manche : temps pour choisir ses 3 cartes
-    @editable DureeChoixCarte : float = 25.0     # temps pour choisir la carte a jouer et ce qu'on annonce
+    @editable DureeTour : float = 15.0           # temps pour appuyer (le choix de la carte et l'annonce en plus)
+    @editable DureeChoixDepart : float = 15.0    # debut de manche : temps pour choisir ses 3 cartes
+    @editable DureeChoixCarte : float = 12.0     # temps pour choisir la carte a jouer et ce qu'on annonce
     @editable AngleFermeture : float = 60.0      # degres pour fermer COMPLETEMENT la machoire
     @editable AxeFermeture : int = 0             # 0 = X, 1 = Y, 2 = Z (change si elle tourne dans le mauvais sens)
     @editable Enfoncement : float = 3.0          # cm : un bouton appuye descend de ca
@@ -697,6 +734,10 @@ hands_manager := class(creative_device):
     var DefiRelique : int = 0
     var DefiAuteur : int = 0                     # numero (P1, P2...) de celui qui annonce
     var Penalites : [player]int = map{}          # boutons en plus au prochain tour (mauvaise accusation)
+    var EnPartie : logic = false                 # une partie (ou l'ecran PLAY AGAIN) est en cours a cette table
+    var PhaseJeu : logic = false                 # les tours ont commence : on peut REJOINDRE s'il reste une place
+    var IndexTour : int = 0                      # place dans Vivants du joueur dont c'est le tour
+    var ChoixFin : [player]int = map{}           # ecran de fin : 701 = PLAY AGAIN, 702 = BACK TO LOBBY
 
     OnBegin<override>()<suspends> : void =
         set BaseTouches = for (T : Touches) do T.GetTransform()
@@ -727,18 +768,36 @@ hands_manager := class(creative_device):
         BoutonRetourLobby.InteractedWithEvent.Subscribe(QuandRetourLobby)
         ZoneLobby.CountedEvent.Subscribe(EntreZone)
         ZoneLobby.RemovedEvent.Subscribe(SortZone)
+        spawn{ PanneauEnBoucle() }
         loop:
-            Table0 := Lobby()
-            # la partie commence : les joueurs partis jouer restent COMPTES dans le compteur de l'enclos (il affiche
-            # 4/4, 3/4... tant que la partie dure) ; on ne peut pas y lancer une autre partie
-            for (X : Table0):
-                ZoneLobby.Register(X)
-            race:
-                Manche(Table0)
-                ZonePendantPartie()
-                GarderEnPlace()
-                LimiterLaTete()
-            ZoneLobby.UnregisterAll()
+            var Groupe : []player = Lobby()
+            # PLAY AGAIN : tant qu'au moins 2 joueurs restent (avec ceux qui attendent dans la zone), on rejoue
+            loop:
+                set EnPartie = true
+                race:
+                    Manche(Groupe)
+                    ZonePendantPartie()
+                    GarderEnPlace()
+                    LimiterLaTete()
+                set PhaseJeu = false
+                Restants := FinDePartie()
+                Requis := if (TestSolo?) then 1 else Min(PlacesMax(), Max(2, JoueursMinimum))
+                PlacesLibres := PlacesMax() - Restants.Length
+                Ajout := for (K -> J : DansZone, K < PlacesLibres, EstLa(J)?) do J
+                if (Restants.Length > 0, Restants.Length + Ajout.Length >= Requis):
+                    set DansZone = for (J : DansZone, not Contient(Ajout, J)?) do J
+                    for (J : Ajout):
+                        AfficherLobby(J, "")
+                    set Groupe = Restants + Ajout
+                    set Table = Groupe
+                    set DejaRentres = array{}
+                else:
+                    # pas assez de monde : celui qui reste retourne attendre dans la zone de sa table
+                    set EnPartie = false
+                    set Table = array{}
+                    set DejaRentres = array{}
+                    AttendreDansZone(Restants)
+                    break
             Sleep(1.0)
 
     # =========================================================================
@@ -761,7 +820,8 @@ hands_manager := class(creative_device):
     # attend que 2 a 4 joueurs restent AttenteLobby secondes dans la zone ; rend la liste des joueurs qui partent
     Lobby()<suspends> : []player =
         set Table = array{}
-        Max4 := Min(4, Max(1, Places.Length))
+        set EnPartie = false
+        Max4 := PlacesMax()
         Requis := if (TestSolo?) then 1 else Min(Max4, Max(2, JoueursMinimum))
         var Reste : float = AttenteLobby
         var Partants : []player = array{}
@@ -770,7 +830,12 @@ hands_manager := class(creative_device):
             for (J -> T : Affiches, not Contient(DansZone, J)?):
                 if (set Affiches[J] = "") {}
             Groupe := for (K -> J : DansZone, K < Max4) do J
-            if (Groupe.Length >= Requis):
+            if (EnclosFerme()?):
+                # peu de monde sur le serveur : tout le monde attend a l'enclos 1
+                set Reste = AttenteLobby
+                for (J : DansZone):
+                    AfficherLobby(J, "CLOSED - GO TO PEN 1")
+            else if (Groupe.Length >= Requis):
                 if (Reste <= 0.0):
                     set Partants = Groupe
                     break
@@ -783,7 +848,7 @@ hands_manager := class(creative_device):
             else:
                 set Reste = AttenteLobby
                 for (J : DansZone):
-                    AfficherLobby(J, "{DansZone.Length}/{Max4} PLAYERS  -  WAITING FOR A FRIEND")
+                    AfficherLobby(J, "{DansZone.Length}/{Max4} WAITING|INVITE A FRIEND!")
             Sleep(0.25)
         for (J : DansZone):
             AfficherLobby(J, "")
@@ -792,12 +857,155 @@ hands_manager := class(creative_device):
         Partants
 
     # pendant la partie de CETTE table, ceux qui entrent dans sa zone sont prevenus
+    # REJOINDRE EN COURS : s'il reste une place (moins de 4 joueurs en jeu), celui qui entre dans la zone est assis
+    # tout de suite avec 3 cartes au hasard ; il joue en dernier dans ce tour de table
     ZonePendantPartie()<suspends> : void =
         loop:
             set DansZone = for (J : DansZone, EstLa(J)?, J.GetFortCharacter[]) do J
             for (J : DansZone):
-                AfficherLobby(J, "GAME IN PROGRESS  -  TRY ANOTHER ZONE")
+                if (not PhaseJeu?):
+                    AfficherLobby(J, "GAME STARTING - YOU CAN JOIN IN A MOMENT")
+                else if (Vivants.Length < PlacesMax(), PlacesLibresTable().Length > 0):
+                    Rejoindre(J)
+                else:
+                    AfficherLobby(J, "TABLE FULL - TRY ANOTHER PEN")
             Sleep(0.5)
+
+    # les places de la table qu'aucun joueur EN JEU n'occupe
+    PlacesLibresTable()<transacts> : []int =
+        Prises := for (X : Vivants, P := PlaceDe[X]) do P
+        for (K := 0..Places.Length - 1, not ContientEntier(Prises, K)?) do K
+
+    PlacesMax()<transacts> : int = Min(4, Max(1, Places.Length))
+
+    Rejoindre(J : player) : void =
+        Libres := PlacesLibresTable()
+        if (P := Libres[GetRandomInt(0, Libres.Length - 1)]):
+            set DansZone = for (X : DansZone, X <> J) do X
+            AfficherLobby(J, "")
+            if (not Contient(Table, J)?):
+                set Table += array{J}
+            set DejaRentres = for (X : DejaRentres, X <> J) do X
+            if (not Contient(Assis, J)?):
+                set Assis += array{J}
+            if (set PlaceDe[J] = P) {}
+            # il joue en DERNIER dans ce tour de table : juste avant le joueur actuel (dans le sens du jeu)
+            Pos := if (Sens > 0) then IndexTour else IndexTour + 1
+            var Nouvelle : []player = array{}
+            for (K -> X : Vivants):
+                if (K = Pos):
+                    set Nouvelle += array{J}
+                set Nouvelle += array{X}
+            if (Pos >= Vivants.Length):
+                set Nouvelle += array{J}
+            set Vivants = Nouvelle
+            if (Sens > 0):
+                set IndexTour += 1
+            # 3 cartes au hasard (pas d'ecran de choix)
+            MainJ := for (K -> Id : Shuffle(TirerOffre()), K < 3) do Id
+            if (set Paquets[J] = MainJ) {}
+            if (Perso := J.GetFortCharacter[]):
+                Perso.ReleaseFromStasis()
+                Perso.Show()
+            Asseoir(J, P)
+            spawn{ VerrouArrivee(J) }
+            for (X : Table, ALaTable(X)?):
+                Avertir(X, "P{NumeroDe(J)} JOINED THE TABLE!")
+
+    # 1.6 : moins de 5 joueurs sur le serveur -> seul l'enclos 1 est ouvert
+    EnclosFerme()<transacts> : logic =
+        if (NumeroEnclos <> 1, not TestSolo?, GetPlayspace().GetPlayers().Length < 5) then true else false
+
+    # LE PANNEAU au-dessus de l'enclos, mis a jour en continu (redessine seulement s'il change)
+    PanneauEnBoucle()<suspends> : void =
+        var Avant : string = "-"
+        loop:
+            N := NumeroEnclos
+            Max4 := PlacesMax()
+            EnJeu := if (PhaseJeu?) then Vivants.Length else Table.Length
+            Texte := if (EnPartie?) then (if (EnJeu >= Max4) then "PEN {N} - FULL" else "PEN {N} - IN GAME {EnJeu}/{Max4} - JOIN!")
+                else if (EnclosFerme()?) then "PEN {N} - CLOSED - GO TO PEN 1"
+                else if (DansZone.Length > 0) then "PEN {N} - {DansZone.Length}/{Max4} WAITING"
+                else "PEN {N} - EMPTY"
+            if (Texte <> Avant):
+                set Avant = Texte
+                PanneauEtat.SetText(TexteJeu(Texte))
+            Sleep(0.5)
+
+    # celui qui reste seul apres une partie retourne attendre DANS LA ZONE de sa table
+    AttendreDansZone(Liste : []player) : void =
+        Ici := ZoneLobby.GetTransform().Translation
+        for (J : Liste, Perso := J.GetFortCharacter[]):
+            Perso.ReleaseFromStasis()
+            Perso.Show()
+            var Pose : logic = false
+            for (H : array{50.0, 100.0, 150.0}, not Pose?):
+                if (Perso.TeleportTo[Ici + vector3{X := 0.0, Y := 0.0, Z := H}, Perso.GetTransform().Rotation]):
+                    set Pose = true
+            if (not Pose?):
+                RenvoyerAuLobby(array{J})
+            if (not Contient(DansZone, J)?):
+                set DansZone += array{J}
+
+    # FIN DE PARTIE : 8 s pour tous ceux encore dans la piece (gagnant ET mordus restes) : PLAY AGAIN / BACK TO LOBBY.
+    # Renvoie ceux qui restent (PLAY AGAIN ou rien clique).
+    FinDePartie()<suspends> : []player =
+        FermerEcrans()
+        Presents := for (J : Assis, EstLa(J)?, not Contient(DejaRentres, J)?, J.GetFortCharacter[]) do J
+        set ChoixFin = map{}
+        for (J : Presents):
+            Chrono := NouveauChrono()
+            EvJ := event(int){}
+            var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.55}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
+            for (I -> Chiffre : Chrono):
+                set S += array{PlaceLibre(Chiffre, 0.5, 0.5, -20.0 + I * 40.0, -300.0)}
+            set S += TexteEcrit("PLAY AGAIN?", 0.5, 0.5, 0.0, -170.0, 110.0)
+            set S += BoutonTexteSur(EvJ, "PLAY AGAIN", 0.5, 0.5, -330.0, 60.0, 70.0, 701)
+            set S += BoutonTexteSur(EvJ, "BACK TO LOBBY", 0.5, 0.5, 330.0, 60.0, 70.0, 702)
+            Montrer(J, S, Chrono, true)
+            spawn{ SuivreChoixFin(J, EvJ) }
+        Fin := GetSimulationElapsedTime() + 8.0
+        loop:
+            Reste := Fin - GetSimulationElapsedTime()
+            MajChronos(Reste)
+            var Tous : logic = true
+            for (J : Presents, EstLa(J)?, not ChoixFin[J]):
+                set Tous = false
+            if (Reste <= 0.0 or Tous?):
+                break
+            Sleep(0.25)
+        FermerEcrans()
+        for (J : Presents):
+            AfficherLobby(J, "")
+        set Orientations = map{}
+        set PoseDe = map{}
+        for (J : Presents, EstLa(J)?, not Contient(DejaRentres, J)?) do J
+
+    SuivreChoixFin(J : player, Ev : event(int))<suspends> : void =
+        race:
+            FinEcran.Await()
+            loop:
+                C := Ev.Await()
+                if (C = 702):
+                    if (set ChoixFin[J] = 702) {}
+                    EnleverEcran(J)
+                    RenvoyerAuLobby(array{J})
+                    set DejaRentres += array{J}
+                    break
+                else if (C = 701):
+                    if (set ChoixFin[J] = 701) {}
+                    EnleverEcran(J)
+                    AfficherLobby(J, "READY!")
+                    break
+
+    # retire l'ecran d'UN joueur (sans fermer ceux des autres)
+    EnleverEcran(J : player) : void =
+        if (C := Ecrans[J], IU := GetPlayerUI[J]):
+            IU.RemoveWidget(C)
+        var Reste : [player]canvas = map{}
+        for (X -> C : Ecrans, X <> J):
+            if (set Reste[X] = C) {}
+        set Ecrans = Reste
 
     # le texte du lobby n'est redessine que s'il change (pas de clignotement)
     var Affiches : [player]string = map{}
@@ -1120,12 +1328,18 @@ hands_manager := class(creative_device):
         set Sens = 1
         set Bloque = 0
         for (I -> J : Liste):
+            # (apres une partie : un mordu etait invisible et libre, le gagnant fige)
+            if (Perso := J.GetFortCharacter[]):
+                Perso.ReleaseFromStasis()
+                Perso.Show()
             Asseoir(J, PlaceIndex(J))
             spawn{ VerrouArrivee(J) }
             if (set Paquets[J] = array{}) {}
         NouvelleGrille()
-        EcranRegles()
-        Sleep(6.0)
+        # LES REGLES : seulement pour ceux qui ne les ont jamais vues (sauvegarde)
+        AvecRegles := EcranRegles()
+        if (AvecRegles?):
+            Sleep(6.0)
         FermerEcrans()
         ChoixDepart()
         for (N := 0..2):
@@ -1133,26 +1347,31 @@ hands_manager := class(creative_device):
             Sleep(1.0)
         Bandeau("")
         # LA ROULETTE : la machine fait plusieurs tours et s'arrete sur le premier joueur (1 chance sur N)
-        var Index : int = GetRandomInt(0, Max(0, Vivants.Length - 1))
-        if (Premier := Vivants[Index]):
+        set IndexTour = GetRandomInt(0, Max(0, Vivants.Length - 1))
+        if (Premier := Vivants[IndexTour]):
             TournerVersAvec(Premier, Max(0, ToursRoulette))
+        # a partir d'ici, un joueur qui entre dans la zone peut REJOINDRE s'il reste une place
+        set PhaseJeu = true
         loop:
-            set Vivants = for (J : Vivants, EstLa(J)?) do J
+            RetirerAbsents()
             # a plusieurs : le dernier en jeu gagne. En TEST SOLO : on joue jusqu'a tomber sur un piege.
             if (Vivants.Length = 0 or (Vivants.Length = 1 and not TestSolo?)):
                 break
-            if (M := Mod[Index + Vivants.Length * 100, Vivants.Length]):
-                set Index = M
-            if (J := Vivants[Index]):
+            if (M := Mod[IndexTour + Vivants.Length * 100, Vivants.Length]):
+                set IndexTour = M
+            if (J := Vivants[IndexTour]):
                 Elimine := TourDe(J)
-                if (Elimine?):
+                # mordu, ou PARTI pendant son tour : il quitte le jeu, on passe tout de suite au suivant
+                if (Elimine? or not EstLa(J)?):
                     set Vivants = for (X : Vivants, X <> J) do X
-                    # il MEURT, reapparait, et est pose un peu au loin : de la, il regarde la partie
-                    spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
+                    if (Elimine?, EstLa(J)?):
+                        # il reste dans la piece (libre), ou rentre au lobby avec BACK TO LOBBY
+                        spawn{ DevenirSpectateur(J, Assis.Length - Vivants.Length - 1) }
                     if (Sens < 0):
-                        set Index -= 1
+                        set IndexTour -= 1
                 else:
-                    set Index += Sens
+                    set IndexTour += Sens
+        set PhaseJeu = false
         # fin de manche
         FermerEcrans()
         if (G := Vivants[0], not TestSolo?):
@@ -1165,14 +1384,20 @@ hands_manager := class(creative_device):
             else:
                 Sleep(4.0)
         Bandeau("")
-        set Orientations = map{}
-        set PoseDe = map{}
-        for (J : Assis, not Contient(DejaRentres, J)?, Perso := J.GetFortCharacter[]):
-            Perso.ReleaseFromStasis()
         EnleverCameras()
-        RenvoyerAuLobby(Assis)
-        set Table = array{}
-        set DejaRentres = array{}
+        # (la suite : l'ecran PLAY AGAIN / BACK TO LOBBY, dans FinDePartie)
+
+    # les joueurs partis du serveur quittent le jeu ; le tour reste sur le bon joueur
+    RetirerAbsents() : void =
+        var Garde : []player = array{}
+        var NouvelIndex : int = IndexTour
+        for (K -> X : Vivants):
+            if (EstLa(X)?):
+                set Garde += array{X}
+            else if (K < IndexTour):
+                set NouvelIndex -= 1
+        set Vivants = Garde
+        set IndexTour = NouvelIndex
 
     # le joueur va a sa place (debout, ou assis avec l'animation), tourne vers la machine, fige, a la premiere personne
     Asseoir(J : player, I : int, ?Annonce : logic = true) : void =
@@ -1432,6 +1657,9 @@ hands_manager := class(creative_device):
     #  renvoie true si le joueur est elimine
     # =========================================================================
     TourDe(J : player)<suspends> : logic =
+        # parti du serveur : on passe tout de suite au suivant
+        if (not EstLa(J)?):
+            return false
         TournerVers(J)
         Penalite := if (P := Penalites[J]) then P else 0
         if (set Penalites[J] = 0) {}
@@ -1462,6 +1690,9 @@ hands_manager := class(creative_device):
                     break
             else:
                 break
+        if (not EstLa(J)?):
+            FermerEcrans()
+            return false
         if (Index >= 0, Paquet := Paquets[J], Reelle := Paquet[Index]):
             # la carte quitte sa main, tout le monde la voit, et elle agit tout de suite
             RetirerRelique(J, Index)
@@ -1497,7 +1728,7 @@ hands_manager := class(creative_device):
 
             Fin := GetSimulationElapsedTime() + DureeTour
             loop:
-                if (Requis <= 0 or Elimine? or LibresRestants() = 0):
+                if (Requis <= 0 or Elimine? or LibresRestants() = 0 or not EstLa(J)?):
                     break
                 K := ViserEtCliquer(J, Requis, Vu, Fin)
                 if (K >= 0):
@@ -1555,7 +1786,13 @@ hands_manager := class(creative_device):
         if (TestSolo?):
             Avertir(J, "NO KEYPAD CAMERA NEAR YOUR PLACE - CHECK CamerasClavier")
         EcranVisee(J, Requis, Vu, false)
-        Sleep(Max(0.0, Fin - GetSimulationElapsedTime()))
+        loop:
+            if (not EstLa(J)?):
+                return -1
+            Reste := Fin - GetSimulationElapsedTime()
+            if (Reste <= 0.0):
+                break
+            Sleep(Min(0.5, Reste))
         BoutonLibre()
 
     # CAMERA FIXE : le curseur de la souris passe sur les boutons de la machine (ils deviennent blancs), un clic
@@ -1565,6 +1802,9 @@ hands_manager := class(creative_device):
         PoserZones(J)
         var Choisi : int = -1
         loop:
+            # parti : pas d'appui au hasard pour un absent
+            if (not EstLa(J)?):
+                break
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
             if (Reste <= 0.0):
@@ -1629,6 +1869,8 @@ hands_manager := class(creative_device):
         var Action : int = 1
         Fin := GetSimulationElapsedTime() + DureeChoixCarte
         loop:
+            if (not EstLa(J)?):
+                break
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
             if (Reste <= 0.0):
@@ -1680,6 +1922,8 @@ hands_manager := class(creative_device):
         EcranJouer(J, Choisie, Mensonge)
         Fin := GetSimulationElapsedTime() + DureeChoixCarte
         loop:
+            if (not EstLa(J)?):
+                break
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
             if (Reste <= 0.0):
@@ -1957,7 +2201,7 @@ hands_manager := class(creative_device):
         var Normales : []texture = array{}
         var Claires : []texture = array{}
         # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
-        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198) then true else false
+        Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702) then true else false
         FondN := if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
         FondS := if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
         HautB := Taille * 1.45
@@ -2035,7 +2279,7 @@ hands_manager := class(creative_device):
             Reste := Fin - GetSimulationElapsedTime()
             MajChronos(Reste)
             var Tous : logic = true
-            for (CD : Liste, not CD.Confirme?):
+            for (CD : Liste, not CD.Confirme?, EstLa(CD.J)?):
                 set Tous = false
             # ceux qui ont confirme voient combien de joueurs sont prets : WAITING FOR PLAYERS 1/3
             NbPrets := (for (CD : Liste, CD.Confirme?) do CD).Length
@@ -2051,11 +2295,19 @@ hands_manager := class(creative_device):
         FermerEcrans()
 
     # LES REGLES, au debut de la manche, pour tout le monde
-    EcranRegles() : void =
+    # renvoie true si au moins un joueur les voit (la manche attend alors 6 s)
+    EcranRegles() : logic =
         FermerEcrans()
         # pendant les regles : TOTALEMENT FIGE (ecran a la souris = la vue ne bouge pas), face a la machine
         RemettreDroit()
-        for (J : Assis, ALaTable(J)?):
+        var Montrees : logic = false
+        for (J : Assis, ALaTable(J)?, not StatsDe(J).DejaVuRegles?):
+            set Montrees = true
+            Ancien := StatsDe(J)
+            if:
+                set Stats[J] = stats_joueur:
+                    CopieStats<constructor>(Ancien)
+                    DejaVuRegles := true
             Chrono := NouveauChrono()
             var S : []canvas_slot = array{PlaceH(color_block{DefaultColor := color{R := 0.0, G := 0.0, B := 0.0}, DefaultOpacity := 0.75}, 0.5, 0.5, 0.0, 0.0, 3000.0, 2000.0)}
             set S += TexteEcrit("HOW TO PLAY", 0.5, 0.5, 0.0, -260.0, 100.0)
@@ -2064,6 +2316,7 @@ hands_manager := class(creative_device):
             set S += TexteEcrit("THEN PRESS A BUTTON ON THE MACHINE...", 0.5, 0.5, 0.0, 70.0, 56.0)
             set S += TexteEcrit("AND PRAY.", 0.5, 0.5, 0.0, 170.0, 80.0)
             Montrer(J, S, Chrono, true)
+        Montrees
 
     # SON CHOIX : deux gros mots, PLAY A CARD / NO CARD (et les boutons qui l'attendent, s'il y en a)
     EcranAction(Actif : player, Attente : int, PeutJouer : logic, PeutPiocher : logic) : void =
@@ -2168,6 +2421,18 @@ hands_manager := class(creative_device):
         if (IU := GetPlayerUI[J]):
             if (Ancien := Bandeaux[J]):
                 IU.RemoveWidget(Ancien)
-            C := canvas{Slots := if (EnMachine[J]?) then TexteEcrit(S, 0.0, 0.5, 330.0, 220.0, 30.0) else TexteEcrit(S, 0.5, 0.0, 0.0, 90.0, 46.0)}
+            # "LIGNE 1|LIGNE 2" : deux lignes, la 2e plus petite en dessous
+            var L1 : string = ""
+            var L2 : string = ""
+            var Apres : logic = false
+            for (Ch : S):
+                if (Ch = '|'):
+                    set Apres = true
+                else if (Apres?):
+                    set L2 += array{Ch}
+                else:
+                    set L1 += array{Ch}
+            C := canvas{Slots := if (EnMachine[J]?) then TexteEcrit(L1, 0.0, 0.5, 330.0, 220.0, 30.0) + TexteEcrit(L2, 0.0, 0.5, 330.0, 255.0, 26.0)
+                else TexteEcrit(L1, 0.5, 0.0, 0.0, 90.0, 46.0) + TexteEcrit(L2, 0.5, 0.0, 0.0, 145.0, 36.0)}
             IU.AddWidget(C)
             if (set Bandeaux[J] = C) {}
