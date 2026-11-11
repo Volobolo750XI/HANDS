@@ -2094,9 +2094,14 @@ hands_manager := class(creative_device):
     # --- LES CHAPEAUX : un accessoire par joueur, colle a sa tete (partout : lobby, table, victoire)
     # le chapeau est replace A CHAQUE IMAGE, un peu en avant dans le sens ou le joueur bouge (sa vitesse) : il
     # compense le petit retard du reseau et reste colle a la tete, meme en courant
+    var PosPrecedente : [player]vector3 = map{}
     ChapeauxEnBoucle()<suspends> : void =
+        var TempsPrecedent : float = GetSimulationElapsedTime()
         loop:
             Sleep(0.0)
+            Maintenant := GetSimulationElapsedTime()
+            Dt := Maintenant - TempsPrecedent
+            set TempsPrecedent = Maintenant
             Caches := if (L := Invisibles[GetSession()]) then L else array{}
             for (J : GetPlayspace().GetPlayers()):
                 Voulu := StatsDe(J).ChapeauEquipe
@@ -2120,8 +2125,13 @@ hands_manager := class(creative_device):
                         Chapeau.Show()
                         F := Perso.GetViewRotation().GetLocalForward()
                         Lacet := ArcTan(F.Y, F.X) * 180.0 / PiFloat
-                        Avance := Perso.GetVelocity() * AvanceChapeau
-                        if (Chapeau.TeleportTo[Perso.GetTransform().Translation + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
+                        # sa vitesse = son deplacement depuis l'image d'avant (pas d'avance apres une teleportation)
+                        Ici := Perso.GetTransform().Translation
+                        Avant := if (P := PosPrecedente[J]) then P else Ici
+                        Bouge := Ici - Avant
+                        Avance := if (Dt > 0.001, Bouge.Length() < 200.0) then Bouge * (AvanceChapeau / Dt) else vector3{}
+                        if (set PosPrecedente[J] = Ici) {}
+                        if (Chapeau.TeleportTo[Ici + Avance + vector3{X := 0.0, Y := 0.0, Z := HauteurChapeau}, MakeRotationFromYawPitchRollDegrees(Lacet, 0.0, 0.0)]) {}
             # joueurs partis : leur chapeau disparait
             var Garde : [player]creative_prop = map{}
             for (X -> P : ChapeauxPortes):
