@@ -1798,7 +1798,7 @@ hands_manager := class(creative_device):
         C := canvas{}
         if (IU := GetPlayerUI[J]):
             IU.AddWidget(C, player_ui_slot{InputMode := ui_input_mode.All})
-        var Anciens : []widget = array{}
+        var AncienContenu : ?canvas = false
         loop:
             if (not EstLa(J)?):
                 break
@@ -1806,11 +1806,12 @@ hands_manager := class(creative_device):
             FinM := event(){}
             Prets := CadeauxPrets(J)
             Slots := DessinerCadeaux(J, Ev, FinM)
-            for (Sl : Slots):
-                C.AddWidget(Sl)
-            for (W : Anciens):
-                C.RemoveWidget(W)
-            set Anciens = for (Sl : Slots) do Sl.Widget
+            # tout le contenu dans UN calque (voir la boutique) : plus d'images qui disparaissent
+            Contenu := canvas{Slots := Slots}
+            if (A := AncienContenu?):
+                C.RemoveWidget(A)
+            C.AddWidget(canvas_slot{Widget := Contenu, Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}})
+            set AncienContenu = option{Contenu}
             var Temps : []widget = AjouterTemps(J, C)
             var Code : int = -1
             loop:
@@ -1960,7 +1961,7 @@ hands_manager := class(creative_device):
         Ecran := canvas{}
         if (IU := GetPlayerUI[J]):
             IU.AddWidget(Ecran, player_ui_slot{InputMode := ui_input_mode.All})
-        var Anciens : []widget = array{}
+        var AncienContenu : ?canvas = false
         loop:
             if (not EstLa(J)?):
                 break
@@ -1969,12 +1970,13 @@ hands_manager := class(creative_device):
             var Slots : []canvas_slot = DessinerMenu(J, Casier, Onglet, Ev, FinM)
             if (Confirmer >= 0):
                 set Slots += DessinerConfirmation(J, Confirmer, Ev, FinM)
-            # le nouveau contenu d'abord, puis l'ancien est retire (jamais d'ecran vide)
-            for (Sl : Slots):
-                Ecran.AddWidget(Sl)
-            for (W : Anciens):
-                Ecran.RemoveWidget(W)
-            set Anciens = for (Sl : Slots) do Sl.Widget
+            # TOUT le contenu dans UN calque : l'ancien calque est retire puis le nouveau pose, dans la meme image
+            # (avant, des images reutilisees etaient retirees avec l'ancien contenu : cadres et boutons BUY disparaissaient)
+            Contenu := canvas{Slots := Slots}
+            if (A := AncienContenu?):
+                Ecran.RemoveWidget(A)
+            Ecran.AddWidget(canvas_slot{Widget := Contenu, Anchors := anchors{Minimum := vector2{X := 0.0, Y := 0.0}, Maximum := vector2{X := 1.0, Y := 1.0}}, Offsets := margin{}})
+            set AncienContenu = option{Contenu}
             # (ferme tout seul apres 90 s sans clic)
             Code := race:
                 Ev.Await()
