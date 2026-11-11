@@ -1838,7 +1838,7 @@ hands_manager := class(creative_device):
             # survol : l'onglet s'eclaircit et grossit (l'onglet ouvert reste jaune)
             FondO := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet
             FondOS := if (I = Onglet) then Interface.Onglet_Actif else Interface.Onglet_Survol
-            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?Fond := option{FondO}, ?FondSurvol := option{FondOS}, ?Ratio := 4.0)
+            set S += BoutonTexteAvec(Ev, FinM, Nom, 0.5, 0.5, (I * 1.0 - 1.0) * 320.0, -265.0, 46.0, 900 + I, ?FondPerso := option{FondO}, ?FondPersoSurvol := option{FondOS}, ?Ratio := 4.0)
         # les objets : des cartes, 4 par rangee
         var Liste : []int = array{}
         if (Casier?, Onglet = 0):
@@ -2790,15 +2790,15 @@ hands_manager := class(creative_device):
 
     # (Fin : l'evenement qui arrete le bouton quand son ecran est retire)
     # (?Fond / ?FondSurvol : un autre fond que le vert / rouge, ex. les onglets en bois ; ?Ratio : largeur / hauteur)
-    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int, ?Fond : ?texture = false, ?FondSurvol : ?texture = false, ?Ratio : float = 4.0) : []canvas_slot =
+    BoutonTexteAvec(Ev : event(int), FinB : event(), S : string, AX : float, AY : float, X : float, Y : float, Taille : float, Code : int, ?FondPerso : ?texture = false, ?FondPersoSurvol : ?texture = false, ?Ratio : float = 4.0) : []canvas_slot =
         var Slots : []canvas_slot = array{}
         var Lettres : []texture_block = array{}
         var Normales : []texture = array{}
         var Claires : []texture = array{}
         # LE FOND CARTOON : rouge pour dire non (NO CARD, LIE, BACK), vert sinon ; toujours aux proportions 4:1
         Rouge := if (Code = 411 or Code = 401 or Code = 197 or Code = 198 or Code = 702 or Code = 999) then true else false
-        FondN := if (F := Fond?) then F else if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
-        FondS := if (F := FondSurvol?) then F else if (F := Fond?) then F else if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
+        FondN := if (F := FondPerso?) then F else if (Rouge?) then Boutons.Bouton_Rouge else Boutons.Bouton_Vert
+        FondS := if (F := FondPersoSurvol?) then F else if (F := FondPerso?) then F else if (Rouge?) then Boutons.Bouton_Rouge_Survol else Boutons.Bouton_Vert_Survol
         HautB := Taille * 1.45
         LargB := HautB * Ratio
         # le texte tient dans le bouton (il est reduit s'il est trop long)
